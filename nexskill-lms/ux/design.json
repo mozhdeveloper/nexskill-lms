@@ -1,518 +1,387 @@
 {
-  "meta": {
-    "name": "Courses Dashboard Design System",
-    "version": "1.0.0",
-    "purpose": "Codify the visual and interaction language of the reference dashboard so AI agents can reliably reproduce the same look-and-feel across the NexSkill LMS ecosystem.",
-    "brandPersonality": [
-      "Modern and tech-forward",
-      "Friendly and approachable",
-      "High-trust and professional",
-      "Focused on productivity and learning outcomes"
-    ]
-  },
-
+  "version": "1.0",
+  "project": "NexSkill LMS",
+  "description": "High-level design language and component guidelines to replicate the reference dashboard look and feel.",
+  "design_principles": [
+    "Prioritize clarity and calm: low-noise surfaces, generous whitespace, and limited color accents.",
+    "Drive focus with hierarchy: bold dark headings, mid-tone body text, soft backgrounds, and strong brand accents used sparingly.",
+    "Leverage soft geometry: large rounded rectangles, circular avatars, and pill-shaped controls for a friendly but premium feel.",
+    "Maintain visual consistency: 8px spacing grid, consistent radii, and repeatable card structures across all modules.",
+    "Signal interactivity clearly: subtle elevation, brand-colored strokes, hover shadows, and clear iconography for clickable elements.",
+    "Optimize for dashboards: medium information density with strong grouping into sections and cards, each with a single primary KPI or task."
+  ],
   "foundations": {
-    "gridAndLayout": {
-      "pageMaxWidth": 1440,
-      "pageBackgroundColorRef": "surface.shell",
-      "grid": {
-        "columns": 12,
-        "gutter": 24,
-        "marginHorizontal": 32
-      },
-      "shellLayout": {
-        "sidebarWidth": 260,
-        "rightRailWidth": 320,
-        "contentGutter": 24,
-        "topPadding": 24,
-        "bottomPadding": 32,
-        "behavior": "Desktop-first three-column layout: left navigation rail, central content canvas, right contextual panel. Collapse right rail to expandable drawer on smaller breakpoints."
-      },
-      "sectionSpacing": {
-        "verticalStack": 24,
-        "sectionHeaderToContent": 16,
-        "cardSpacingWithinSections": 16
-      }
+    "layout": {
+      "page_max_width": 1440,
+      "outer_margin": 32,
+      "section_gap": 32,
+      "card_gap": 24,
+      "grid_system": "12-column layout for desktop with fixed-width left sidebar and fluid content area.",
+      "content_structure": "Left vertical navigation, right main workspace composed of horizontal bands (Live + Search, Courses, Progress + Popular content)."
     },
-
-    "colors": {
-      "palette": {
-        "primary": {
-          "500": { "value": "#7F2FE8", "usage": "Core brand purple; primary actions, active states, key accents." },
-          "400": { "value": "#A368F5", "usage": "Hover states, gradients, charts." },
-          "300": { "value": "#CA91F8", "usage": "Soft bars, backgrounds for metrics and tags." }
-        },
-        "accentPink": {
-          "500": { "value": "#FF6FD8", "usage": "Hero gradients, promotional banners, high-energy callouts." },
-          "300": { "value": "#FBA4F0", "usage": "Soft gradient transitions and highlights." }
-        },
-        "neutrals": {
-          "shell": { "value": "#F4F4F7", "usage": "Application outer background." },
-          "surface": { "value": "#FFFFFF", "usage": "Default card and panel surfaces." },
-          "surfaceMuted": { "value": "#F8F8FB", "usage": "Soft blocks, secondary chips, subtle dividers." },
-          "borderSubtle": { "value": "#ECECF2", "usage": "Card outlines, separators, table row dividers." },
-          "textPrimary": { "value": "#111111", "usage": "Primary headings and key labels." },
-          "textSecondary": { "value": "#5F6470", "usage": "Body copy, secondary labels." },
-          "textTertiary": { "value": "#9A9FB1", "usage": "Meta information, timestamps, captions." }
-        },
-        "status": {
-          "success": { "value": "#22C55E", "usage": "Positive progress, completion labels." },
-          "warning": { "value": "#FACC15", "usage": "Subtle alerts and thresholds if needed." },
-          "danger":  { "value": "#EF4444", "usage": "Destructive actions and error states, used sparingly." }
-        },
-        "overlays": {
-          "shadowSoft": { "value": "rgba(15, 23, 42, 0.06)", "usage": "Card elevation against light background." },
-          "shadowStrong": { "value": "rgba(15, 23, 42, 0.12)", "usage": "Modals, floating elements like tooltips and dropdowns." }
-        },
-        "gradients": {
-          "heroPrimary": {
-            "value": "linear-gradient(90deg, #FF6FD8 0%, #7F2FE8 60%, #A368F5 100%)",
-            "usage": "Hero banner backgrounds and high-visibility promotional tiles."
-          },
-          "chartBars": {
-            "value": "linear-gradient(180deg, #CA91F8 0%, #7F2FE8 100%)",
-            "usage": "Metric bars in the right-rail analytics component."
-          },
-          "avatarRing": {
-            "value": "conic-gradient(from 180deg, #FF6FD8 0deg, #7F2FE8 120deg, #CA91F8 240deg, #FF6FD8 360deg)",
-            "usage": "Profile ring accents for key users."
-          }
-        }
-      }
-    },
-
-    "typography": {
-      "primaryFontStack": [
-        "Inter",
-        "SF Pro Text",
-        "system-ui",
-        "-apple-system",
-        "BlinkMacSystemFont",
-        "Segoe UI",
-        "sans-serif"
-      ],
-      "scale": {
-        "display": { "fontSize": 32, "fontWeight": 700, "lineHeight": 40 },
-        "h1": { "fontSize": 24, "fontWeight": 700, "lineHeight": 32 },
-        "h2": { "fontSize": 20, "fontWeight": 600, "lineHeight": 28 },
-        "h3": { "fontSize": 18, "fontWeight": 600, "lineHeight": 24 },
-        "body": { "fontSize": 14, "fontWeight": 500, "lineHeight": 20 },
-        "bodySecondary": { "fontSize": 13, "fontWeight": 400, "lineHeight": 20 },
-        "caption": { "fontSize": 12, "fontWeight": 500, "lineHeight": 16 },
-        "overline": { "fontSize": 10, "fontWeight": 600, "letterSpacing": 0.6, "textTransform": "uppercase" }
-      },
-      "usageGuidelines": [
-        "Use bold weights (600–700) for primary titles, hero copy, and navigation labels to maintain strong hierarchy.",
-        "Use medium weights (500) for card titles, buttons, and major labels.",
-        "Use regular weights (400) for body copy and descriptions to keep the interface readable and low-friction.",
-        "Overlines and pill labels rely on small uppercase text with increased letter spacing to feel crisp and premium."
-      ]
-    },
-
-    "spacing": {
+    "spacing_scale": {
       "unit": 4,
-      "scale": {
-        "xxs": 4,
-        "xs": 8,
-        "sm": 12,
-        "md": 16,
-        "lg": 24,
-        "xl": 32,
-        "2xl": 40,
-        "3xl": 48
+      "tokens": {
+        "xs": 4,
+        "sm": 8,
+        "md": 12,
+        "lg": 16,
+        "xl": 24,
+        "2xl": 32,
+        "3xl": 40,
+        "4xl": 48
       },
-      "patterns": [
-        "Cards use 24–32 padding internally depending on content density.",
-        "Vertical gaps between stacked elements inside cards typically 8–16.",
-        "Navigation rail and right panel maintain generous padding to avoid visual congestion."
-      ]
-    },
-
-    "radius": {
-      "cardOuter": 24,
-      "cardInner": 16,
-      "chip": 999,
-      "avatar": 999,
-      "input": 999,
-      "shell": 32,
-      "guidelines": [
-        "Core visual language is soft and rounded; avoid sharp corners except for small utility elements.",
-        "Primary containers and hero sections use large radius (24–32) to feel friendly and high-end.",
-        "Interactive pills and tags are fully rounded for a modern streaming-dashboard aesthetic."
-      ]
-    },
-
-    "shadows": {
-      "card": {
-        "value": "0 18px 45px rgba(15, 23, 42, 0.08)",
-        "usage": "Main content cards and hero tiles."
-      },
-      "soft": {
-        "value": "0 6px 20px rgba(15, 23, 42, 0.06)",
-        "usage": "Small floating items such as dropdowns, tooltips, and floating action buttons."
-      },
-      "none": {
-        "value": "none",
-        "usage": "For flat elements within already elevated containers."
+      "usage": {
+        "card_padding": "Use 24px internal padding for primary cards; 16px for compact list items and controls.",
+        "section_padding": "Use 32px from page edge to content blocks and 32px vertical spacing between major sections.",
+        "element_spacing": "Use 8–16px spacing between related elements inside cards (title → subtitle → meta → controls)."
       }
     },
-
+    "radii": {
+      "tokens": {
+        "none": 0,
+        "sm": 8,
+        "md": 12,
+        "lg": 16,
+        "xl": 20,
+        "2xl": 24,
+        "pill": 999
+      },
+      "usage": {
+        "app_shell": "Apply 32px–40px outer radius to the main white container inside the gradient background (can be treated as 2xl+).",
+        "cards": "Use 24px radius on all primary cards (courses, progress, popular lectures).",
+        "inputs_and_buttons": "Use 999px pill radius for search fields, buttons, chips, and avatar outlines.",
+        "side_nav": "Use 12–16px radius for the active nav indicator pill."
+      }
+    },
+    "shadows_and_blur": {
+      "elevations": {
+        "card": "0 18px 45px rgba(15, 35, 95, 0.08)",
+        "floating_chip": "0 12px 30px rgba(20, 46, 130, 0.12)",
+        "button_primary": "0 12px 24px rgba(35, 76, 200, 0.35)"
+      },
+      "frosted_effect": "Use subtle inner gradients and very light blur-style gradients on course cards and progress cards to create a soft, semi-glass appearance. Avoid hard borders; rely on light shadows and gradients."
+    },
+    "colors": {
+      "brand": {
+        "primary": "#304DB5",
+        "primary_light": "#5E7BFF",
+        "primary_soft": "#E0E5FF",
+        "primary_dark": "#152457"
+      },
+      "background": {
+        "app_outer": "#E8ECFD",
+        "app_gradient": "radial-gradient(circle at top left, #E7F0FF 0%, #F9F0FF 45%, #E3F4FF 100%)",
+        "shell": "#FFFFFF",
+        "card": "#FFFFFF",
+        "card_tinted": "linear-gradient(135deg, rgba(232,238,255,0.95) 0%, rgba(255,236,249,0.9) 100%)",
+        "sidebar": "#FFFFFF"
+      },
+      "text": {
+        "primary": "#111827",
+        "secondary": "#5F6473",
+        "muted": "#9CA3B5",
+        "inverse": "#FFFFFF",
+        "link": "#304DB5"
+      },
+      "stroke_and_dividers": {
+        "soft_divider": "#EDF0FB",
+        "card_stroke_soft": "rgba(255,255,255,0.4)",
+        "avatar_active_ring": "#304DB5",
+        "avatar_inner_ring": "#FFFFFF"
+      },
+      "status": {
+        "success": "#22C55E",
+        "warning": "#F97316",
+        "danger": "#EF4444",
+        "info": "#38BDF8"
+      },
+      "data_visualization": {
+        "chart_primary": "#5E7BFF",
+        "chart_secondary": "#C3CCFF",
+        "chart_tertiary": "#F5C7FF",
+        "chart_background": "#F5F7FF"
+      }
+    },
+    "typography": {
+      "font_family_stack": "\"Inter\", -apple-system, BlinkMacSystemFont, \"SF Pro Text\", system-ui, sans-serif",
+      "scale": {
+        "display": {
+          "font_size": 32,
+          "line_height": 1.25,
+          "font_weight": 700
+        },
+        "h1": {
+          "font_size": 24,
+          "line_height": 1.3,
+          "font_weight": 700
+        },
+        "h2": {
+          "font_size": 20,
+          "line_height": 1.35,
+          "font_weight": 600
+        },
+        "h3": {
+          "font_size": 16,
+          "line_height": 1.35,
+          "font_weight": 600
+        },
+        "body": {
+          "font_size": 14,
+          "line_height": 1.5,
+          "font_weight": 400
+        },
+        "body_bold": {
+          "font_size": 14,
+          "line_height": 1.5,
+          "font_weight": 600
+        },
+        "caption": {
+          "font_size": 12,
+          "line_height": 1.4,
+          "font_weight": 400
+        },
+        "overline": {
+          "font_size": 11,
+          "letter_spacing": 0.06,
+          "font_weight": 500
+        }
+      },
+      "usage": {
+        "page_titles": "Use 24px–32px bold (h1/display) for section headers like 'My courses', 'My progress', and 'Popular lectures'.",
+        "card_titles": "Use 16px–18px semi-bold for card titles (course names, widgets headings).",
+        "body_copy": "Use 14px regular for descriptions, labels, and metadata.",
+        "meta_text": "Use 12px for supporting info (timestamps, durations, counts).",
+        "alignment": "Left-align all content; reserve center alignment for charts or single KPI numbers."
+      }
+    },
     "iconography": {
-      "style": "Rounded, minimal line icons with consistent stroke weight.",
-      "size": {
+      "style": "Outlined, 1.5px–2px stroke weight, rounded corners, matching brand blue and neutral gray palette.",
+      "size_tokens": {
         "sm": 16,
         "md": 20,
         "lg": 24
       },
-      "guidelines": [
-        "Icons are always secondary to labels; never rely on icons alone for critical navigation.",
-        "Use the primary purple color for active icons and neutral greys for inactive states."
-      ]
+      "usage": {
+        "sidebar": "Use 20px outlined icons to the left of each nav label.",
+        "controls": "Use 16px icons inside circular or pill buttons (play, dropdown arrows, chevrons)."
+      }
     }
   },
-
   "components": {
-    "AppShell": {
-      "role": "High-level frame that orchestrates sidebar, central content, and right contextual rail.",
-      "structure": {
-        "background": "surface.shell",
-        "contentContainer": "centered max-width card with surface.surface and shell radius",
-        "layout": "CSS grid or flex with three primary columns: sidebar, main content, right rail."
-      },
-      "spacing": {
-        "outerPadding": 24,
-        "innerPadding": 24
+    "app_shell": {
+      "description": "Primary desktop canvas housing the LMS experience.",
+      "structure": "Full-viewport gradient background with a centered white shell. Inside the shell, use a fixed-width left sidebar and fluid right content column.",
+      "layout": {
+        "shell_padding": 32,
+        "sidebar_width": 230,
+        "content_horizontal_padding": 32,
+        "content_vertical_padding": 32
       }
     },
-
-    "SidebarNav": {
-      "role": "Primary navigation and identity anchor for the learning platform.",
-      "layout": {
-        "width": 260,
-        "background": "surface.surface",
-        "sections": [
-          "Logo and brand at top",
-          "Overview nav group",
-          "Friends/contacts list",
-          "Settings and logout at bottom"
-        ],
-        "verticalSpacingBetweenSections": 32
+    "sidebar_navigation": {
+      "description": "Vertical navigation rail on the left holding logo, nav items, and user profile.",
+      "sections": [
+        "Logo and product name at the top.",
+        "Primary nav items stacked with equal spacing.",
+        "Current user mini-profile anchored at the bottom."
+      ],
+      "nav_item": {
+        "layout": "Horizontal row: icon on the left, label on the right.",
+        "spacing": "12px between icon and label; 12px vertical padding; 16px left-right padding.",
+        "typography": "14px medium for labels.",
+        "default_state": "Text in neutral gray (#5F6473), icon in matching neutral, transparent background.",
+        "active_state": "Label in brand primary, icon in brand primary, pill indicator bar or rounded capsule with brand blue and a subtle glow."
       },
-      "content": {
-        "logoLockup": "Compact wordmark with brand icon in primary purple.",
-        "navItems": "Icon + label, left-aligned, using h3/body type scale.",
-        "activeItem": {
-          "background": "surfaceMuted",
-          "indicator": "Subtle left bar or pill highlight in primary color",
-          "iconColor": "primary.500",
-          "labelColor": "textPrimary"
-        },
-        "inactiveItem": {
-          "background": "transparent",
-          "iconColor": "textTertiary",
-          "labelColor": "textSecondary"
-        }
-      },
-      "friendsBlock": {
-        "item": "Small avatar + name + role in two-line layout.",
-        "density": "Compact; 8–12 vertical spacing between entries."
+      "logo_lockup": {
+        "layout": "Circular brand mark on the left with product name text on the right.",
+        "spacing": "8px between logo mark and wordmark.",
+        "treatment": "Use brand primary for the mark and type; keep it light and minimal."
       }
     },
-
-    "TopSearchBar": {
-      "role": "Global course search and discovery entry point.",
+    "header_band_top": {
+      "description": "Top band with 'Live broadcasts' avatar rail on the left and 'Search course' on the right.",
       "layout": {
-        "containerWidth": "full main content width",
-        "height": 56,
-        "borderRadius": "input",
-        "paddingHorizontal": 24,
-        "background": "surface.surface",
-        "alignment": "Icon, placeholder text, right-side utility icons (filter)."
-      },
-      "visuals": {
-        "outline": "Subtle inner shadow or 1px border in borderSubtle.",
-        "placeholderText": "bodySecondary typography, textTertiary color.",
-        "icons": "Neutral when idle; primary color on focus or interaction."
+        "orientation": "Two-column horizontal layout: left block ~55%, right block ~45%.",
+        "alignment": "Vertically center-aligned within the band with 24px vertical padding."
       }
     },
-
-    "HeroBanner": {
-      "role": "Primary promotional surface for featured course or campaign.",
-      "layout": {
-        "borderRadius": "cardOuter",
+    "avatar_chip": {
+      "description": "Circular avatar with dual-ring highlight used for live broadcasts and user listing.",
+      "shape": "Circle with 999px radius.",
+      "states": {
+        "default": "Outer ring in brand primary with inner white ring and avatar photo inside.",
+        "active": "Increase outer ring thickness and add a very subtle shadow.",
+        "inactive": "Gray or soft neutral ring with lower opacity."
+      },
+      "spacing": "8px between avatar chips in a horizontal rail."
+    },
+    "chip_button": {
+      "description": "Pill-shaped secondary button such as 'More' near live broadcasts.",
+      "shape": "Pill radius (999px).",
+      "padding": "8px vertical, 20px horizontal.",
+      "typography": "14px medium.",
+      "default_state": "Soft neutral background (#F3F5FF), text in #304DB5 or #5F6473.",
+      "hover_state": "Slightly darker background and subtle shadow.",
+      "usage": "Secondary actions that complement primary CTAs but are less prominent."
+    },
+    "search_bar": {
+      "description": "Hero search for courses at the top-right.",
+      "structure": "Label 'Search course' above a pill input field with a CTA button on the right.",
+      "input_field": {
+        "shape": "Full pill radius.",
+        "background": "#F5F7FF",
+        "placeholder_text": "Muted gray (#9CA3B5), 14px.",
+        "icon": "Left-aligned search icon inside the input, 16px.",
+        "padding": "12px vertical, 20px horizontal (including icon)."
+      },
+      "primary_button": {
+        "label": "Search",
+        "background": "Brand primary gradient from #304DB5 to #5E7BFF.",
+        "text_color": "#FFFFFF",
+        "shadow": "0 12px 24px rgba(35, 76, 200, 0.35)",
+        "padding": "12px vertical, 24px horizontal.",
+        "shape": "Pill radius.",
+        "hover_state": "Slightly brighter gradient and stronger shadow.",
+        "focus_state": "Add 2px soft outer glow in primary_light."
+      },
+      "spacing": "16px horizontal gap between text field and button."
+    },
+    "section_header": {
+      "description": "Reusable pattern for rows like 'My courses', 'My progress', and 'Popular lectures'.",
+      "layout": "Left-aligned title, optional right-aligned link action such as 'View all'.",
+      "typography": {
+        "title": "20–24px bold.",
+        "action_link": "14px medium in brand primary."
+      },
+      "spacing": "16px below the header before the content block."
+    },
+    "course_card": {
+      "description": "Primary visual unit representing a course within 'My courses'.",
+      "container": {
+        "background": "Soft pastel gradient (card_tinted).",
+        "radius": 24,
         "padding": 24,
-        "height": 220,
-        "contentZones": [
-          "Left zone: course label, headline, subcopy, primary CTA.",
-          "Right zone: abstract 3D object and soft gradient background."
-        ]
+        "shadow": "card elevation",
+        "width": "Fixed width for carousel-like row; consistent height across cards."
       },
-      "visuals": {
-        "background": "gradients.heroPrimary with soft blob illustration overlay.",
-        "headline": {
-          "typographyRef": "h1",
-          "color": "#FFFFFF"
-        },
-        "subcopy": {
-          "typographyRef": "bodySecondary",
-          "color": "rgba(255,255,255,0.9)"
-        },
-        "ctaButton": {
-          "styleRef": "Button.primarySolid",
-          "contrastMode": "Dark pill (near-black) against bright gradient to maximize click salience."
-        }
-      }
-    },
-
-    "HeroStatsStrip": {
-      "role": "Horizontal row of mini-stat cards indicating watched progress for multiple tracks.",
-      "layout": {
-        "container": "Full-width white strip with 16–20 padding and large border radius.",
-        "items": "Equally spaced mini-cards with icon, progress label, and course type."
-      },
-      "miniCard": {
-        "icon": "Circular pill with subtle purple tint.",
-        "text": "Two-line stack: progress metric line + category in smaller label.",
-        "spacing": 8
-      }
-    },
-
-    "SectionHeader": {
-      "role": "Reusable pattern for section titles like Continue Watching and Your Mentor.",
-      "layout": {
-        "orientation": "Horizontal row with left-aligned title and optional right-aligned action such as See All or carousel controls.",
-        "spacing": {
-          "titleToMeta": 4,
-          "titleToActions": "flex space-between"
-        }
+      "content_structure": [
+        "Course title at the top left.",
+        "Short course description below the title.",
+        "Progress meta (e.g., 08/12) left-aligned bottom.",
+        "Progress bar at the bottom spanning most of the card width.",
+        "Compact chevron icon on the right side to indicate navigation."
+      ],
+      "progress_bar": {
+        "track_color": "#EDF0FB",
+        "fill_color": "#304DB5",
+        "height": 4,
+        "radius": 999,
+        "padding_top": 12
       },
       "typography": {
-        "title": "h2",
-        "subtitle": "bodySecondary",
-        "actions": "caption or body with primary color."
+        "title": "16px semi-bold, text_primary.",
+        "subtitle": "14px regular, text_secondary.",
+        "meta": "12px, text_secondary."
       }
     },
-
-    "CourseCardHorizontal": {
-      "role": "Primary tile for a course in Continue Watching.",
-      "layout": {
-        "borderRadius": "cardOuter",
-        "background": "surface.surface",
-        "shadow": "shadows.card",
+    "add_course_card": {
+      "description": "Minimal card at the end of the course carousel used to add a new course.",
+      "container": {
+        "background": "#F5F7FF",
+        "radius": 24,
+        "border": "1px dashed rgba(48,77,181,0.25)",
+        "content_alignment": "Centered both vertically and horizontally."
+      },
+      "content": "Vertical stack: outlined plus icon and 'Add' label in brand primary."
+    },
+    "summary_widget_progress": {
+      "description": "Card under 'My progress' showing total hours and donut chart.",
+      "container": {
+        "background": "#FFFFFF",
+        "radius": 24,
+        "padding": 24,
+        "shadow": "card elevation",
+        "layout": "Two-column internal grid: left circular chart, right stats and dropdown."
+      },
+      "header_row": {
+        "left_label": "Widget title such as 'Total hours spent' (14px medium).",
+        "right_control": "Compact pill dropdown with current period label and caret icon."
+      },
+      "donut_chart": {
+        "rings": "Use 3–4 concentric rings in different pastel blues/purples.",
+        "inner_label": "Numeric KPI in center (e.g., 134) in 24px bold.",
+        "stroke_caps": "Rounded stroke ends for a soft look."
+      },
+      "stat_stack": {
+        "items": "Each stat line: bold primary number (e.g., 75/115) and small label below (e.g., Visited lectures).",
+        "spacing": "12px vertical gap between stat lines."
+      }
+    },
+    "list_card_media": {
+      "description": "Horizontally oriented media cards for 'Popular lectures'.",
+      "container": {
+        "background": "#FFFFFF",
+        "radius": 24,
         "padding": 16,
-        "structure": [
-          "Top: thumbnail or visual preview covering full width with minor radius.",
-          "Bottom: label row (category pill), course title, metadata (avatars, progress, actions)."
-        ]
-      },
-      "typography": {
-        "title": "body with fontWeight 600",
-        "meta": "caption"
-      },
-      "elements": {
-        "categoryTag": "Tag.pill with accentPink or primary color.",
-        "avatars": "Group of 3–5 overlapping avatars with subtle white border.",
-        "metricChip": "Small pill showing count (e.g., +124) in primary brand color.",
-        "optionsIcon": "Top right overflow menu icon in neutral color."
-      },
-      "hoverState": {
-        "shadow": "shadows.soft",
-        "lift": 4,
-        "cursor": "pointer",
-        "scale": 1.01
-      }
-    },
-
-    "MentorTable": {
-      "role": "Tabular listing of mentors with their course type and topics.",
-      "layout": {
-        "borderRadius": "cardOuter",
-        "background": "surface.surface",
-        "padding": 20,
-        "rowHeight": 56,
-        "columns": [
-          "Instructor name and date",
-          "Course type chip",
-          "Course title",
-          "Action icons (edit)."
-        ]
-      },
-      "visuals": {
-        "headerRow": "Muted textSecondary with uppercase captions.",
-        "rowDivider": "borderSubtle at 1px between rows.",
-        "hover": "Background switch to surfaceMuted with subtle highlight."
-      }
-    },
-
-    "RightRailProfileCard": {
-      "role": "Snapshot of current user profile and progress metrics.",
-      "layout": {
-        "borderRadius": "cardOuter",
-        "background": "surface.surface",
-        "padding": 20,
-        "stack": [
-          "Avatar with gradient ring and greeting copy.",
-          "Short motivational subtitle.",
-          "3 icon buttons representing profile shortcuts.",
-          "BarChartMetrics below as separate card."
-        ]
+        "shadow": "card elevation",
+        "layout": "Horizontal flex: avatar thumbnail, text stack, trailing play button.",
+        "gap": 16
       },
       "avatar": {
-        "size": 72,
-        "ring": "gradients.avatarRing with white inner border."
+        "shape": "Rounded rectangle or circle with 12–16px radius.",
+        "size": 40
       },
-      "iconButtons": {
-        "styleRef": "IconButton.circular",
-        "distribution": "Evenly spaced horizontally."
-      }
+      "text_block": {
+        "title": "14px medium in text_primary.",
+        "meta": "12px regular in text_muted (time duration and icons).",
+        "spacing": "4px gap between title and meta."
+      },
+      "play_button": {
+        "shape": "Circular, 40px.",
+        "background": "#F5F7FF",
+        "icon_color": "#304DB5",
+        "shadow": "Soft drop shadow to signal clickability.",
+        "hover_state": "Slight increase in background brightness and a subtle scale-up."
+      },
+      "stacking": "Arrange 3–4 list_card_media vertically with 12–16px gap between cards."
     },
-
-    "BarChartMetrics": {
-      "role": "Visual representation of learning progress over time.",
-      "layout": {
-        "borderRadius": "cardOuter",
-        "background": "surface.surface",
-        "padding": 16,
-        "orientation": "Horizontal bars increasing from left to right."
-      },
-      "visuals": {
-        "bars": "Use gradients.chartBars with varying heights.",
-        "baseline": "Subtle neutral gridline.",
-        "labels": "Minimal; rely mostly on visual trend rather than detailed numeric ticks."
-      }
+    "dropdown_pill": {
+      "description": "Compact dropdown used for date ranges (e.g., June 2020).",
+      "shape": "Pill radius with subtle shadow.",
+      "background": "#F5F7FF",
+      "border": "None or 1px soft stroke (#E2E6FB).",
+      "padding": "6px vertical, 12px horizontal.",
+      "icon": "Chevron-down at the right end, 12–14px.",
+      "text_style": "12–14px medium in text_secondary."
     },
-
-    "RightRailMentorList": {
-      "role": "Scrollable list of suggested mentors with follow actions.",
-      "itemLayout": {
-        "background": "surface.surface with optional alternating tinted rows.",
-        "structure": "Avatar, name, role stacked vertically, Follow CTA aligned right.",
-        "paddingVertical": 12,
-        "paddingHorizontal": 12
+    "footer_profile": {
+      "description": "User profile summary anchored at the bottom-left of the sidebar.",
+      "layout": "Avatar on the left, text stack (name + role) on the right.",
+      "avatar": {
+        "size": 32,
+        "shape": "Circle",
+        "border": "Optional subtle primary ring."
       },
-      "followButton": {
-        "styleRef": "Button.primaryPill",
-        "width": 80
+      "typography": {
+        "name": "14px medium.",
+        "role": "12px muted gray."
       },
-      "seeAllButton": {
-        "position": "Pinned at bottom of card as full-width pill.",
-        "style": "Secondary button with primary outline."
-      }
+      "spacing": "8px between avatar and text stack; 16px padding around the block."
     },
-
-    "Buttons": {
-      "primarySolid": {
-        "background": "primary.500",
-        "textColor": "#FFFFFF",
-        "radius": 999,
-        "paddingHorizontal": 20,
-        "paddingVertical": 10,
-        "typographyRef": "body",
-        "shadow": "shadows.soft",
-        "hover": {
-          "background": "primary.400",
-          "shadow": "shadows.card"
-        }
-      },
-      "secondaryGhost": {
-        "background": "transparent",
-        "textColor": "primary.500",
-        "border": "1px solid primary.300",
-        "radius": 999,
-        "hover": {
-          "background": "surfaceMuted"
-        }
-      },
-      "tertiaryIcon": {
-        "background": "surfaceMuted",
-        "textColor": "textSecondary",
-        "radius": 999,
-        "iconOnly": true,
-        "size": 32
-      }
+    "scroll_behavior": {
+      "description": "Ensure scroll only appears on the main content when necessary.",
+      "guidelines": [
+        "Sidebar should remain fixed; only the right content column scrolls.",
+        "Sections maintain generous top and bottom padding so cards never touch shell edges.",
+        "Avoid visible scrollbars on individual cards; use full-page scroll for simplicity."
+      ]
     },
-
-    "TagsAndChips": {
-      "courseTypeTag": {
-        "background": "rgba(127,47,232,0.08)",
-        "borderRadius": 999,
-        "paddingHorizontal": 10,
-        "paddingVertical": 4,
-        "textColor": "primary.500",
-        "typographyRef": "caption"
-      },
-      "statusPill": {
-        "background": "surfaceMuted",
-        "borderRadius": 999,
-        "paddingHorizontal": 12,
-        "paddingVertical": 4,
-        "textColor": "textSecondary"
-      }
-    },
-
-    "Inputs": {
-      "searchInput": {
-        "height": 56,
-        "background": "surface.surface",
-        "borderColor": "borderSubtle",
-        "radius": 999,
-        "paddingHorizontal": 24,
-        "iconInset": "Left search icon, right filter icon.",
-        "focusState": {
-          "borderColor": "primary.400",
-          "shadow": "0 0 0 1px rgba(127,47,232,0.15)"
-        }
-      }
-    },
-
-    "Avatars": {
-      "sizes": {
-        "xs": 24,
-        "sm": 32,
-        "md": 40,
-        "lg": 64
-      },
-      "style": {
-        "shape": "circle",
-        "border": "2px solid #FFFFFF when overlapping",
-        "groupOverlapOffset": 8
-      }
-    },
-
-    "IconButton": {
-      "circular": {
-        "size": 40,
-        "radius": 999,
-        "background": "surfaceMuted",
-        "iconColor": "textSecondary",
-        "hoverBackground": "rgba(127,47,232,0.06)",
-        "activeIconColor": "primary.500"
-      }
-    },
-
-    "CarouselControls": {
-      "role": "Horizontal course scroller navigation.",
-      "layout": {
-        "position": "Right-aligned in section header",
-        "controls": "Previous and next icon buttons."
-      },
-      "style": {
-        "buttonRef": "IconButton.circular",
-        "disabledState": "Lower opacity, no shadow."
-      }
+    "interaction_states": {
+      "focus": "Apply a 2px soft outline in primary_soft or primary_light for keyboard focus on inputs and buttons.",
+      "hover": "Increase elevation slightly, brighten backgrounds, and adjust icon/text color subtly toward brand primary.",
+      "active": "Slightly darken the button or card background and compress the shadow to indicate press state.",
+      "disabled": "Reduce opacity to ~40% and remove shadows."
     }
-  },
-
-  "principles": [
-    "Prioritize clarity over decoration: every visual choice must support discoverability of courses, actions, or progress.",
-    "Maintain a consistent three-column mental model: left for navigation, center for task execution, right for contextual insight and recommendations.",
-    "Lean into white space to prevent cognitive overload; never overpack a card or panel.",
-    "Use primary purple and pink gradients as strategic accents, not as defaults; they should highlight the most important actions and narratives on the screen.",
-    "Keep typography hierarchy disciplined: no more than three sizes in any given panel (title, body, meta).",
-    "All components should read as part of a cohesive card ecosystem: white surfaces, soft shadows, rounded corners, and aligned internal padding.",
-    "Motion should be subtle and functional: small hover lifts, fades, and slides that reinforce interactivity without distracting from the learning content.",
-    "Icons are supportive, not leading: pair them with labels and maintain consistent positioning and sizing across navigation and actions.",
-    "Use chips, tags, and pills to encode metadata (course type, counts, statuses) in a glanceable way; avoid long sentences when a compact label will do.",
-    "Right rail content should always feel like an assistant: profile info, metrics, and suggested mentors that complement, not compete with, the central learning tasks."
-  ]
+  }
 }
