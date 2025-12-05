@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import StudentAuthLayout from '../../layouts/StudentAuthLayout';
 import { useAuth } from '../../context/AuthContext';
-import { allRoles, labelByRole, roleIcons, type UserRole } from '../../types/roles';
+import { allRoles, labelByRole, roleIcons, defaultLandingRouteByRole, type UserRole } from '../../types/roles';
 
 const Login: React.FC = () => {
   const { loginMock } = useAuth();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -25,11 +26,15 @@ const Login: React.FC = () => {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Use the display name or fallback to email
-    const displayName = formData.name.trim() || formData.email.split('@')[0] || 'User';
+    // Use the display name or fallback to role name
+    const displayName = formData.name.trim() || labelByRole[selectedRole];
     
-    // Mock login with selected role
+    // Mock login with selected role - no validation required
     loginMock(displayName, selectedRole);
+    
+    // Navigate to the appropriate dashboard based on role
+    const defaultRoute = defaultLandingRouteByRole[selectedRole];
+    navigate(defaultRoute);
   };
 
   const handleSocialLogin = (provider: string) => {
@@ -37,6 +42,10 @@ const Login: React.FC = () => {
     console.log(`Logging in with ${provider} as ${selectedRole}`);
     const displayName = `${provider} User`;
     loginMock(displayName, selectedRole);
+    
+    // Navigate to the appropriate dashboard based on role
+    const defaultRoute = defaultLandingRouteByRole[selectedRole];
+    navigate(defaultRoute);
   };
 
   return (
@@ -74,11 +83,11 @@ const Login: React.FC = () => {
         </div>
 
         {/* Login Form */}
-        <form onSubmit={handleLogin} className="space-y-5">
+        <form onSubmit={handleLogin} className="space-y-5" noValidate>
           {/* Display Name Input */}
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-text-primary mb-2">
-              Display Name
+              Display Name (Optional)
             </label>
             <input
               type="text"
@@ -88,17 +97,16 @@ const Login: React.FC = () => {
               onChange={handleInputChange}
               placeholder="Enter your display name"
               className="w-full px-5 py-3 bg-[#F5F7FF] rounded-full text-sm text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary-light transition-all"
-              required
             />
           </div>
 
           {/* Email Input */}
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-text-primary mb-2">
-              Email
+              Email (Optional)
             </label>
             <input
-              type="email"
+              type="text"
               id="email"
               name="email"
               value={formData.email}
@@ -111,7 +119,7 @@ const Login: React.FC = () => {
           {/* Password Input */}
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-text-primary mb-2">
-              Password
+              Password (Optional)
             </label>
             <input
               type="password"
@@ -121,7 +129,6 @@ const Login: React.FC = () => {
               onChange={handleInputChange}
               placeholder="Enter your password"
               className="w-full px-5 py-3 bg-[#F5F7FF] rounded-full text-sm text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary-light transition-all"
-              required
             />
           </div>
 
