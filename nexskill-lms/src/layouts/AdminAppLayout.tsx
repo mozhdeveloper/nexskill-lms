@@ -13,7 +13,9 @@ const AdminAppLayout: React.FC<AdminAppLayoutProps> = ({ children }) => {
     { label: 'Users', path: '/admin/users', icon: '👥' },
     { label: 'Coaches', path: '/admin/coaches', icon: '🎓' },
     { label: 'Courses', path: '/admin/courses/moderation', icon: '📚' },
+    { label: 'Funnels', path: '/admin/funnels', icon: '🎯' },
     { label: 'Finance', path: '/admin/finance', icon: '💰' },
+    { label: 'Contacts', path: '/admin/contacts', icon: '👤' },
     { label: 'CRM & Marketing', path: '/admin/crm-marketing', icon: '📢' },
     { label: 'Notifications', path: '/admin/notifications', icon: '🔔' },
     { label: 'Analytics', path: '/admin/analytics', icon: '📈' },
@@ -21,7 +23,18 @@ const AdminAppLayout: React.FC<AdminAppLayoutProps> = ({ children }) => {
     { label: 'Settings', path: '/admin/settings', icon: '⚙️' },
   ];
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) => {
+    // Exact match
+    if (location.pathname === path) return true;
+    
+    // For nested routes, check if current path starts with nav path
+    // e.g., /admin/contacts/123 should highlight /admin/contacts
+    if (path !== '/admin/dashboard' && location.pathname.startsWith(path + '/')) {
+      return true;
+    }
+    
+    return false;
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F5F7FF] via-[#FEFEFE] to-[#FFF9F5]">

@@ -48,6 +48,10 @@ import AdminCrmMarketingPage from './pages/admin/AdminCrmMarketingPage';
 import AdminNotificationsPage from './pages/admin/AdminNotificationsPage';
 import AdminSystemSettingsPage from './pages/admin/AdminSystemSettingsPage';
 import AdminAnalyticsPage from './pages/admin/AdminAnalyticsPage';
+import FunnelDashboardPage from './pages/admin/funnels/FunnelDashboardPage';
+import FunnelBuilderPage from './pages/admin/funnels/FunnelBuilderPage';
+import ContactsPage from './pages/admin/contacts/ContactsPage';
+import ContactProfilePlaceholderPage from './pages/admin/contacts/ContactProfilePlaceholderPage';
 
 function App() {
   return (
@@ -120,7 +124,11 @@ function App() {
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/users" element={<UsersManagementPage />} />
         <Route path="/admin/courses/moderation" element={<CourseModerationPage />} />
+        <Route path="/admin/funnels" element={<FunnelDashboardPage />} />
+        <Route path="/admin/funnels/:funnelId" element={<FunnelBuilderPage />} />
         <Route path="/admin/finance" element={<FinancialControlPage />} />
+        <Route path="/admin/contacts" element={<ContactsPage />} />
+        <Route path="/admin/contacts/:contactId" element={<ContactProfilePlaceholderPage />} />
         <Route path="/admin/crm-marketing" element={<AdminCrmMarketingPage />} />
         <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
         <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
