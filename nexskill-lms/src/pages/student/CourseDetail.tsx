@@ -184,8 +184,8 @@ const CourseDetail: React.FC = () => {
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="text-center">
             <div className="text-6xl mb-4">📚</div>
-            <h2 className="text-2xl font-bold text-text-primary mb-2">Course not found</h2>
-            <p className="text-text-secondary mb-6">The course you're looking for doesn't exist.</p>
+            <h2 className="text-2xl font-bold text-text-primary dark:text-dark-text-primary mb-2">Course not found</h2>
+            <p className="text-text-secondary dark:text-dark-text-secondary mb-6">The course you're looking for doesn't exist.</p>
             <Link
               to="/student/courses"
               className="inline-block px-6 py-3 bg-gradient-to-r from-brand-primary to-brand-primary-light text-white font-medium rounded-full hover:shadow-lg transition-all"
@@ -216,7 +216,7 @@ const CourseDetail: React.FC = () => {
   return (
     <StudentAppLayout>
       {/* Header */}
-      <div className="px-8 py-6 border-b border-[#EDF0FB]">
+      <div className="px-8 py-6 border-b border-[#EDF0FB] dark:border-gray-700">
         <button
           onClick={() => navigate('/student/courses')}
           className="flex items-center gap-2 text-sm text-text-secondary hover:text-brand-primary mb-4 transition-colors"
@@ -230,23 +230,23 @@ const CourseDetail: React.FC = () => {
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-2xl font-bold text-text-primary">{course.title}</h1>
+              <h1 className="text-2xl font-bold text-text-primary dark:text-dark-text-primary">{course.title}</h1>
               <span className="px-3 py-1 bg-brand-primary-soft text-brand-primary rounded-full text-xs font-medium">
                 {course.level}
               </span>
             </div>
-            <p className="text-sm text-text-secondary mb-3">{course.category}</p>
+            <p className="text-sm text-text-secondary dark:text-dark-text-secondary mb-3">{course.category}</p>
             <div className="flex items-center gap-6 text-sm">
               <div className="flex items-center gap-1">
                 <span className="text-yellow-500">★</span>
-                <span className="font-semibold text-text-primary">{course.rating}</span>
-                <span className="text-text-muted">({course.reviewCount} reviews)</span>
+                <span className="font-semibold text-text-primary dark:text-dark-text-primary">{course.rating}</span>
+                <span className="text-text-muted dark:text-dark-text-muted">({course.reviewCount} reviews)</span>
               </div>
-              <div className="flex items-center gap-1 text-text-secondary">
+              <div className="flex items-center gap-1 text-text-secondary dark:text-dark-text-secondary">
                 <span>👥</span>
                 <span>{course.studentsCount.toLocaleString()} students</span>
               </div>
-              <div className="flex items-center gap-1 text-text-secondary">
+              <div className="flex items-center gap-1 text-text-secondary dark:text-dark-text-secondary">
                 <span>⏱️</span>
                 <span>{course.duration}</span>
               </div>
@@ -261,7 +261,7 @@ const CourseDetail: React.FC = () => {
           {/* Left: Tabbed Content */}
           <div className="flex-1 min-w-0">
             {/* Tab Bar */}
-            <div className="flex gap-2 mb-6 border-b border-[#EDF0FB]">
+            <div className="flex gap-2 mb-6 border-b border-[#EDF0FB] dark:border-gray-700">
               {(['overview', 'curriculum', 'reviews', 'coach'] as const).map((tab) => (
                 <button
                   key={tab}
@@ -278,33 +278,33 @@ const CourseDetail: React.FC = () => {
             </div>
 
             {/* Tab Content */}
-            <div className="bg-white rounded-3xl shadow-card p-8">
+            <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-card dark:bg-dark-background-card p-8">
               {activeTab === 'overview' && (
                 <div className="space-y-8">
                   <div>
-                    <h3 className="text-lg font-semibold text-text-primary mb-4">About this course</h3>
+                    <h3 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary mb-4">About this course</h3>
                     <p className="text-text-secondary leading-relaxed">{course.description}</p>
                   </div>
 
                   <div>
-                    <h3 className="text-lg font-semibold text-text-primary mb-4">What you'll learn</h3>
+                    <h3 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary mb-4">What you'll learn</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {course.whatYouLearn.map((item: string, index: number) => (
                         <div key={index} className="flex items-start gap-3">
                           <span className="text-green-500 mt-1">✓</span>
-                          <span className="text-sm text-text-secondary">{item}</span>
+                          <span className="text-sm text-text-secondary dark:text-dark-text-secondary">{item}</span>
                         </div>
                       ))}
                     </div>
                   </div>
 
                   <div>
-                    <h3 className="text-lg font-semibold text-text-primary mb-4">Tools & Technologies</h3>
+                    <h3 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary mb-4">Tools & Technologies</h3>
                     <div className="flex flex-wrap gap-2">
                       {course.tools.map((tool: string) => (
                         <span
                           key={tool}
-                          className="px-4 py-2 bg-[#F5F7FF] text-brand-primary rounded-full text-sm font-medium"
+                          className="px-4 py-2 bg-[#F5F7FF] dark:bg-gray-800 text-brand-primary rounded-full text-sm font-medium"
                         >
                           {tool}
                         </span>
@@ -316,12 +316,12 @@ const CourseDetail: React.FC = () => {
 
               {activeTab === 'curriculum' && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-text-primary mb-4">Course curriculum</h3>
+                  <h3 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary mb-4">Course curriculum</h3>
                   {course.curriculum.map((module: any) => (
-                    <div key={module.id} className="border border-[#EDF0FB] rounded-2xl overflow-hidden">
+                    <div key={module.id} className="border border-[#EDF0FB] dark:border-gray-700 rounded-2xl overflow-hidden">
                       <button
                         onClick={() => toggleModule(module.id)}
-                        className="w-full flex items-center justify-between p-4 hover:bg-[#F5F7FF] transition-colors"
+                        className="w-full flex items-center justify-between p-4 hover:bg-[#F5F7FF] dark:hover:bg-gray-800 dark:bg-gray-800 transition-colors"
                       >
                         <div className="flex items-center gap-3">
                           <svg
@@ -334,9 +334,9 @@ const CourseDetail: React.FC = () => {
                           >
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>
-                          <span className="font-medium text-text-primary">{module.title}</span>
+                          <span className="font-medium text-text-primary dark:text-dark-text-primary">{module.title}</span>
                         </div>
-                        <span className="text-sm text-text-muted">{module.lessons.length} lessons</span>
+                        <span className="text-sm text-text-muted dark:text-dark-text-muted">{module.lessons.length} lessons</span>
                       </button>
 
                       {expandedModules.includes(module.id) && (
@@ -344,13 +344,13 @@ const CourseDetail: React.FC = () => {
                           {module.lessons.map((lesson: any) => (
                             <div
                               key={lesson.id}
-                              className="flex items-center justify-between py-2 px-3 hover:bg-white rounded-lg transition-colors"
+                              className="flex items-center justify-between py-2 px-3 hover:bg-white dark:bg-dark-background-card rounded-lg transition-colors"
                             >
                               <div className="flex items-center gap-3">
-                                <span className="text-text-muted">▶️</span>
-                                <span className="text-sm text-text-secondary">{lesson.title}</span>
+                                <span className="text-text-muted dark:text-dark-text-muted">▶️</span>
+                                <span className="text-sm text-text-secondary dark:text-dark-text-secondary">{lesson.title}</span>
                               </div>
-                              <span className="text-xs text-text-muted">{lesson.duration}</span>
+                              <span className="text-xs text-text-muted dark:text-dark-text-muted">{lesson.duration}</span>
                             </div>
                           ))}
                         </div>
@@ -362,17 +362,17 @@ const CourseDetail: React.FC = () => {
 
               {activeTab === 'reviews' && (
                 <div className="space-y-6">
-                  <div className="flex items-center gap-8 pb-6 border-b border-[#EDF0FB]">
+                  <div className="flex items-center gap-8 pb-6 border-b border-[#EDF0FB] dark:border-gray-700">
                     <div className="text-center">
-                      <div className="text-4xl font-bold text-text-primary mb-1">{course.rating}</div>
+                      <div className="text-4xl font-bold text-text-primary dark:text-dark-text-primary mb-1">{course.rating}</div>
                       <div className="text-yellow-500 text-xl mb-1">★★★★★</div>
-                      <div className="text-sm text-text-muted">{course.reviewCount} reviews</div>
+                      <div className="text-sm text-text-muted dark:text-dark-text-muted">{course.reviewCount} reviews</div>
                     </div>
                   </div>
 
                   <div className="space-y-6">
                     {course.reviews.map((review: any) => (
-                      <div key={review.id} className="pb-6 border-b border-[#EDF0FB] last:border-0">
+                      <div key={review.id} className="pb-6 border-b border-[#EDF0FB] dark:border-gray-700 last:border-0">
                         <div className="flex items-start gap-4">
                           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-2xl flex-shrink-0">
                             {review.avatar}
@@ -380,14 +380,14 @@ const CourseDetail: React.FC = () => {
                           <div className="flex-1">
                             <div className="flex items-center justify-between mb-2">
                               <div>
-                                <p className="font-medium text-text-primary">{review.userName}</p>
-                                <p className="text-xs text-text-muted">{review.date}</p>
+                                <p className="font-medium text-text-primary dark:text-dark-text-primary">{review.userName}</p>
+                                <p className="text-xs text-text-muted dark:text-dark-text-muted">{review.date}</p>
                               </div>
                               <div className="text-yellow-500">
                                 {'★'.repeat(review.rating)}
                               </div>
                             </div>
-                            <p className="text-sm text-text-secondary">{review.comment}</p>
+                            <p className="text-sm text-text-secondary dark:text-dark-text-secondary">{review.comment}</p>
                           </div>
                         </div>
                       </div>
@@ -403,21 +403,21 @@ const CourseDetail: React.FC = () => {
                       {course.coach.avatar}
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-xl font-bold text-text-primary mb-2">{course.coach.name}</h3>
-                      <p className="text-text-secondary mb-4">{course.coach.bio}</p>
+                      <h3 className="text-xl font-bold text-text-primary dark:text-dark-text-primary mb-2">{course.coach.name}</h3>
+                      <p className="text-text-secondary dark:text-dark-text-secondary mb-4">{course.coach.bio}</p>
                       
                       <div className="flex gap-6">
                         <div className="text-center">
-                          <div className="text-2xl font-bold text-text-primary">{course.coach.studentsCount.toLocaleString()}</div>
-                          <div className="text-xs text-text-muted">Students</div>
+                          <div className="text-2xl font-bold text-text-primary dark:text-dark-text-primary">{course.coach.studentsCount.toLocaleString()}</div>
+                          <div className="text-xs text-text-muted dark:text-dark-text-muted">Students</div>
                         </div>
                         <div className="text-center">
-                          <div className="text-2xl font-bold text-text-primary">{course.coach.coursesCount}</div>
-                          <div className="text-xs text-text-muted">Courses</div>
+                          <div className="text-2xl font-bold text-text-primary dark:text-dark-text-primary">{course.coach.coursesCount}</div>
+                          <div className="text-xs text-text-muted dark:text-dark-text-muted">Courses</div>
                         </div>
                         <div className="text-center">
-                          <div className="text-2xl font-bold text-text-primary">{course.coach.rating}</div>
-                          <div className="text-xs text-text-muted">Rating</div>
+                          <div className="text-2xl font-bold text-text-primary dark:text-dark-text-primary">{course.coach.rating}</div>
+                          <div className="text-xs text-text-muted dark:text-dark-text-muted">Rating</div>
                         </div>
                       </div>
                     </div>
@@ -429,10 +429,10 @@ const CourseDetail: React.FC = () => {
 
           {/* Right: Pricing Card */}
           <div className="w-80 flex-shrink-0">
-            <div className="bg-white rounded-3xl shadow-card p-6 sticky top-6">
+            <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-card dark:bg-dark-background-card p-6 sticky top-6">
               <div className="mb-6">
                 <div className="flex items-baseline gap-3 mb-2">
-                  <span className="text-3xl font-bold text-text-primary">${course.price}</span>
+                  <span className="text-3xl font-bold text-text-primary dark:text-dark-text-primary">${course.price}</span>
                   {course.originalPrice && (
                     <span className="text-lg text-text-muted line-through">${course.originalPrice}</span>
                   )}
@@ -474,13 +474,13 @@ const CourseDetail: React.FC = () => {
                 </div>
               )}
 
-              <div className="pt-6 border-t border-[#EDF0FB]">
-                <h4 className="text-sm font-semibold text-text-primary mb-3">This course includes:</h4>
+              <div className="pt-6 border-t border-[#EDF0FB] dark:border-gray-700">
+                <h4 className="text-sm font-semibold text-text-primary dark:text-dark-text-primary mb-3">This course includes:</h4>
                 <div className="space-y-2">
                   {course.includes.map((item: string, index: number) => (
                     <div key={index} className="flex items-start gap-2">
                       <span className="text-brand-primary mt-0.5">✓</span>
-                      <span className="text-sm text-text-secondary">{item}</span>
+                      <span className="text-sm text-text-secondary dark:text-dark-text-secondary">{item}</span>
                     </div>
                   ))}
                 </div>

@@ -75,7 +75,7 @@ const QuizResult: React.FC = () => {
       <div className="min-h-screen bg-gradient-to-br from-[#E7F0FF] via-[#F9F0FF] to-[#E3F4FF] py-8 px-6">
         <div className="max-w-4xl mx-auto">
           {/* Score summary hero card */}
-          <div className="bg-white rounded-3xl shadow-xl p-8 mb-8 text-center">
+          <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-xl p-8 mb-8 text-center">
             <div className="mb-4">
               <div
                 className={`

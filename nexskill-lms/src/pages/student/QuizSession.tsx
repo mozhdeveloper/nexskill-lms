@@ -197,7 +197,7 @@ const QuizSession: React.FC = () => {
       <div className="min-h-screen bg-gradient-to-br from-[#E7F0FF] via-[#F9F0FF] to-[#E3F4FF] py-8 px-6">
         <div className="max-w-4xl mx-auto">
           {/* Top bar */}
-          <div className="bg-white rounded-2xl shadow-md p-6 mb-6">
+          <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-md p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
               <h1 className="text-xl font-bold text-slate-900">{dummyQuiz.title}</h1>
               <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-full">
@@ -213,7 +213,7 @@ const QuizSession: React.FC = () => {
           </div>
 
           {/* Question card */}
-          <div className="bg-white rounded-3xl shadow-md p-8 mb-6">
+          <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-md p-8 mb-6">
             {currentQuestion.type === 'multiple-choice' && (
               <QuestionMultipleChoice
                 question={currentQuestion}

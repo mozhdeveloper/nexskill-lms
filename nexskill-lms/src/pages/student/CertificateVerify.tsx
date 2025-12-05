@@ -61,7 +61,7 @@ const CertificateVerify: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-[#E7F0FF] via-[#F9F0FF] to-[#E3F4FF] flex items-center justify-center p-6">
       <div className="max-w-3xl w-full">
         {/* Main Card */}
-        <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-12">
+        <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-2xl p-8 md:p-12">
           {/* Logo */}
           <div className="text-center mb-8">
             <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-[#304DB5] to-[#5E7BFF] flex items-center justify-center">

@@ -38,7 +38,7 @@ const MembershipConfirmation: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-8">
         {/* Hero Confirmation Card */}
         <div className="max-w-3xl mx-auto">
-          <div className="bg-white rounded-3xl shadow-xl p-8 md:p-12 mb-8">
+          <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-xl p-8 md:p-12 mb-8">
             {/* Success Icon */}
             <div className="text-center mb-8">
               <div

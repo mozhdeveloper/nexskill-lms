@@ -91,7 +91,7 @@ const CoachProfile: React.FC = () => {
       <StudentAppLayout>
         <div className="min-h-screen bg-gradient-to-br from-[#E7F0FF] via-[#F9F0FF] to-[#E3F4FF] pb-16">
           <div className="max-w-7xl mx-auto px-6 py-8">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
               <p className="text-lg text-slate-600 mb-4">Coach not found</p>
               <button
                 onClick={() => navigate('/student/coaching')}
@@ -122,7 +122,7 @@ const CoachProfile: React.FC = () => {
           </button>
 
           {/* Header card */}
-          <div className="bg-white rounded-2xl shadow-md border border-slate-200 p-8 mb-6">
+          <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-md border border-slate-200 p-8 mb-6">
             <div className="flex items-start gap-6 mb-6">
               <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#304DB5] to-[#5E7BFF] flex items-center justify-center text-white font-bold text-3xl flex-shrink-0">
                 {coach.name.charAt(0)}
@@ -158,13 +158,13 @@ const CoachProfile: React.FC = () => {
           </div>
 
           {/* About */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+          <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
             <h2 className="text-xl font-bold text-slate-900 mb-3">About</h2>
             <p className="text-slate-700 leading-relaxed">{coach.bio}</p>
           </div>
 
           {/* Expertise */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+          <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
             <h2 className="text-xl font-bold text-slate-900 mb-3">Areas of expertise</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {coach.expertise.map((item: string, index: number) => (
@@ -184,7 +184,7 @@ const CoachProfile: React.FC = () => {
 
           {/* Education & Experience */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-6">
               <h2 className="text-xl font-bold text-slate-900 mb-3">Education</h2>
               <ul className="space-y-2">
                 {coach.education.map((item: string, index: number) => (
@@ -196,7 +196,7 @@ const CoachProfile: React.FC = () => {
               </ul>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-6">
               <h2 className="text-xl font-bold text-slate-900 mb-3">Experience</h2>
               <ul className="space-y-2">
                 {coach.experience.map((item: string, index: number) => (
@@ -211,7 +211,7 @@ const CoachProfile: React.FC = () => {
 
           {/* Testimonials */}
           {coach.testimonials && coach.testimonials.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-6">
               <h2 className="text-xl font-bold text-slate-900 mb-4">What students say</h2>
               <div className="space-y-4">
                 {coach.testimonials.map((testimonial: any, index: number) => (

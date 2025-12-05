@@ -109,8 +109,8 @@ const CoursePlayer: React.FC = () => {
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="text-center">
             <div className="text-6xl mb-4">📚</div>
-            <h2 className="text-2xl font-bold text-text-primary mb-2">Lesson not found</h2>
-            <p className="text-text-secondary mb-6">The lesson you're looking for doesn't exist.</p>
+            <h2 className="text-2xl font-bold text-text-primary dark:text-dark-text-primary mb-2">Lesson not found</h2>
+            <p className="text-text-secondary dark:text-dark-text-secondary mb-6">The lesson you're looking for doesn't exist.</p>
             <button
               onClick={() => navigate('/student/courses')}
               className="px-6 py-3 bg-gradient-to-r from-brand-primary to-brand-primary-light text-white font-medium rounded-full hover:shadow-lg transition-all"
@@ -126,12 +126,12 @@ const CoursePlayer: React.FC = () => {
   return (
     <StudentAppLayout>
       {/* Header */}
-      <div className="px-8 py-4 border-b border-[#EDF0FB]">
+      <div className="px-8 py-4 border-b border-[#EDF0FB] dark:border-gray-700">
         <div className="flex items-start justify-between mb-2">
           <div className="flex-1">
-            <h1 className="text-xl font-bold text-text-primary mb-1">{courseData.title}</h1>
-            <h2 className="text-lg text-text-secondary mb-2">{currentLesson.title}</h2>
-            <div className="flex items-center gap-4 text-sm text-text-muted">
+            <h1 className="text-xl font-bold text-text-primary dark:text-dark-text-primary mb-1">{courseData.title}</h1>
+            <h2 className="text-lg text-text-secondary dark:text-dark-text-secondary mb-2">{currentLesson.title}</h2>
+            <div className="flex items-center gap-4 text-sm text-text-muted dark:text-dark-text-muted">
               <span>{currentLesson.moduleTitle}</span>
               <span>•</span>
               <span>Lesson {lessonId}</span>
@@ -140,7 +140,7 @@ const CoursePlayer: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="px-4 py-2 bg-[#F5F7FF] rounded-full">
+            <div className="px-4 py-2 bg-[#F5F7FF] dark:bg-gray-800 rounded-full">
               <span className="text-sm font-medium text-brand-primary">{progress}% complete</span>
             </div>
             <button

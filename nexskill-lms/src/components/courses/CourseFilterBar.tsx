@@ -26,7 +26,7 @@ const CourseFilterBar: React.FC<CourseFilterBarProps> = ({
   onSortChange,
 }) => {
   return (
-    <div className="bg-white rounded-3xl shadow-card p-6 mb-6 transition-colors">
+    <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-card p-6 mb-6 transition-colors">
       <div className="flex flex-col lg:flex-row gap-4">
         {/* Search Input */}
         <div className="flex-1">
@@ -36,10 +36,10 @@ const CourseFilterBar: React.FC<CourseFilterBarProps> = ({
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search courses"
-              className="w-full pl-12 pr-5 py-3 bg-[#F5F7FF] rounded-full text-sm text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary-light transition-all"
+              className="w-full pl-12 pr-5 py-3 bg-[#F5F7FF] dark:bg-gray-800 rounded-full text-sm text-text-primary dark:text-dark-text-primary placeholder-text-muted dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-primary-light transition-all"
             />
             <svg
-              className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted"
+              className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted dark:text-dark-text-muted"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"

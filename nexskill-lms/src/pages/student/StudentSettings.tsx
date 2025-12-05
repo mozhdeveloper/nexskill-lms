@@ -82,11 +82,11 @@ const StudentSettings: React.FC = () => {
   return (
     <StudentAppLayout>
       {/* Header */}
-      <div className="px-8 py-6 border-b border-[#EDF0FB]">
+      <div className="px-8 py-6 border-b border-[#EDF0FB] dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-text-primary mb-1">Settings</h1>
-            <p className="text-sm text-text-secondary">
+            <h1 className="text-2xl font-bold text-text-primary dark:text-dark-text-primary mb-1">Settings</h1>
+            <p className="text-sm text-text-secondary dark:text-dark-text-secondary">
               Manage your account and customize your learning experience
             </p>
           </div>
@@ -117,7 +117,7 @@ const StudentSettings: React.FC = () => {
 
         <div className="max-w-5xl mx-auto">
           {/* Tabs */}
-          <div className="bg-white rounded-2xl shadow-sm border border-[#EDF0FB] mb-6">
+          <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-[#EDF0FB] dark:border-gray-700 mb-6">
             <div className="flex overflow-x-auto">
               {tabs.map((tab) => (
                 <button
@@ -144,9 +144,9 @@ const StudentSettings: React.FC = () => {
                 <ProfileAccountSettingsForm account={accountSettings} onChange={setAccountSettings} />
                 
                 {/* Delete Account Section */}
-                <div className="bg-white rounded-2xl shadow-sm border border-red-200 p-6">
-                  <h3 className="text-lg font-bold text-text-primary mb-2">Danger Zone</h3>
-                  <p className="text-sm text-text-secondary mb-4">
+                <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-red-200 p-6">
+                  <h3 className="text-lg font-bold text-text-primary dark:text-dark-text-primary mb-2">Danger Zone</h3>
+                  <p className="text-sm text-text-secondary dark:text-dark-text-secondary mb-4">
                     Once you delete your account, there is no going back. Please be certain.
                   </p>
                   <button
@@ -163,7 +163,7 @@ const StudentSettings: React.FC = () => {
             {activeTab === 'preferences' && (
               <div className="space-y-6">
                 {/* Theme Toggle */}
-                <div className="bg-white rounded-2xl shadow-sm border border-[#EDF0FB] p-6">
+                <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-[#EDF0FB] dark:border-gray-700 p-6">
                   <ThemeToggle variant="button" showLabel={true} />
                 </div>
 
@@ -177,13 +177,13 @@ const StudentSettings: React.FC = () => {
                 <ProfileLanguagePreferences preferences={languagePrefs} onChange={setLanguagePrefs} />
                 
                 {/* Learning Preferences */}
-                <div className="bg-white rounded-2xl shadow-sm border border-[#EDF0FB] p-6">
-                  <h3 className="text-lg font-bold text-text-primary mb-4">Learning Preferences</h3>
+                <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-[#EDF0FB] dark:border-gray-700 p-6">
+                  <h3 className="text-lg font-bold text-text-primary dark:text-dark-text-primary mb-4">Learning Preferences</h3>
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-text-primary">Auto-play next lesson</p>
-                        <p className="text-xs text-text-secondary">Automatically start the next lesson when one finishes</p>
+                        <p className="text-sm font-medium text-text-primary dark:text-dark-text-primary">Auto-play next lesson</p>
+                        <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Automatically start the next lesson when one finishes</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" className="sr-only peer" defaultChecked />
@@ -192,8 +192,8 @@ const StudentSettings: React.FC = () => {
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-text-primary">Video playback speed memory</p>
-                        <p className="text-xs text-text-secondary">Remember your preferred playback speed</p>
+                        <p className="text-sm font-medium text-text-primary dark:text-dark-text-primary">Video playback speed memory</p>
+                        <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Remember your preferred playback speed</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" className="sr-only peer" defaultChecked />
@@ -202,8 +202,8 @@ const StudentSettings: React.FC = () => {
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-text-primary">Download for offline</p>
-                        <p className="text-xs text-text-secondary">Allow downloading courses for offline viewing</p>
+                        <p className="text-sm font-medium text-text-primary dark:text-dark-text-primary">Download for offline</p>
+                        <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Allow downloading courses for offline viewing</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" className="sr-only peer" />
@@ -224,9 +224,9 @@ const StudentSettings: React.FC = () => {
                 />
                 
                 {/* Email Digest Settings */}
-                <div className="bg-white rounded-2xl shadow-sm border border-[#EDF0FB] p-6">
-                  <h3 className="text-lg font-bold text-text-primary mb-4">Email Digest</h3>
-                  <p className="text-sm text-text-secondary mb-4">
+                <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-[#EDF0FB] dark:border-gray-700 p-6">
+                  <h3 className="text-lg font-bold text-text-primary dark:text-dark-text-primary mb-4">Email Digest</h3>
+                  <p className="text-sm text-text-secondary dark:text-dark-text-secondary mb-4">
                     Choose how often you want to receive email summaries
                   </p>
                   <select className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary">
@@ -242,8 +242,8 @@ const StudentSettings: React.FC = () => {
             {/* Privacy Tab */}
             {activeTab === 'privacy' && (
               <div className="space-y-6">
-                <div className="bg-white rounded-2xl shadow-sm border border-[#EDF0FB] p-6">
-                  <h3 className="text-lg font-bold text-text-primary mb-4">Profile Visibility</h3>
+                <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-[#EDF0FB] dark:border-gray-700 p-6">
+                  <h3 className="text-lg font-bold text-text-primary dark:text-dark-text-primary mb-4">Profile Visibility</h3>
                   <div className="space-y-4">
                     <div>
                       <label className="text-sm font-medium text-text-primary mb-2 block">
@@ -262,8 +262,8 @@ const StudentSettings: React.FC = () => {
                     
                     <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                       <div>
-                        <p className="text-sm font-medium text-text-primary">Show course progress</p>
-                        <p className="text-xs text-text-secondary">Display your progress publicly on your profile</p>
+                        <p className="text-sm font-medium text-text-primary dark:text-dark-text-primary">Show course progress</p>
+                        <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Display your progress publicly on your profile</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input 
@@ -278,8 +278,8 @@ const StudentSettings: React.FC = () => {
 
                     <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                       <div>
-                        <p className="text-sm font-medium text-text-primary">Show certificates</p>
-                        <p className="text-xs text-text-secondary">Display earned certificates on your profile</p>
+                        <p className="text-sm font-medium text-text-primary dark:text-dark-text-primary">Show certificates</p>
+                        <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Display earned certificates on your profile</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input 
@@ -294,8 +294,8 @@ const StudentSettings: React.FC = () => {
 
                     <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                       <div>
-                        <p className="text-sm font-medium text-text-primary">Allow direct messages</p>
-                        <p className="text-xs text-text-secondary">Let other students send you messages</p>
+                        <p className="text-sm font-medium text-text-primary dark:text-dark-text-primary">Allow direct messages</p>
+                        <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Let other students send you messages</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input 
@@ -310,13 +310,13 @@ const StudentSettings: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="bg-white rounded-2xl shadow-sm border border-[#EDF0FB] p-6">
-                  <h3 className="text-lg font-bold text-text-primary mb-4">Data & Privacy</h3>
+                <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-[#EDF0FB] dark:border-gray-700 p-6">
+                  <h3 className="text-lg font-bold text-text-primary dark:text-dark-text-primary mb-4">Data & Privacy</h3>
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-text-primary">Help improve NexSkill</p>
-                        <p className="text-xs text-text-secondary">Share anonymous usage data to improve the platform</p>
+                        <p className="text-sm font-medium text-text-primary dark:text-dark-text-primary">Help improve NexSkill</p>
+                        <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Share anonymous usage data to improve the platform</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input 
@@ -345,8 +345,8 @@ const StudentSettings: React.FC = () => {
             {/* Accessibility Tab */}
             {activeTab === 'accessibility' && (
               <div className="space-y-6">
-                <div className="bg-white rounded-2xl shadow-sm border border-[#EDF0FB] p-6">
-                  <h3 className="text-lg font-bold text-text-primary mb-4">Display Settings</h3>
+                <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-[#EDF0FB] dark:border-gray-700 p-6">
+                  <h3 className="text-lg font-bold text-text-primary dark:text-dark-text-primary mb-4">Display Settings</h3>
                   <div className="space-y-4">
                     <div>
                       <label className="text-sm font-medium text-text-primary mb-2 block">
@@ -366,8 +366,8 @@ const StudentSettings: React.FC = () => {
 
                     <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                       <div>
-                        <p className="text-sm font-medium text-text-primary">High contrast mode</p>
-                        <p className="text-xs text-text-secondary">Increase contrast for better readability</p>
+                        <p className="text-sm font-medium text-text-primary dark:text-dark-text-primary">High contrast mode</p>
+                        <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Increase contrast for better readability</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input 
@@ -382,8 +382,8 @@ const StudentSettings: React.FC = () => {
 
                     <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                       <div>
-                        <p className="text-sm font-medium text-text-primary">Reduced motion</p>
-                        <p className="text-xs text-text-secondary">Minimize animations and transitions</p>
+                        <p className="text-sm font-medium text-text-primary dark:text-dark-text-primary">Reduced motion</p>
+                        <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Minimize animations and transitions</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input 
@@ -398,13 +398,13 @@ const StudentSettings: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="bg-white rounded-2xl shadow-sm border border-[#EDF0FB] p-6">
-                  <h3 className="text-lg font-bold text-text-primary mb-4">Navigation</h3>
+                <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-[#EDF0FB] dark:border-gray-700 p-6">
+                  <h3 className="text-lg font-bold text-text-primary dark:text-dark-text-primary mb-4">Navigation</h3>
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-text-primary">Screen reader optimization</p>
-                        <p className="text-xs text-text-secondary">Optimize interface for screen readers</p>
+                        <p className="text-sm font-medium text-text-primary dark:text-dark-text-primary">Screen reader optimization</p>
+                        <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Optimize interface for screen readers</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input 
@@ -419,8 +419,8 @@ const StudentSettings: React.FC = () => {
 
                     <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                       <div>
-                        <p className="text-sm font-medium text-text-primary">Enhanced keyboard navigation</p>
-                        <p className="text-xs text-text-secondary">Enable advanced keyboard shortcuts</p>
+                        <p className="text-sm font-medium text-text-primary dark:text-dark-text-primary">Enhanced keyboard navigation</p>
+                        <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Enable advanced keyboard shortcuts</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input 
@@ -447,11 +447,11 @@ const StudentSettings: React.FC = () => {
             )}
 
             {/* Save Button */}
-            <div className="bg-white rounded-2xl shadow-sm border border-[#EDF0FB] p-6 sticky bottom-0">
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-[#EDF0FB] dark:border-gray-700 p-6 sticky bottom-0">
               <div className="flex items-center justify-between">
                 <button
                   onClick={() => navigate('/student/dashboard')}
-                  className="px-6 py-2.5 text-sm font-medium text-text-secondary hover:bg-gray-100 rounded-xl transition-colors"
+                  className="px-6 py-2.5 text-sm font-medium text-text-secondary hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
                 >
                   Cancel
                 </button>

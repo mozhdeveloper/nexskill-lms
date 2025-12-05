@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -25,6 +26,20 @@ export default {
           muted: '#9CA3B5',
           inverse: '#FFFFFF',
           link: '#304DB5',
+        },
+        dark: {
+          background: {
+            'app-outer': '#0F172A',
+            shell: '#1E293B',
+            card: '#1E293B',
+            'card-tinted': '#334155',
+          },
+          text: {
+            primary: '#F1F5F9',
+            secondary: '#CBD5E1',
+            muted: '#94A3B8',
+            inverse: '#0F172A',
+          },
         },
       },
       borderRadius: {

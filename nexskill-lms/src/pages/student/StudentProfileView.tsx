@@ -36,7 +36,7 @@ const StudentProfileView: React.FC = () => {
           {/* Left column - Bio and Interests */}
           <div className="lg:col-span-2 space-y-6">
             {/* Bio */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-6">
               <h2 className="text-xl font-bold text-slate-900 mb-3">About me</h2>
               <p className="text-slate-700 leading-relaxed">{dummyProfile.bio}</p>
             </div>
@@ -53,7 +53,7 @@ const StudentProfileView: React.FC = () => {
           {/* Right column - Metrics and Quick Actions */}
           <div className="space-y-6">
             {/* Learning Stats */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-6">
               <h2 className="text-xl font-bold text-slate-900 mb-4">Learning stats</h2>
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-3 bg-blue-50 rounded-xl">
@@ -101,7 +101,7 @@ const StudentProfileView: React.FC = () => {
             </div>
 
             {/* Quick Actions */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-6">
               <h2 className="text-xl font-bold text-slate-900 mb-4">Quick actions</h2>
               <div className="space-y-3">
                 <button

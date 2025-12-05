@@ -175,7 +175,7 @@ const ThreadView: React.FC = () => {
           </div>
 
           {/* Original post */}
-          <div className="bg-white rounded-3xl shadow-md p-8 mb-6">
+          <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-md p-8 mb-6">
             {/* Author info */}
             <div className="flex items-start gap-4 mb-6">
               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#304DB5] to-[#5E7BFF] flex items-center justify-center text-white font-semibold text-lg flex-shrink-0">

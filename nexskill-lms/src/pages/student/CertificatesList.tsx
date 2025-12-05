@@ -108,17 +108,17 @@ const CertificatesList: React.FC = () => {
 
         {/* Stats Row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-6">
             <div className="text-3xl font-bold text-[#304DB5] mb-1">{allCertificates.length}</div>
             <div className="text-sm text-slate-600">Total certificates</div>
           </div>
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-6">
             <div className="text-3xl font-bold text-[#304DB5] mb-1">
               {allCertificates.filter((c) => c.certificateType === 'Course completion').length}
             </div>
             <div className="text-sm text-slate-600">Course completions</div>
           </div>
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-6">
             <div className="text-3xl font-bold text-[#304DB5] mb-1">
               {allCertificates.filter((c) => c.certificateType === 'Specialization').length}
             </div>
@@ -127,7 +127,7 @@ const CertificatesList: React.FC = () => {
         </div>
 
         {/* Filters and Sort */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
+        <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             {/* Filter Pills */}
             <div className="flex flex-wrap gap-2">
@@ -177,7 +177,7 @@ const CertificatesList: React.FC = () => {
             ))}
           </div>
         ) : (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
+          <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
             <div className="text-slate-400 mb-4">
               <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path

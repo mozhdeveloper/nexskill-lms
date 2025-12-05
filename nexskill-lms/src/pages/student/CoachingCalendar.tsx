@@ -96,15 +96,15 @@ const CoachingCalendar: React.FC = () => {
 
           {/* Quick stats */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-6">
               <div className="text-3xl font-bold text-[#304DB5] mb-1">20+</div>
               <div className="text-sm text-slate-600">Expert coaches</div>
             </div>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-6">
               <div className="text-3xl font-bold text-[#304DB5] mb-1">$15</div>
               <div className="text-sm text-slate-600">Coaching credit available</div>
             </div>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-6">
               <div className="text-3xl font-bold text-[#304DB5] mb-1">3</div>
               <div className="text-sm text-slate-600">Upcoming sessions</div>
             </div>
@@ -121,7 +121,7 @@ const CoachingCalendar: React.FC = () => {
           </div>
 
           {/* Search and filter */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
+          <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
             <div className="flex flex-col md:flex-row gap-4">
               {/* Search input */}
               <div className="flex-1 relative">
@@ -180,7 +180,7 @@ const CoachingCalendar: React.FC = () => {
             </div>
 
             {filteredCoaches.length === 0 && (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
+              <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
                 <div className="text-slate-400 mb-4">
                   <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path

@@ -79,7 +79,7 @@ const CertificateDetail: React.FC = () => {
     return (
       <StudentAppLayout>
         <div className="flex-1 overflow-y-auto p-8">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
+          <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
             <p className="text-lg text-slate-600 mb-4">Certificate not found</p>
             <button
               onClick={() => navigate('/student/certificates')}
@@ -171,7 +171,7 @@ const CertificateDetail: React.FC = () => {
           {/* Right Column - Actions */}
           <div className="space-y-6">
             {/* Download Section */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-6">
               <h3 className="text-lg font-bold text-slate-900 mb-4">Download</h3>
               <button
                 onClick={handleDownload}
@@ -206,7 +206,7 @@ const CertificateDetail: React.FC = () => {
             <CertificateShareBar certificateId={certificate.id} />
 
             {/* Blockchain Verification */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-6">
               <h3 className="text-lg font-bold text-slate-900 mb-4">Blockchain verification</h3>
               <div className="mb-4">
                 <BlockchainVerificationBadge
@@ -228,7 +228,7 @@ const CertificateDetail: React.FC = () => {
 
             {/* Certificate Info */}
             {(certificate.score || certificate.grade) && (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-6">
                 <h3 className="text-lg font-bold text-slate-900 mb-4">Performance</h3>
                 {certificate.score && (
                   <div className="mb-3">

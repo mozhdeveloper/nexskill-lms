@@ -93,7 +93,7 @@ const StudentAccountSettings: React.FC = () => {
         </div>
 
         {/* Save Button */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+        <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-6">
           <button
             onClick={handleSave}
             className="w-full py-3 px-6 bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white font-semibold rounded-full hover:shadow-lg transition-all"

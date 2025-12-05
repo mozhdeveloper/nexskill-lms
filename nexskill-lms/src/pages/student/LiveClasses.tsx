@@ -128,18 +128,18 @@ const LiveClasses: React.FC = () => {
   return (
     <StudentAppLayout>
       {/* Header */}
-      <div className="px-8 py-6 border-b border-[#EDF0FB]">
+      <div className="px-8 py-6 border-b border-[#EDF0FB] dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-text-primary mb-1">Live Classes</h1>
-            <p className="text-sm text-text-secondary">
+            <h1 className="text-2xl font-bold text-text-primary dark:text-dark-text-primary mb-1">Live Classes</h1>
+            <p className="text-sm text-text-secondary dark:text-dark-text-secondary">
               Join interactive sessions with expert instructors
             </p>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={() => console.log('Browse all classes')}
-              className="px-4 py-2 text-sm font-medium text-text-secondary hover:bg-gray-100 rounded-lg transition-colors"
+              className="px-4 py-2 text-sm font-medium text-text-secondary hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
             >
               📅 Browse Schedule
             </button>
@@ -157,7 +157,7 @@ const LiveClasses: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-8">
         <div className="max-w-6xl mx-auto">
           {/* Tabs */}
-          <div className="bg-white rounded-2xl shadow-sm border border-[#EDF0FB] mb-6">
+          <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-[#EDF0FB] dark:border-gray-700 mb-6">
             <div className="flex">
               <button
                 onClick={() => setActiveTab('upcoming')}
@@ -198,7 +198,7 @@ const LiveClasses: React.FC = () => {
               {upcomingClasses.map((liveClass) => (
                 <div
                   key={liveClass.id}
-                  className="bg-white rounded-2xl shadow-sm border border-[#EDF0FB] p-6 hover:shadow-md transition-all"
+                  className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-[#EDF0FB] dark:border-gray-700 p-6 hover:shadow-md transition-all"
                 >
                   <div className="flex gap-6">
                     {/* Thumbnail */}
@@ -221,10 +221,10 @@ const LiveClasses: React.FC = () => {
                               {liveClass.category}
                             </span>
                           </div>
-                          <h3 className="text-lg font-bold text-text-primary mb-2">
+                          <h3 className="text-lg font-bold text-text-primary dark:text-dark-text-primary mb-2">
                             {liveClass.title}
                           </h3>
-                          <div className="flex items-center gap-4 text-sm text-text-secondary mb-3">
+                          <div className="flex items-center gap-4 text-sm text-text-secondary dark:text-dark-text-secondary mb-3">
                             <div className="flex items-center gap-1">
                               <span>👨‍🏫</span>
                               <span>{liveClass.instructor}</span>
@@ -238,7 +238,7 @@ const LiveClasses: React.FC = () => {
                               <span>{liveClass.duration}</span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 text-sm text-text-secondary">
+                          <div className="flex items-center gap-2 text-sm text-text-secondary dark:text-dark-text-secondary">
                             <span>👥 {liveClass.participants}/{liveClass.maxParticipants} registered</span>
                             <div className="w-32 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                               <div
@@ -268,7 +268,7 @@ const LiveClasses: React.FC = () => {
                         )}
                         <button
                           onClick={() => console.log('View details:', liveClass.id)}
-                          className="px-6 py-2.5 text-sm font-medium text-text-secondary hover:bg-gray-100 rounded-full transition-colors"
+                          className="px-6 py-2.5 text-sm font-medium text-text-secondary hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
                         >
                           View Details
                         </button>
@@ -286,23 +286,23 @@ const LiveClasses: React.FC = () => {
               {completedClasses.map((liveClass) => (
                 <div
                   key={liveClass.id}
-                  className="bg-white rounded-2xl shadow-sm border border-[#EDF0FB] p-6 hover:shadow-md transition-all"
+                  className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-[#EDF0FB] dark:border-gray-700 p-6 hover:shadow-md transition-all"
                 >
                   <div className="flex gap-6">
                     <div className={`w-48 h-32 rounded-xl bg-gradient-to-br ${liveClass.thumbnail} flex-shrink-0 flex items-center justify-center`}>
                       <div className="text-white text-5xl">✅</div>
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-lg font-bold text-text-primary mb-2">
+                      <h3 className="text-lg font-bold text-text-primary dark:text-dark-text-primary mb-2">
                         {liveClass.title}
                       </h3>
-                      <div className="flex items-center gap-4 text-sm text-text-secondary mb-3">
+                      <div className="flex items-center gap-4 text-sm text-text-secondary dark:text-dark-text-secondary mb-3">
                         <span>👨‍🏫 {liveClass.instructor}</span>
                         <span>📅 {liveClass.date} at {liveClass.time}</span>
                         <span>⏱️ {liveClass.duration}</span>
                         <span>⭐ {liveClass.rating}/5</span>
                       </div>
-                      <p className="text-sm text-text-secondary mb-4">
+                      <p className="text-sm text-text-secondary dark:text-dark-text-secondary mb-4">
                         {liveClass.attendees} students attended this session
                       </p>
                       <div className="flex items-center gap-3">
@@ -314,7 +314,7 @@ const LiveClasses: React.FC = () => {
                         </button>
                         <button
                           onClick={() => console.log('Download resources:', liveClass.id)}
-                          className="px-6 py-2 text-sm font-medium text-text-secondary hover:bg-gray-100 rounded-full transition-colors"
+                          className="px-6 py-2 text-sm font-medium text-text-secondary hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
                         >
                           📥 Download Resources
                         </button>
@@ -332,7 +332,7 @@ const LiveClasses: React.FC = () => {
               {recordedClasses.map((recording) => (
                 <div
                   key={recording.id}
-                  className="bg-white rounded-2xl shadow-sm border border-[#EDF0FB] overflow-hidden hover:shadow-md transition-all cursor-pointer"
+                  className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-[#EDF0FB] dark:border-gray-700 overflow-hidden hover:shadow-md transition-all cursor-pointer"
                   onClick={() => console.log('Watch recording:', recording.id)}
                 >
                   <div className={`h-40 bg-gradient-to-br ${recording.thumbnail} flex items-center justify-center`}>
@@ -345,10 +345,10 @@ const LiveClasses: React.FC = () => {
                     <h3 className="text-base font-bold text-text-primary mt-2 mb-1">
                       {recording.title}
                     </h3>
-                    <p className="text-sm text-text-secondary mb-3">
+                    <p className="text-sm text-text-secondary dark:text-dark-text-secondary mb-3">
                       by {recording.instructor}
                     </p>
-                    <div className="flex items-center justify-between text-xs text-text-secondary">
+                    <div className="flex items-center justify-between text-xs text-text-secondary dark:text-dark-text-secondary">
                       <span>⏱️ {recording.duration}</span>
                       <span>👁️ {recording.views} views</span>
                     </div>

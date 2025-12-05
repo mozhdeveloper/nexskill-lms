@@ -56,7 +56,7 @@ const StudentProfileEdit: React.FC = () => {
         )}
 
         {/* Main Form Card */}
-        <div className="bg-white rounded-3xl shadow-md border border-slate-200 p-8 mb-6">
+        <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-md border border-slate-200 p-8 mb-6">
           {/* Avatar Section */}
           <div className="mb-8 pb-8 border-b border-slate-200">
             <h2 className="text-xl font-bold text-slate-900 mb-4">Profile photo</h2>

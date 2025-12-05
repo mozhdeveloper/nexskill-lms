@@ -77,12 +77,12 @@ This is an interactive session where you can ask questions and engage with the i
                   <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse"></span>
                   LIVE NOW
                 </span>
-                <span className="text-sm text-text-secondary">
+                <span className="text-sm text-text-secondary dark:text-dark-text-secondary">
                   {classData.participants} / {classData.maxParticipants} participants
                 </span>
               </div>
-              <h1 className="text-3xl font-bold text-text-primary mb-2">{classData.title}</h1>
-              <p className="text-text-secondary">
+              <h1 className="text-3xl font-bold text-text-primary dark:text-dark-text-primary mb-2">{classData.title}</h1>
+              <p className="text-text-secondary dark:text-dark-text-secondary">
                 {classData.date} • {classData.startTime} - {classData.endTime} ({classData.duration})
               </p>
             </div>
@@ -110,7 +110,7 @@ This is an interactive session where you can ask questions and engage with the i
               <div className="flex gap-3">
                 <button
                   onClick={handleJoinClass}
-                  className="px-6 py-3 bg-white text-brand-primary font-semibold rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-2">
+                  className="px-6 py-3 bg-white text-brand-primary font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center gap-2">
                   <span>🎥</span>
                   <span>Join Live Class</span>
                 </button>
@@ -135,32 +135,32 @@ This is an interactive session where you can ask questions and engage with the i
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* About This Class */}
-            <div className="bg-white rounded-xl p-6 border border-[#EDF0FB] transition-colors">
-              <h3 className="text-xl font-bold text-text-primary mb-4">About This Class</h3>
+            <div className="bg-white dark:bg-dark-background-card rounded-xl p-6 border border-[#EDF0FB] dark:border-gray-700 transition-colors">
+              <h3 className="text-xl font-bold text-text-primary dark:text-dark-text-primary mb-4">About This Class</h3>
               <p className="text-text-primary whitespace-pre-line leading-relaxed">{classData.description}</p>
             </div>
 
             {/* Topics Covered */}
-            <div className="bg-white rounded-xl p-6 border border-[#EDF0FB] transition-colors">
-              <h3 className="text-xl font-bold text-text-primary mb-4">Topics Covered</h3>
+            <div className="bg-white dark:bg-dark-background-card rounded-xl p-6 border border-[#EDF0FB] dark:border-gray-700 transition-colors">
+              <h3 className="text-xl font-bold text-text-primary dark:text-dark-text-primary mb-4">Topics Covered</h3>
               <ul className="space-y-3">
                 {classData.topics.map((topic, index) => (
                   <li key={index} className="flex items-start gap-3">
                     <span className="text-brand-primary mt-1">✓</span>
-                    <span className="text-text-primary">{topic}</span>
+                    <span className="text-text-primary dark:text-dark-text-primary">{topic}</span>
                   </li>
                 ))}
               </ul>
             </div>
 
             {/* Requirements */}
-            <div className="bg-white rounded-xl p-6 border border-[#EDF0FB] transition-colors">
-              <h3 className="text-xl font-bold text-text-primary mb-4">What You'll Need</h3>
+            <div className="bg-white dark:bg-dark-background-card rounded-xl p-6 border border-[#EDF0FB] dark:border-gray-700 transition-colors">
+              <h3 className="text-xl font-bold text-text-primary dark:text-dark-text-primary mb-4">What You'll Need</h3>
               <ul className="space-y-3">
                 {classData.requirements.map((req, index) => (
                   <li key={index} className="flex items-start gap-3">
                     <span className="text-gray-400 mt-1">•</span>
-                    <span className="text-text-primary">{req}</span>
+                    <span className="text-text-primary dark:text-dark-text-primary">{req}</span>
                   </li>
                 ))}
               </ul>
@@ -170,23 +170,23 @@ This is an interactive session where you can ask questions and engage with the i
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Instructor Info */}
-            <div className="bg-white rounded-xl p-6 border border-[#EDF0FB] transition-colors">
-              <h3 className="text-lg font-bold text-text-primary mb-4">Your Instructor</h3>
+            <div className="bg-white dark:bg-dark-background-card rounded-xl p-6 border border-[#EDF0FB] dark:border-gray-700 transition-colors">
+              <h3 className="text-lg font-bold text-text-primary dark:text-dark-text-primary mb-4">Your Instructor</h3>
               <div className="flex items-start gap-4 mb-4">
                 <div className="w-16 h-16 bg-brand-primary rounded-full flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
                   {classData.instructor.split(' ').map(n => n[0]).join('')}
                 </div>
                 <div>
-                  <h4 className="font-semibold text-text-primary">{classData.instructor}</h4>
-                  <p className="text-sm text-text-secondary mb-2">{classData.instructorTitle}</p>
+                  <h4 className="font-semibold text-text-primary dark:text-dark-text-primary">{classData.instructor}</h4>
+                  <p className="text-sm text-text-secondary dark:text-dark-text-secondary mb-2">{classData.instructorTitle}</p>
                 </div>
               </div>
-              <p className="text-sm text-text-primary">{classData.instructorBio}</p>
+              <p className="text-sm text-text-primary dark:text-dark-text-primary">{classData.instructorBio}</p>
             </div>
 
             {/* Quick Info */}
-            <div className="bg-white rounded-xl p-6 border border-[#EDF0FB] transition-colors">
-              <h3 className="text-lg font-bold text-text-primary mb-4">Class Details</h3>
+            <div className="bg-white dark:bg-dark-background-card rounded-xl p-6 border border-[#EDF0FB] dark:border-gray-700 transition-colors">
+              <h3 className="text-lg font-bold text-text-primary dark:text-dark-text-primary mb-4">Class Details</h3>
               <div className="space-y-4">
                 <div>
                   <div className="flex items-center gap-2 text-text-secondary text-sm mb-1">
@@ -217,8 +217,8 @@ This is an interactive session where you can ask questions and engage with the i
 
             {/* Technical Requirements */}
             <div className="bg-blue-50/20 rounded-xl p-6 border border-blue-100 transition-colors">
-              <h3 className="text-lg font-bold text-text-primary mb-3">Technical Setup</h3>
-              <ul className="space-y-2 text-sm text-text-primary">
+              <h3 className="text-lg font-bold text-text-primary dark:text-dark-text-primary mb-3">Technical Setup</h3>
+              <ul className="space-y-2 text-sm text-text-primary dark:text-dark-text-primary">
                 <li className="flex items-start gap-2">
                   <span>✓</span>
                   <span>Stable internet connection</span>

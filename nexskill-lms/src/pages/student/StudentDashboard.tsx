@@ -70,24 +70,24 @@ const StudentDashboard: React.FC = () => {
   return (
     <StudentAppLayout>
       {/* Header */}
-      <div className="px-8 py-6 border-b border-[#EDF0FB]">
+      <div className="px-8 py-6 border-b border-[#EDF0FB] dark:border-gray-700">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-text-primary mb-1">
+            <h1 className="text-2xl font-bold text-text-primary dark:text-dark-text-primary mb-1">
               {getGreeting()}, Student 👋
             </h1>
-            <p className="text-sm text-text-secondary">
+            <p className="text-sm text-text-secondary dark:text-dark-text-secondary">
               Keep learning, you're doing great!
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <div className="px-4 py-2 bg-[#F5F7FF] rounded-full">
-              <span className="text-xs font-medium text-text-primary">
+            <div className="px-4 py-2 bg-[#F5F7FF] dark:bg-gray-800 rounded-full">
+              <span className="text-xs font-medium text-text-primary dark:text-dark-text-primary">
                 🔥 Streak: <span className="text-brand-primary">5 days</span>
               </span>
             </div>
-            <div className="px-4 py-2 bg-[#F5F7FF] rounded-full">
-              <span className="text-xs font-medium text-text-primary">
+            <div className="px-4 py-2 bg-[#F5F7FF] dark:bg-gray-800 rounded-full">
+              <span className="text-xs font-medium text-text-primary dark:text-dark-text-primary">
                 📊 Level: <span className="text-brand-primary">Intermediate</span>
               </span>
             </div>
@@ -101,12 +101,12 @@ const StudentDashboard: React.FC = () => {
           {/* Top Row: Progress Summary + AI Coach + Certificates */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Progress Summary Card */}
-            <div className="lg:col-span-1 bg-white rounded-3xl shadow-card p-6">
+            <div className="lg:col-span-1 bg-white dark:bg-dark-background-card rounded-3xl shadow-card dark:bg-dark-background-card p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-text-secondary">Progress</h3>
+                <h3 className="text-sm font-medium text-text-secondary dark:text-dark-text-secondary">Progress</h3>
                 <button 
                   onClick={() => console.log('Change time filter')}
-                  className="px-3 py-1 bg-[#F5F7FF] rounded-full text-xs font-medium text-text-secondary flex items-center gap-1"
+                  className="px-3 py-1 bg-[#F5F7FF] dark:bg-gray-800 rounded-full text-xs font-medium text-text-secondary flex items-center gap-1"
                 >
                   {timeFilter}
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -145,8 +145,8 @@ const StudentDashboard: React.FC = () => {
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center">
-                    <p className="text-3xl font-bold text-text-primary">45%</p>
-                    <p className="text-xs text-text-muted">Complete</p>
+                    <p className="text-3xl font-bold text-text-primary dark:text-dark-text-primary">45%</p>
+                    <p className="text-xs text-text-muted dark:text-dark-text-muted">Complete</p>
                   </div>
                 </div>
               </div>
@@ -154,19 +154,19 @@ const StudentDashboard: React.FC = () => {
               {/* Stats */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-text-secondary">Hours learned</span>
-                  <span className="text-sm font-semibold text-text-primary">6.5h</span>
+                  <span className="text-sm text-text-secondary dark:text-dark-text-secondary">Hours learned</span>
+                  <span className="text-sm font-semibold text-text-primary dark:text-dark-text-primary">6.5h</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-text-secondary">Lessons completed</span>
-                  <span className="text-sm font-semibold text-text-primary">12 / 20</span>
+                  <span className="text-sm text-text-secondary dark:text-dark-text-secondary">Lessons completed</span>
+                  <span className="text-sm font-semibold text-text-primary dark:text-dark-text-primary">12 / 20</span>
                 </div>
               </div>
             </div>
 
             {/* AI Coach Message Card */}
             {showAICoach && (
-              <div className="lg:col-span-2 bg-gradient-to-br from-[#E8EEFF] to-[#F5E8FF] rounded-3xl shadow-card p-6 relative">
+              <div className="lg:col-span-2 bg-gradient-to-br from-[#E8EEFF] to-[#F5E8FF] rounded-3xl shadow-card dark:bg-dark-background-card p-6 relative">
                 <button
                   onClick={() => setShowAICoach(false)}
                   className="absolute top-4 right-4 w-6 h-6 rounded-full bg-white/50 hover:bg-white/80 flex items-center justify-center transition-colors"
@@ -181,11 +181,11 @@ const StudentDashboard: React.FC = () => {
                     🤖
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-text-primary mb-2">
+                    <h3 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary mb-2">
                       Today's AI coach insight
                     </h3>
-                    <p className="text-sm text-text-secondary mb-4">
-                      You're 3 lessons away from completing <span className="font-medium text-text-primary">'UI Design Basics'</span>. 
+                    <p className="text-sm text-text-secondary dark:text-dark-text-secondary mb-4">
+                      You're 3 lessons away from completing <span className="font-medium text-text-primary dark:text-dark-text-primary">'UI Design Basics'</span>. 
                       Keep up the momentum! Based on your learning pace, you can finish this course by this weekend.
                     </p>
                     <button 
@@ -201,9 +201,9 @@ const StudentDashboard: React.FC = () => {
 
             {/* Certificates KPI Card */}
             {!showAICoach && (
-              <div className="lg:col-span-1 bg-white rounded-2xl shadow-card p-6">
-                <p className="text-sm text-text-secondary mb-2">Certificates earned</p>
-                <p className="text-4xl font-bold text-text-primary mb-3">4</p>
+              <div className="lg:col-span-1 bg-white dark:bg-dark-background-card rounded-2xl shadow-card dark:bg-dark-background-card p-6">
+                <p className="text-sm text-text-secondary dark:text-dark-text-secondary mb-2">Certificates earned</p>
+                <p className="text-4xl font-bold text-text-primary dark:text-dark-text-primary mb-3">4</p>
                 <Link to="/student/certificates" className="text-sm text-brand-primary font-medium hover:text-brand-primary-light transition-colors">
                   View certificates →
                 </Link>
@@ -213,9 +213,9 @@ const StudentDashboard: React.FC = () => {
 
           {/* Certificates Card (when AI Coach is visible) */}
           {showAICoach && (
-            <div className="bg-white rounded-2xl shadow-card p-6 max-w-xs">
-              <p className="text-sm text-text-secondary mb-2">Certificates earned</p>
-              <p className="text-4xl font-bold text-text-primary mb-3">4</p>
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-card dark:bg-dark-background-card p-6 max-w-xs">
+              <p className="text-sm text-text-secondary dark:text-dark-text-secondary mb-2">Certificates earned</p>
+              <p className="text-4xl font-bold text-text-primary dark:text-dark-text-primary mb-3">4</p>
               <Link to="/student/certificates" className="text-sm text-brand-primary font-medium hover:text-brand-primary-light transition-colors">
                 View certificates →
               </Link>
@@ -225,7 +225,7 @@ const StudentDashboard: React.FC = () => {
           {/* Recommended Courses Section */}
           <div>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-text-primary">Recommended courses for you</h2>
+              <h2 className="text-xl font-bold text-text-primary dark:text-dark-text-primary">Recommended courses for you</h2>
               <Link to="/student/courses" className="text-sm font-medium text-brand-primary hover:text-brand-primary-light transition-colors">
                 View all →
               </Link>
@@ -235,7 +235,7 @@ const StudentDashboard: React.FC = () => {
               {courses.map((course) => (
                 <div
                   key={course.id}
-                  className={`bg-gradient-to-br ${course.gradient} rounded-3xl shadow-card p-6 hover:shadow-lg transition-all`}
+                  className={`bg-gradient-to-br ${course.gradient} rounded-3xl shadow-card dark:bg-dark-background-card p-6 hover:shadow-lg transition-all`}
                 >
                   <div className="flex items-start justify-between mb-3">
                     <h3 className="text-base font-semibold text-text-primary flex-1">
@@ -246,7 +246,7 @@ const StudentDashboard: React.FC = () => {
                     </span>
                   </div>
 
-                  <p className="text-xs text-text-secondary mb-4">
+                  <p className="text-xs text-text-secondary dark:text-dark-text-secondary mb-4">
                     {course.completed} / {course.total} lessons
                   </p>
 
@@ -274,24 +274,24 @@ const StudentDashboard: React.FC = () => {
           {/* Upcoming Live Classes Section */}
           <div>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-text-primary">Upcoming live classes</h2>
+              <h2 className="text-xl font-bold text-text-primary dark:text-dark-text-primary">Upcoming live classes</h2>
             </div>
 
-            <div className="bg-white rounded-3xl shadow-card p-6">
+            <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-card dark:bg-dark-background-card p-6">
               <div className="space-y-4">
                 {liveClasses.map((liveClass, index) => (
                   <div
                     key={liveClass.id}
                     className={`flex items-center justify-between py-4 ${
-                      index !== liveClasses.length - 1 ? 'border-b border-[#EDF0FB]' : ''
+                      index !== liveClasses.length - 1 ? 'border-b border-[#EDF0FB] dark:border-gray-700' : ''
                     }`}
                   >
                     <div className="flex-1">
                       <p className="text-xs text-text-muted mb-1">{liveClass.date}</p>
-                      <h4 className="text-sm font-semibold text-text-primary mb-1">
+                      <h4 className="text-sm font-semibold text-text-primary dark:text-dark-text-primary mb-1">
                         {liveClass.title}
                       </h4>
-                      <p className="text-xs text-text-secondary">
+                      <p className="text-xs text-text-secondary dark:text-dark-text-secondary">
                         with {liveClass.instructor}
                       </p>
                     </div>

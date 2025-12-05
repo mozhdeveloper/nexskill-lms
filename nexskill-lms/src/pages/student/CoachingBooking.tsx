@@ -101,7 +101,7 @@ const CoachingBooking: React.FC = () => {
       <StudentAppLayout>
         <div className="min-h-screen bg-gradient-to-br from-[#E7F0FF] via-[#F9F0FF] to-[#E3F4FF] pb-16">
           <div className="max-w-7xl mx-auto px-6 py-8">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
               <p className="text-lg text-slate-600 mb-4">Coach not found</p>
               <button
                 onClick={() => navigate('/student/coaching')}
@@ -159,7 +159,7 @@ const CoachingBooking: React.FC = () => {
           {/* Main content */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Left column: Time slot picker */}
-            <div className="bg-white rounded-2xl shadow-md border border-slate-200 p-6">
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-md border border-slate-200 p-6">
               <h2 className="text-xl font-bold text-slate-900 mb-6">Choose your time</h2>
               <TimeSlotPicker
                 availableDays={availableDays}
@@ -208,7 +208,7 @@ const CoachingBooking: React.FC = () => {
 
               {/* Placeholder when no time slot selected */}
               {(!selectedDate || !selectedSlot) && (
-                <div className="bg-white rounded-2xl shadow-md border border-slate-200 p-12 text-center">
+                <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-md border border-slate-200 p-12 text-center">
                   <div className="text-slate-400 mb-4">
                     <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path

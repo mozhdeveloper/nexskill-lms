@@ -94,22 +94,22 @@ const CoachingSessions: React.FC = () => {
 
           {/* Stats cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-6">
               <div className="text-3xl font-bold text-[#304DB5] mb-1">{upcomingSessions.length}</div>
               <div className="text-sm text-slate-600">Upcoming sessions</div>
             </div>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-6">
               <div className="text-3xl font-bold text-[#304DB5] mb-1">{pastSessions.length}</div>
               <div className="text-sm text-slate-600">Completed sessions</div>
             </div>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 p-6">
               <div className="text-3xl font-bold text-[#304DB5] mb-1">$15</div>
               <div className="text-sm text-slate-600">Available credits</div>
             </div>
           </div>
 
           {/* Tab navigation */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 mb-6">
+          <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 mb-6">
             <div className="flex border-b border-slate-200">
               <button
                 onClick={() => setActiveTab('upcoming')}

@@ -42,7 +42,7 @@ const QuizStart: React.FC = () => {
           </button>
 
           {/* Hero card */}
-          <div className="bg-white rounded-3xl shadow-xl p-8">
+          <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-xl p-8">
             {/* Header */}
             <div className="mb-6">
               <h1 className="text-3xl font-bold text-slate-900 mb-2">

@@ -155,7 +155,7 @@ const DiscussionBoard: React.FC = () => {
               <button
                 key={thread.id}
                 onClick={() => handleThreadClick(thread.id)}
-                className="w-full bg-white rounded-2xl shadow-sm hover:shadow-md border border-slate-200 p-6 transition-all text-left"
+                className="w-full bg-white dark:bg-dark-background-card rounded-2xl shadow-sm hover:shadow-md border border-slate-200 p-6 transition-all text-left"
               >
                 {/* Thread header */}
                 <div className="mb-3">
