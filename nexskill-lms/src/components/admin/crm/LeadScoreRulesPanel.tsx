@@ -34,7 +34,7 @@ const LeadScoreRulesPanel: React.FC<LeadScoreRulesPanelProps> = ({ rules, onChan
     let conditionSummary = '';
     switch (formData.conditionType) {
       case 'tag':
-        conditionSummary = `Tag = "${formData.conditionValue}"`;
+        conditionSummary = `Tag ="${formData.conditionValue}"`;
         break;
       case 'status':
         conditionSummary = `Status = ${formData.conditionValue}`;
@@ -63,7 +63,7 @@ const LeadScoreRulesPanel: React.FC<LeadScoreRulesPanelProps> = ({ rules, onChan
       points: 10,
     });
     setIsCreating(false);
-    window.alert(`Rule "${newRule.label}" created successfully!`);
+    window.alert(`Rule"${newRule.label}" created successfully!`);
   };
 
   const handleToggleActive = (ruleId: string) => {
@@ -94,12 +94,12 @@ const LeadScoreRulesPanel: React.FC<LeadScoreRulesPanelProps> = ({ rules, onChan
     const rule = rules.find((r) => r.id === ruleId);
     if (!rule) return;
 
-    if (!window.confirm(`Delete rule "${rule.label}"?`)) return;
+    if (!window.confirm(`Delete rule"${rule.label}"?`)) return;
 
     const updated = rules.filter((r) => r.id !== ruleId);
     onChange(updated);
     console.log('Deleted rule:', ruleId);
-    window.alert(`Rule "${rule.label}" has been deleted.`);
+    window.alert(`Rule"${rule.label}" has been deleted.`);
   };
 
   return (

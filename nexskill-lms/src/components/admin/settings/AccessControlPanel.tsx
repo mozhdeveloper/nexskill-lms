@@ -65,7 +65,7 @@ const AccessControlPanel: React.FC<AccessControlPanelProps> = ({
     setNewRoleName('');
     setNewRoleDescription('');
     setShowAddRoleForm(false);
-    showNotification(`✓ Role "${newRoleName}" created`);
+    showNotification(`✓ Role"${newRoleName}" created`);
   };
 
   const handleDuplicateRole = (roleId: string) => {
@@ -88,7 +88,7 @@ const AccessControlPanel: React.FC<AccessControlPanelProps> = ({
 
     onChangeRoles([...roles, duplicatedRole]);
     onChangeRolePermissions([...rolePermissions, ...duplicatedPerms]);
-    showNotification(`✓ Duplicated "${role.name}"`);
+    showNotification(`✓ Duplicated"${role.name}"`);
   };
 
   const handleDeleteRole = (roleId: string) => {

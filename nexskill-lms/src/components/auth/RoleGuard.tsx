@@ -14,7 +14,7 @@ interface RoleGuardProps {
  * RoleGuard component - protects routes based on user role
  * 
  * Usage:
- * <RoleGuard allowedRoles={["ADMIN", "PLATFORM_OWNER"]}>
+ * <RoleGuard allowedRoles={["ADMIN","PLATFORM_OWNER"]}>
  *   <AdminRoutes />
  * </RoleGuard>
  */

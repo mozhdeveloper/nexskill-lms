@@ -21,8 +21,8 @@ const CourseCategorySidebar: React.FC<CourseCategorySidebarProps> = ({
   onCategoryChange,
 }) => {
   return (
-    <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-card p-6 sticky top-6 transition-colors">
-      <h3 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary mb-4">Categories</h3>
+    <div className="bg-white rounded-3xl shadow-card p-6 sticky top-6 transition-colors">
+      <h3 className="text-lg font-semibold text-text-primary mb-4">Categories</h3>
       
       <div className="space-y-2">
         {categories.map((category) => {
@@ -35,7 +35,7 @@ const CourseCategorySidebar: React.FC<CourseCategorySidebarProps> = ({
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left ${
                 isActive
                   ? 'bg-gradient-to-r from-brand-primary to-brand-primary-light text-white shadow-button-primary'
-                  : 'bg-[#F5F7FF] dark:bg-gray-800 text-text-secondary dark:text-dark-text-secondary hover:bg-brand-primary-soft dark:hover:bg-blue-900/30 hover:text-brand-primary dark:hover:text-blue-400'
+                  : 'bg-[#F5F7FF] text-text-secondary hover:bg-brand-primary-soft/30 hover:text-brand-primary'
               }`}
             >
               <span className="text-lg">{categoryIcons[category] || '📁'}</span>
@@ -46,8 +46,8 @@ const CourseCategorySidebar: React.FC<CourseCategorySidebarProps> = ({
       </div>
 
       {/* Course Count Info */}
-      <div className="mt-6 p-4 bg-[#F5F7FF] dark:bg-gray-800 rounded-2xl transition-colors">
-        <p className="text-xs text-text-secondary dark:text-dark-text-secondary">
+      <div className="mt-6 p-4 bg-[#F5F7FF] rounded-2xl transition-colors">
+        <p className="text-xs text-text-secondary">
           💡 <span className="font-medium">Tip:</span> Select a category to filter courses by your interests
         </p>
       </div>

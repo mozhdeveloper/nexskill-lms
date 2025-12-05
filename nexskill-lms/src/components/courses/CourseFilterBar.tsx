@@ -26,7 +26,7 @@ const CourseFilterBar: React.FC<CourseFilterBarProps> = ({
   onSortChange,
 }) => {
   return (
-    <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-card p-6 mb-6 transition-colors">
+    <div className="bg-white rounded-3xl shadow-card p-6 mb-6 transition-colors">
       <div className="flex flex-col lg:flex-row gap-4">
         {/* Search Input */}
         <div className="flex-1">
@@ -36,10 +36,10 @@ const CourseFilterBar: React.FC<CourseFilterBarProps> = ({
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search courses"
-              className="w-full pl-12 pr-5 py-3 bg-[#F5F7FF] dark:bg-gray-800 rounded-full text-sm text-text-primary dark:text-dark-text-primary placeholder-text-muted dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-primary-light transition-all"
+              className="w-full pl-12 pr-5 py-3 bg-[#F5F7FF] rounded-full text-sm text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary-light transition-all"
             />
             <svg
-              className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted dark:text-gray-500"
+              className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -63,7 +63,7 @@ const CourseFilterBar: React.FC<CourseFilterBarProps> = ({
               className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                 selectedLevel === level
                   ? 'bg-brand-primary text-white shadow-button-primary'
-                  : 'bg-[#F5F7FF] dark:bg-gray-800 text-text-secondary dark:text-dark-text-secondary hover:bg-brand-primary-soft dark:hover:bg-blue-900/30 hover:text-brand-primary dark:hover:text-blue-400'
+                  : 'bg-[#F5F7FF] text-text-secondary hover:bg-brand-primary-soft/30 hover:text-brand-primary'
               }`}
             >
               {level}
@@ -76,7 +76,7 @@ const CourseFilterBar: React.FC<CourseFilterBarProps> = ({
           <select
             value={sortOption}
             onChange={(e) => onSortChange(e.target.value)}
-            className="pl-4 pr-10 py-3 bg-[#F5F7FF] dark:bg-gray-800 rounded-full text-sm font-medium text-text-secondary dark:text-dark-text-secondary appearance-none focus:outline-none focus:ring-2 focus:ring-brand-primary-light cursor-pointer hover:bg-brand-primary-soft dark:hover:bg-blue-900/30 transition-all"
+            className="pl-4 pr-10 py-3 bg-[#F5F7FF] rounded-full text-sm font-medium text-text-secondary appearance-none focus:outline-none focus:ring-2 focus:ring-brand-primary-light cursor-pointer hover:bg-brand-primary-soft/30 transition-all"
           >
             {sortOptions.map((option) => (
               <option key={option} value={option}>

@@ -17,7 +17,7 @@ const SupportCertificatesPage = () => {
           <ul className="space-y-2 text-blue-700">
             <li>• Verify the student has completed the course</li>
             <li>• Confirm the email address is correct</li>
-            <li>• Click "Resend" to trigger an automated email with download link</li>
+            <li>• Click"Resend" to trigger an automated email with download link</li>
             <li>• Monitor the status to ensure successful delivery</li>
           </ul>
         </div>

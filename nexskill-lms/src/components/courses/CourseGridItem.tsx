@@ -23,9 +23,9 @@ interface CourseGridItemProps {
 
 const CourseGridItem: React.FC<CourseGridItemProps> = ({ course, onClick }) => {
   const levelColors = {
-    Beginner: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
-    Intermediate: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
-    Advanced: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400',
+    Beginner: 'bg-green-100/30 text-green-700',
+    Intermediate: 'bg-blue-100/30 text-blue-700',
+    Advanced: 'bg-purple-100/30 text-purple-700',
   };
 
   const gradientClasses: Record<string, string> = {
@@ -39,7 +39,7 @@ const CourseGridItem: React.FC<CourseGridItemProps> = ({ course, onClick }) => {
   return (
     <div
       onClick={() => onClick(course.id)}
-      className="bg-white dark:bg-dark-background-card rounded-3xl shadow-card hover:shadow-lg hover:scale-[1.02] transition-all cursor-pointer overflow-hidden group"
+      className="bg-white rounded-3xl shadow-card hover:shadow-lg hover:scale-[1.02] transition-all cursor-pointer overflow-hidden group"
     >
       {/* Thumbnail */}
       <div className={`relative h-40 bg-gradient-to-br ${gradientClasses[course.thumbnail] || 'from-gray-100 to-gray-200'} flex items-center justify-center`}>
@@ -71,12 +71,12 @@ const CourseGridItem: React.FC<CourseGridItemProps> = ({ course, onClick }) => {
       {/* Content */}
       <div className="p-6">
         {/* Title */}
-        <h3 className="text-base font-semibold text-text-primary dark:text-dark-text-primary mb-2 line-clamp-2 group-hover:text-brand-primary dark:group-hover:text-blue-400 transition-colors">
+        <h3 className="text-base font-semibold text-text-primary mb-2 line-clamp-2 group-hover:text-brand-primary transition-colors">
           {course.title}
         </h3>
 
         {/* Description */}
-        <p className="text-sm text-text-secondary dark:text-dark-text-secondary mb-4 line-clamp-2">
+        <p className="text-sm text-text-secondary mb-4 line-clamp-2">
           {course.shortDescription}
         </p>
 

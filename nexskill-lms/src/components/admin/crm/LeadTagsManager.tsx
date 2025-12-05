@@ -64,7 +64,7 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({ tags, onChange, onFil
       description: '',
     });
     setIsCreating(false);
-    window.alert(`Tag "${newTag.name}" created successfully!`);
+    window.alert(`Tag"${newTag.name}" created successfully!`);
   };
 
   const handleRename = (tagId: string) => {
@@ -104,12 +104,12 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({ tags, onChange, onFil
     const tag = tags.find((t) => t.id === tagId);
     if (!tag) return;
 
-    if (!window.confirm(`Delete tag "${tag.name}"?`)) return;
+    if (!window.confirm(`Delete tag"${tag.name}"?`)) return;
 
     const updated = tags.filter((t) => t.id !== tagId);
     onChange(updated);
     console.log('Deleted tag:', tagId);
-    window.alert(`Tag "${tag.name}" has been deleted.`);
+    window.alert(`Tag"${tag.name}" has been deleted.`);
   };
 
   const getCategoryLabel = (category?: string) => {

@@ -273,7 +273,7 @@ const FunnelBuilderCanvas: React.FC<FunnelBuilderCanvasProps> = ({
                 Start Building Your Funnel
               </h3>
               <p className="text-[#5F6473]">
-                Click "Add Step" to create your first funnel step.
+                Click"Add Step" to create your first funnel step.
               </p>
             </div>
           </div>

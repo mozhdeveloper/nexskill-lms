@@ -69,7 +69,7 @@ const BiReportsPanel: React.FC<BiReportsPanelProps> = ({ data: initialData }) =>
       ],
     });
 
-    showNotification(`Generating "${report.name}"...`);
+    showNotification(`Generating"${report.name}"...`);
     console.log(`[BI Reports] Generate now: ${report.name}`);
 
     // Simulate completion after 2 seconds
@@ -92,7 +92,7 @@ const BiReportsPanel: React.FC<BiReportsPanelProps> = ({ data: initialData }) =>
         r.id === reportId ? { ...r, schedule: newSchedule } : r
       ),
     });
-    showNotification(`Schedule updated to "${newSchedule}"`);
+    showNotification(`Schedule updated to"${newSchedule}"`);
     console.log(`[BI Reports] Schedule changed for ${reportId}: ${newSchedule}`);
   };
 
@@ -104,7 +104,7 @@ const BiReportsPanel: React.FC<BiReportsPanelProps> = ({ data: initialData }) =>
 
   const handleOpenReport = (reportId: string) => {
     const report = data.availableReports.find((r) => r.id === reportId);
-    showNotification(`Opening "${report?.name}"...`);
+    showNotification(`Opening"${report?.name}"...`);
     console.log(`[BI Reports] Open report: ${reportId}`);
   };
 

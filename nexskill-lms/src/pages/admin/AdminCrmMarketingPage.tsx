@@ -447,21 +447,21 @@ const AdminCrmMarketingPage: React.FC = () => {
     {
       id: 'rule-1',
       label: 'High Intent Tag',
-      conditionSummary: 'Tag equals "High Intent"',
+      conditionSummary: 'Tag equals"High Intent"',
       points: 20,
       isActive: true,
     },
     {
       id: 'rule-2',
       label: 'Webinar Attendance',
-      conditionSummary: 'Tag equals "Webinar Attendee"',
+      conditionSummary: 'Tag equals"Webinar Attendee"',
       points: 15,
       isActive: true,
     },
     {
       id: 'rule-3',
       label: 'Engaged Status',
-      conditionSummary: 'Status equals "Engaged"',
+      conditionSummary: 'Status equals"Engaged"',
       points: 10,
       isActive: true,
     },
@@ -475,7 +475,7 @@ const AdminCrmMarketingPage: React.FC = () => {
     {
       id: 'rule-5',
       label: 'Ready to Buy Tag',
-      conditionSummary: 'Tag equals "Ready to Buy"',
+      conditionSummary: 'Tag equals"Ready to Buy"',
       points: 25,
       isActive: false,
     },
@@ -486,7 +486,7 @@ const AdminCrmMarketingPage: React.FC = () => {
     {
       id: 'campaign-1',
       name: 'January UX Newsletter',
-      segmentSummary: 'All leads with tag "UX Bootcamp Interest"',
+      segmentSummary: 'All leads with tag"UX Bootcamp Interest"',
       status: 'completed',
       scheduledAt: undefined,
       sentCount: 520,
@@ -496,7 +496,7 @@ const AdminCrmMarketingPage: React.FC = () => {
     {
       id: 'campaign-2',
       name: 'Product Launch Announcement',
-      segmentSummary: 'All leads with tag "High Intent"',
+      segmentSummary: 'All leads with tag"High Intent"',
       status: 'scheduled',
       scheduledAt: '2024-01-20 10:00',
       sentCount: 0,
@@ -506,7 +506,7 @@ const AdminCrmMarketingPage: React.FC = () => {
     {
       id: 'campaign-3',
       name: 'Webinar Follow-up',
-      segmentSummary: 'All leads with tag "Webinar Attendee"',
+      segmentSummary: 'All leads with tag"Webinar Attendee"',
       status: 'completed',
       scheduledAt: undefined,
       sentCount: 150,
@@ -516,7 +516,7 @@ const AdminCrmMarketingPage: React.FC = () => {
     {
       id: 'campaign-4',
       name: 'Corporate Training Promo',
-      segmentSummary: 'All leads with tag "Corporate Training"',
+      segmentSummary: 'All leads with tag"Corporate Training"',
       status: 'draft',
       scheduledAt: undefined,
       sentCount: 0,
@@ -530,7 +530,7 @@ const AdminCrmMarketingPage: React.FC = () => {
     {
       id: 'broadcast-1',
       name: 'Weekly UX Tips',
-      listSummary: 'All leads with tag "UI/UX Interest"',
+      listSummary: 'All leads with tag"UI/UX Interest"',
       status: 'completed',
       scheduledAt: undefined,
       deliveredCount: 280,
@@ -539,7 +539,7 @@ const AdminCrmMarketingPage: React.FC = () => {
     {
       id: 'broadcast-2',
       name: 'Flash Sale Alert',
-      listSummary: 'All leads with tag "High Intent"',
+      listSummary: 'All leads with tag"High Intent"',
       status: 'scheduled',
       scheduledAt: '2024-01-18 14:00',
       deliveredCount: 0,

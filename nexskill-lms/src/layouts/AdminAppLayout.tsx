@@ -40,17 +40,17 @@ const AdminAppLayout: React.FC<AdminAppLayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F0F4FF] via-[#E8EEFF] to-[#F0F4FF] dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-8 transition-colors">
-      <div className="max-w-[1440px] mx-auto bg-white dark:bg-dark-background-shell rounded-[32px] shadow-card overflow-hidden flex transition-colors" style={{ minHeight: 'calc(100vh - 64px)' }}>
+    <div className="min-h-screen bg-gradient-to-br from-[#F0F4FF] via-[#E8EEFF] to-[#F0F4FF] p-8 transition-colors">
+      <div className="max-w-[1440px] mx-auto bg-white rounded-[32px] shadow-card overflow-hidden flex transition-colors" style={{ minHeight: 'calc(100vh - 64px)' }}>
         {/* Left Sidebar */}
-        <aside className="w-[240px] flex-shrink-0 flex flex-col p-6 border-r border-[#EDF0FB] dark:border-gray-700">
+        <aside className="w-[240px] flex-shrink-0 flex flex-col p-6 border-r border-[#EDF0FB]">
           {/* Logo */}
           <div className="mb-8">
             <Link to="/admin/dashboard" className="flex items-center gap-3">
               <BrandLogo size="md" showText={false} />
               <div>
                 <span className="text-xl font-bold text-[#304DB5] block leading-tight">NexSkill</span>
-                <span className="text-xs text-slate-600 dark:text-gray-400">Admin Console</span>
+                <span className="text-xs text-slate-600">Admin Console</span>
               </div>
             </Link>
           </div>
@@ -64,7 +64,7 @@ const AdminAppLayout: React.FC<AdminAppLayoutProps> = ({ children }) => {
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                   isActive(item.path)
                     ? 'bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white shadow-md'
-                    : 'text-text-secondary dark:text-dark-text-secondary hover:bg-[#F0F4FF] dark:hover:bg-gray-800 hover:text-text-primary dark:hover:text-dark-text-primary'
+                    : 'text-text-secondary hover:bg-[#F0F4FF] hover:text-text-primary'
                 }`}
               >
                 <span className="text-lg">{item.icon}</span>
@@ -77,7 +77,7 @@ const AdminAppLayout: React.FC<AdminAppLayoutProps> = ({ children }) => {
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col">
           {/* Top Bar */}
-          <header className="px-8 py-4 border-b border-[#EDF0FB] dark:border-gray-700 flex items-center justify-end">
+          <header className="px-8 py-4 border-b border-[#EDF0FB] flex items-center justify-end">
             <GlobalTopBarControls />
           </header>
 

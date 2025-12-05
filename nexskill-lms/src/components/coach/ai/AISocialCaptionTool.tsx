@@ -71,40 +71,40 @@ const AISocialCaptionTool: React.FC = () => {
         // Generate caption based on platform and angle
         if (formData.angle === 'announce-course') {
           if (platform === 'LinkedIn') {
-            caption = `🚀 Excited to announce: "${formData.courseToPromote}" is now live!\n\nAfter months of development, I'm thrilled to share this comprehensive course designed to help you master essential skills. Whether you're just starting out or looking to level up, this course has something for everyone.\n\n✨ What you'll gain:\n• In-depth lessons and practical projects\n• Lifetime access to all materials\n• Certificate upon completion\n\n${cta} - Link in comments 👇`;
+            caption = `🚀 Excited to announce:"${formData.courseToPromote}" is now live!\n\nAfter months of development, I'm thrilled to share this comprehensive course designed to help you master essential skills. Whether you're just starting out or looking to level up, this course has something for everyone.\n\n✨ What you'll gain:\n• In-depth lessons and practical projects\n• Lifetime access to all materials\n• Certificate upon completion\n\n${cta} - Link in comments 👇`;
             hashtags = '#OnlineLearning #ProfessionalDevelopment #SkillBuilding #Education';
           } else if (platform === 'Facebook') {
-            caption = `🎉 Big news! My new course "${formData.courseToPromote}" just launched!\n\nI've poured my heart into creating something truly valuable for anyone looking to grow their skills. Check it out and let me know what you think!\n\n${cta} ➡️ [Link]`;
+            caption = `🎉 Big news! My new course"${formData.courseToPromote}" just launched!\n\nI've poured my heart into creating something truly valuable for anyone looking to grow their skills. Check it out and let me know what you think!\n\n${cta} ➡️ [Link]`;
             hashtags = '#NewCourse #Learning #OnlineEducation #Skills';
           } else if (platform === 'Instagram') {
             caption = `✨ NEW COURSE ALERT ✨\n\n"${formData.courseToPromote}" is officially here! 🎓\n\nSwipe to see what's inside 👉\n\n${cta} - Link in bio! 🔗`;
             hashtags = '#OnlineCourse #LearnOnline #Education #NewCourse #SkillDevelopment #Learning';
           } else if (platform === 'X') {
-            caption = `🚀 Just launched: "${formData.courseToPromote}"\n\nEverything you need to master this skill, all in one place.\n\n${cta} 👇`;
+            caption = `🚀 Just launched:"${formData.courseToPromote}"\n\nEverything you need to master this skill, all in one place.\n\n${cta} 👇`;
             hashtags = '#Education #OnlineLearning #NewCourse';
           }
         } else if (formData.angle === 'promote-discount') {
           if (platform === 'LinkedIn') {
-            caption = `⏰ Limited Time Offer!\n\nGet 30% off "${formData.courseToPromote}" this week only. This is your chance to invest in yourself at a fraction of the cost.\n\nDon't miss out - offer ends soon!\n\n${cta} 👇`;
+            caption = `⏰ Limited Time Offer!\n\nGet 30% off"${formData.courseToPromote}" this week only. This is your chance to invest in yourself at a fraction of the cost.\n\nDon't miss out - offer ends soon!\n\n${cta} 👇`;
             hashtags = '#LimitedOffer #OnlineLearning #ProfessionalDevelopment #CareerGrowth';
           } else if (platform === 'Facebook') {
-            caption = `🎁 SPECIAL OFFER 🎁\n\n30% OFF "${formData.courseToPromote}" - but only for the next few days!\n\nThis is the perfect time to start your learning journey. ${cta}!`;
+            caption = `🎁 SPECIAL OFFER 🎁\n\n30% OFF"${formData.courseToPromote}" - but only for the next few days!\n\nThis is the perfect time to start your learning journey. ${cta}!`;
             hashtags = '#Sale #Discount #OnlineCourse #LimitedTime';
           } else if (platform === 'Instagram') {
-            caption = `⚡ FLASH SALE ⚡\n\n30% off "${formData.courseToPromote}"\n\nDon't wait - this deal won't last! 🔥\n\n${cta} - Link in bio 🔗`;
+            caption = `⚡ FLASH SALE ⚡\n\n30% off"${formData.courseToPromote}"\n\nDon't wait - this deal won't last! 🔥\n\n${cta} - Link in bio 🔗`;
             hashtags = '#Sale #FlashSale #OnlineCourse #LimitedOffer #LearnOnline #Discount';
           } else if (platform === 'X') {
-            caption = `⚡ 30% OFF "${formData.courseToPromote}" this week only!\n\nYour future self will thank you. ${cta} 👇`;
+            caption = `⚡ 30% OFF"${formData.courseToPromote}" this week only!\n\nYour future self will thank you. ${cta} 👇`;
             hashtags = '#Sale #OnlineLearning #LimitedOffer';
           }
         } else if (formData.angle === 'student-success') {
-          caption = `💫 Student Success Story!\n\nOne of my students just completed "${formData.courseToPromote}" and achieved amazing results. Here's what they had to say:\n\n"This course completely transformed my approach. Within weeks, I was applying what I learned to real projects."\n\nReady to write your own success story? ${cta}!`;
+          caption = `💫 Student Success Story!\n\nOne of my students just completed"${formData.courseToPromote}" and achieved amazing results. Here's what they had to say:\n\n"This course completely transformed my approach. Within weeks, I was applying what I learned to real projects."\n\nReady to write your own success story? ${cta}!`;
           hashtags =
             platform === 'Instagram'
               ? '#Success #StudentSuccess #Testimonial #OnlineLearning #Education #Transformation'
               : '#StudentSuccess #Testimonial #OnlineLearning #Education';
         } else if (formData.angle === 'quick-tip') {
-          caption = `💡 Quick Tip from "${formData.courseToPromote}":\n\nHere's something that often gets overlooked but makes a huge difference... [Share specific actionable tip]\n\nWant more tips like this? ${cta} to access the full course with dozens of practical lessons!`;
+          caption = `💡 Quick Tip from"${formData.courseToPromote}":\n\nHere's something that often gets overlooked but makes a huge difference... [Share specific actionable tip]\n\nWant more tips like this? ${cta} to access the full course with dozens of practical lessons!`;
           hashtags =
             platform === 'Instagram'
               ? '#Tips #Tutorial #Learning #OnlineEducation #SkillBuilding #QuickTip'
@@ -234,7 +234,7 @@ const AISocialCaptionTool: React.FC = () => {
           <div className="flex flex-col items-center justify-center h-64 text-center">
             <div className="text-6xl mb-4">📱</div>
             <p className="text-[#9CA3B5]">
-              Select platforms and click "Generate Captions" to create your social media content.
+              Select platforms and click"Generate Captions" to create your social media content.
             </p>
           </div>
         ) : (

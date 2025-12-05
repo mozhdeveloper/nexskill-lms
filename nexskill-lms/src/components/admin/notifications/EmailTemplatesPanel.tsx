@@ -76,7 +76,7 @@ const EmailTemplatesPanel: React.FC<EmailTemplatesPanelProps> = ({
 
     onChange([...templates, duplicated]);
     console.log('Duplicated template:', templateId);
-    window.alert(`Template "${template.name}" duplicated successfully!`);
+    window.alert(`Template"${template.name}" duplicated successfully!`);
   };
 
   const handleToggleStatus = (templateId: string) => {
@@ -96,7 +96,7 @@ const EmailTemplatesPanel: React.FC<EmailTemplatesPanelProps> = ({
     if (!template) return;
 
     console.log('Sending test email for template:', templateId);
-    window.alert(`Test email sent (simulated) for "${template.name}"!`);
+    window.alert(`Test email sent (simulated) for"${template.name}"!`);
   };
 
   return (

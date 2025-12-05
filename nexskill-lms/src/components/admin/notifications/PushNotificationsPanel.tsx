@@ -67,7 +67,7 @@ const PushNotificationsPanel: React.FC<PushNotificationsPanelProps> = ({
     if (!config) return;
 
     console.log('Editing settings for config:', configId);
-    window.alert(`Edit settings for "${config.name}" - coming soon!`);
+    window.alert(`Edit settings for"${config.name}" - coming soon!`);
   };
 
   const handleSendTest = (configId: string) => {
@@ -75,7 +75,7 @@ const PushNotificationsPanel: React.FC<PushNotificationsPanelProps> = ({
     if (!config) return;
 
     console.log('Sending test push for config:', configId);
-    window.alert(`Test push notification sent (simulated) for "${config.name}"!`);
+    window.alert(`Test push notification sent (simulated) for"${config.name}"!`);
   };
 
   return (

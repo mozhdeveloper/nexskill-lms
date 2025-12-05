@@ -18,7 +18,7 @@ const AskAIWidget: React.FC<AskAIWidgetProps> = () => {
     setTimeout(() => {
       setAnswer(
         `Great question! Based on this lesson, ${question.toLowerCase().includes('hook') 
-          ? 'hooks are functions that let you "hook into" React features from function components. They enable you to use state and lifecycle features without writing a class.' 
+          ? 'hooks are functions that let you"hook into" React features from function components. They enable you to use state and lifecycle features without writing a class.' 
           : 'the key concept here is understanding the fundamentals before moving to advanced patterns. Make sure to practice with the provided examples.'
         }`
       );

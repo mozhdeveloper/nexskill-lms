@@ -78,7 +78,7 @@ const LandingPagesManagerPanel: React.FC<LandingPagesManagerPanelProps> = ({
       url: '',
     });
     setIsCreating(false);
-    window.alert(`Landing page "${newPage.name}" has been created!`);
+    window.alert(`Landing page"${newPage.name}" has been created!`);
   };
 
   const handlePublish = (pageId: string) => {
@@ -138,7 +138,7 @@ const LandingPagesManagerPanel: React.FC<LandingPagesManagerPanelProps> = ({
 
     console.log('Viewing analytics for page:', pageId);
     window.alert(
-      `Analytics for "${page.name}":\n\nURL: ${page.url}\nViews: ${page.views}\nConversion Rate: ${page.conversionRate}%\nVariants: ${page.variantCount}\n\nDetailed analytics coming soon!`
+      `Analytics for"${page.name}":\n\nURL: ${page.url}\nViews: ${page.views}\nConversion Rate: ${page.conversionRate}%\nVariants: ${page.variantCount}\n\nDetailed analytics coming soon!`
     );
   };
 
@@ -146,7 +146,7 @@ const LandingPagesManagerPanel: React.FC<LandingPagesManagerPanelProps> = ({
     const page = pages.find((p) => p.id === pageId);
     if (!page) return;
 
-    if (!window.confirm(`Archive landing page "${page.name}"?`)) return;
+    if (!window.confirm(`Archive landing page"${page.name}"?`)) return;
 
     const updated = pages.map((p) => (p.id === pageId ? { ...p, status: 'archived' as const } : p));
     onChange(updated);

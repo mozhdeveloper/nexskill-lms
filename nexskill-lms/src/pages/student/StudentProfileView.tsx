@@ -11,7 +11,7 @@ const dummyProfile = {
   level: 'Intermediate',
   memberSince: '2025',
   streakDays: 12,
-  bio: "I'm a career switcher passionate about creating user-centered digital experiences. Currently learning UI/UX design fundamentals and building my portfolio.",
+  bio:"I'm a career switcher passionate about creating user-centered digital experiences. Currently learning UI/UX design fundamentals and building my portfolio.",
   interests: ['Design', 'Business', 'Career'],
   goals: ['Get a job', 'Start a side project'],
   completedCourses: 8,

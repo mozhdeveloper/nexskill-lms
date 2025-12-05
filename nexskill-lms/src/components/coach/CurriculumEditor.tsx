@@ -164,7 +164,7 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({ curriculum, onChang
             {expandedModules.has(module.id) && (
               <div className="p-4 space-y-2">
                 {module.lessons.length === 0 ? (
-                  <p className="text-sm text-slate-500 text-center py-4">No lessons yet. Click "Add lesson" to start.</p>
+                  <p className="text-sm text-slate-500 text-center py-4">No lessons yet. Click"Add lesson" to start.</p>
                 ) : (
                   module.lessons.map((lesson, lessonIndex) => (
                     <div key={lesson.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">

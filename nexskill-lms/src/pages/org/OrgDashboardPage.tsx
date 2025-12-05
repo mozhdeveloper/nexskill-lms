@@ -112,10 +112,10 @@ const OrgDashboardPage: React.FC = () => {
             <h3 className="text-base font-bold text-text-primary mb-4">Recent Activity</h3>
             <div className="space-y-4">
               {[
-                { icon: '✅', text: 'Jessica Park completed "JavaScript Fundamentals"', time: '2 hours ago', color: 'bg-green-100' },
+                { icon: '✅', text: 'Jessica Park completed"JavaScript Fundamentals"', time: '2 hours ago', color: 'bg-green-100' },
                 { icon: '👤', text: 'New team member David Kim was added', time: '5 hours ago', color: 'bg-blue-100' },
                 { icon: '🎫', text: '12 new seats were allocated to Michael Chen', time: '1 day ago', color: 'bg-orange-100' },
-                { icon: '📚', text: '5 learners enrolled in "Product Management Basics"', time: '2 days ago', color: 'bg-purple-100' },
+                { icon: '📚', text: '5 learners enrolled in"Product Management Basics"', time: '2 days ago', color: 'bg-purple-100' },
               ].map((activity, index) => (
                 <div key={index} className="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-xl transition-colors">
                   <div className={`w-10 h-10 ${activity.color} rounded-lg flex items-center justify-center text-lg flex-shrink-0`}>

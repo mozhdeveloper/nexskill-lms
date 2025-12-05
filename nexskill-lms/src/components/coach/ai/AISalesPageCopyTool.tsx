@@ -82,10 +82,10 @@ const AISalesPageCopyTool: React.FC = () => {
         section: 'Solution / Course Introduction',
         content: `${courseName} is the comprehensive training program designed specifically for ${audience}. This isn't just another course - it's a complete transformation system that takes you from beginner to confident practitioner. ${
           formData.tone === 'story-driven'
-            ? "I created this course after experiencing the same frustrations you're facing now. I know what it takes to break through, and I've distilled years of experience into a step-by-step framework that actually works."
+            ?"I created this course after experiencing the same frustrations you're facing now. I know what it takes to break through, and I've distilled years of experience into a step-by-step framework that actually works."
             : formData.tone === 'educational'
             ? 'Built on proven pedagogical principles and industry best practices, this course delivers measurable results through structured learning modules and hands-on application.'
-            : "We've eliminated all the guesswork and created a streamlined path to success. Follow the system, do the work, and watch your skills transform."
+            :"We've eliminated all the guesswork and created a streamlined path to success. Follow the system, do the work, and watch your skills transform."
         }`,
       });
 
@@ -101,7 +101,7 @@ const AISalesPageCopyTool: React.FC = () => {
           ];
 
       sections.push({
-        section: "What You'll Get",
+        section:"What You'll Get",
         content: outcomes,
       });
 
@@ -112,7 +112,7 @@ const AISalesPageCopyTool: React.FC = () => {
       });
 
       // Pricing & Guarantee
-      const defaultGuarantee = "30-Day Money-Back Guarantee: Try the entire course risk-free. If you're not completely satisfied, we'll refund every penny - no questions asked.";
+      const defaultGuarantee ="30-Day Money-Back Guarantee: Try the entire course risk-free. If you're not completely satisfied, we'll refund every penny - no questions asked.";
       sections.push({
         section: 'Pricing & Guarantee',
         content: `Investment: ${priceText}\n\n${
@@ -125,11 +125,11 @@ const AISalesPageCopyTool: React.FC = () => {
         ? 'Your future self is waiting on the other side of this decision. Take the leap.'
         : formData.tone === 'educational'
         ? 'Invest in your education today and reap the benefits for years to come.'
-        : "Join the thousands who've already transformed their careers. The only question is: will you be next?";
+        :"Join the thousands who've already transformed their careers. The only question is: will you be next?";
       
       sections.push({
         section: 'Final Call-to-Action',
-        content: `Don't let another day go by wondering "what if." ${finalCtaText}\n\nClick below to get instant access to ${courseName} and start your transformation today. See you inside!`,
+        content: `Don't let another day go by wondering"what if." ${finalCtaText}\n\nClick below to get instant access to ${courseName} and start your transformation today. See you inside!`,
       });
 
       setGeneratedCopy(sections);
@@ -266,7 +266,7 @@ const AISalesPageCopyTool: React.FC = () => {
           <div className="flex flex-col items-center justify-center h-64 text-center">
             <div className="text-6xl mb-4">📄</div>
             <p className="text-[#9CA3B5]">
-              Fill in the course details and click "Generate Sales Page Copy" to create your
+              Fill in the course details and click"Generate Sales Page Copy" to create your
               content.
             </p>
           </div>

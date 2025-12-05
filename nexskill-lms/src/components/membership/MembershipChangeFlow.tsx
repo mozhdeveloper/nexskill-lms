@@ -96,7 +96,7 @@ const MembershipChangeFlow: React.FC<MembershipChangeFlowProps> = ({
       {targetPlan.features && targetPlan.features.length > 0 && (
         <div className="mb-6">
           <h3 className="text-sm font-semibold text-slate-700 mb-3">
-            {isUpgrade ? "What you'll gain:" : "What you'll keep:"}
+            {isUpgrade ?"What you'll gain:" : "What you'll keep:"}
           </h3>
           <ul className="space-y-2">
             {targetPlan.features.slice(0, 4).map((feature, index) => (

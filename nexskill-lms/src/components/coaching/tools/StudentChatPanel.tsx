@@ -58,13 +58,13 @@ const StudentChatPanel: React.FC = () => {
     {
       id: 'msg-2',
       sender: 'coach',
-      text: "I'm glad you found it helpful! How are you progressing with the action items?",
+      text:"I'm glad you found it helpful! How are you progressing with the action items?",
       timestamp: '10:32 AM',
     },
     {
       id: 'msg-3',
       sender: 'student',
-      text: "I've completed 2 out of 3. Still working on the marketing plan.",
+      text:"I've completed 2 out of 3. Still working on the marketing plan.",
       timestamp: '10:35 AM',
     },
     {

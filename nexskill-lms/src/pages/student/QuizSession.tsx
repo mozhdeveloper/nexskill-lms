@@ -27,7 +27,7 @@ const dummyQuiz = {
         { id: 'd', label: 'To handle routing in applications', helperText: 'That\'s React Router\'s job' },
       ],
       correctOptionId: 'b',
-      explanation: 'React Context API is designed to share data that can be considered "global" for a tree of React components, avoiding prop drilling.',
+      explanation: 'React Context API is designed to share data that can be considered"global" for a tree of React components, avoiding prop drilling.',
     },
     {
       id: 'q2',
@@ -72,7 +72,7 @@ const dummyQuiz = {
     {
       id: 'q6',
       type: 'multiple-choice' as const,
-      questionText: 'What does the "reducer" function in useReducer accept as parameters?',
+      questionText: 'What does the"reducer" function in useReducer accept as parameters?',
       options: [
         { id: 'a', label: 'Only the new state' },
         { id: 'b', label: 'Previous state and action' },

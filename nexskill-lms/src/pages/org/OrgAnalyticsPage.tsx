@@ -250,7 +250,7 @@ const OrgAnalyticsPage: React.FC = () => {
                   <div className="bg-white/80 rounded-xl p-4">
                     <p className="text-sm font-semibold text-purple-800 mb-1">🏆 Top Course</p>
                     <p className="text-xs text-text-secondary">
-                      "JavaScript Fundamentals" has the highest completion rate at 92%
+"JavaScript Fundamentals" has the highest completion rate at 92%
                     </p>
                   </div>
                 </div>

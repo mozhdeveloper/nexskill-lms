@@ -11,7 +11,7 @@ const PostComposer: React.FC<PostComposerProps> = ({
   mode,
   onSubmit,
   onCancel,
-  placeholder = "What would you like to share?",
+  placeholder ="What would you like to share?",
 }) => {
   const [content, setContent] = useState('');
 

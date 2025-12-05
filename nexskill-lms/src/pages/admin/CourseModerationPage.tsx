@@ -388,7 +388,7 @@ const CourseModerationPage: React.FC = () => {
 
   const handleInvestigate = (reportId: string) => {
     console.log('Investigating report:', reportId);
-    window.alert(`Report ${reportId} status changed to "Investigating".`);
+    window.alert(`Report ${reportId} status changed to"Investigating".`);
   };
 
   const handleResolve = (reportId: string) => {

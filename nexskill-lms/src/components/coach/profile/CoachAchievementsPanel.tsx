@@ -159,7 +159,7 @@ const CoachAchievementsPanel: React.FC<CoachAchievementsPanelProps> = ({
       <div className="space-y-4">
         {achievements.length === 0 && (
           <p className="text-sm text-[#9CA3B5] italic text-center py-6">
-            No achievements added yet. Click "+ Add" to showcase your accomplishments.
+            No achievements added yet. Click"+ Add" to showcase your accomplishments.
           </p>
         )}
         {achievements.map((achievement) => (

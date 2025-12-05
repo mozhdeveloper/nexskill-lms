@@ -244,7 +244,7 @@ const AdminSystemSettingsPage: React.FC = () => {
       action: 'UPDATED_FEATURE_FLAG',
       resourceType: 'FeatureToggle',
       resourceId: 'ft-1',
-      summary: 'Enabled feature "ai_student_coach" for segment global',
+      summary: 'Enabled feature"ai_student_coach" for segment global',
       ipAddress: '203.0.113.42',
     },
     {
@@ -266,7 +266,7 @@ const AdminSystemSettingsPage: React.FC = () => {
       action: 'GENERATED_API_KEY',
       resourceType: 'APIKey',
       resourceId: 'key-2',
-      summary: 'Generated new API key "Integration Service – Write" with write scope',
+      summary: 'Generated new API key"Integration Service – Write" with write scope',
       ipAddress: '192.0.2.100',
     },
     {
@@ -277,7 +277,7 @@ const AdminSystemSettingsPage: React.FC = () => {
       action: 'UPDATED_ROLE_PERMISSIONS',
       resourceType: 'Role',
       resourceId: 'role-3',
-      summary: 'Added permission "manage_courses" to Coach role',
+      summary: 'Added permission"manage_courses" to Coach role',
       ipAddress: '203.0.113.42',
     },
     {
@@ -299,7 +299,7 @@ const AdminSystemSettingsPage: React.FC = () => {
       action: 'REVOKED_API_KEY',
       resourceType: 'APIKey',
       resourceId: 'key-4',
-      summary: 'Revoked API key "Legacy Integration (deprecated)"',
+      summary: 'Revoked API key"Legacy Integration (deprecated)"',
       ipAddress: '198.51.100.88',
     },
     {
@@ -310,7 +310,7 @@ const AdminSystemSettingsPage: React.FC = () => {
       action: 'UPDATED_FEATURE_FLAG',
       resourceType: 'FeatureToggle',
       resourceId: 'ft-6',
-      summary: 'Disabled feature "gamification_badges" for segment beta',
+      summary: 'Disabled feature"gamification_badges" for segment beta',
       ipAddress: '203.0.113.42',
     },
     {
@@ -321,7 +321,7 @@ const AdminSystemSettingsPage: React.FC = () => {
       action: 'CREATED_ROLE',
       resourceType: 'Role',
       resourceId: 'role-5',
-      summary: 'Created new custom role "Org Admin" with organizational management permissions',
+      summary: 'Created new custom role"Org Admin" with organizational management permissions',
       ipAddress: '192.0.2.100',
     },
     {

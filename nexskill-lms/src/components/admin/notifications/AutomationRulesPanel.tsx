@@ -130,7 +130,7 @@ const AutomationRulesPanel: React.FC<AutomationRulesPanelProps> = ({
       status: 'enabled',
     });
     setIsCreating(false);
-    window.alert(`Automation rule "${newRule.name}" created successfully!`);
+    window.alert(`Automation rule"${newRule.name}" created successfully!`);
   };
 
   const handleDuplicate = (ruleId: string) => {
@@ -146,7 +146,7 @@ const AutomationRulesPanel: React.FC<AutomationRulesPanelProps> = ({
 
     onChange([...rules, duplicated]);
     console.log('Duplicated rule:', ruleId);
-    window.alert(`Rule "${rule.name}" duplicated successfully!`);
+    window.alert(`Rule"${rule.name}" duplicated successfully!`);
   };
 
   const handleToggleStatus = (ruleId: string) => {
@@ -167,7 +167,7 @@ const AutomationRulesPanel: React.FC<AutomationRulesPanelProps> = ({
 
     console.log('Simulating rule run:', ruleId);
     window.alert(
-      `Rule "${rule.name}" simulated (no real sends)!\n\nChannels: ${rule.channels.join(', ')}`
+      `Rule"${rule.name}" simulated (no real sends)!\n\nChannels: ${rule.channels.join(', ')}`
     );
   };
 
@@ -176,7 +176,7 @@ const AutomationRulesPanel: React.FC<AutomationRulesPanelProps> = ({
     if (!rule) return;
 
     console.log('Editing rule:', ruleId);
-    window.alert(`Edit rule "${rule.name}" - coming soon!`);
+    window.alert(`Edit rule"${rule.name}" - coming soon!`);
   };
 
   return (

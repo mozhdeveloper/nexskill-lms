@@ -215,7 +215,7 @@ const ReportedContentQueuePanel: React.FC<ReportedContentQueuePanelProps> = ({
 
               {/* Reason Snippet */}
               <p className="text-xs text-[#5F6473] mb-3 line-clamp-2">
-                "{report.reasonSnippet}"
+"{report.reasonSnippet}"
               </p>
 
               {/* Actions */}

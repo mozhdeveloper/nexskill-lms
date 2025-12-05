@@ -133,7 +133,7 @@ const CourseStudents: React.FC = () => {
   }) => {
     console.log('Sending announcement:', payload);
     setIsAnnouncementOpen(false);
-    alert(`Announcement "${payload.subject}" sent successfully! (simulated)`);
+    alert(`Announcement"${payload.subject}" sent successfully! (simulated)`);
   };
 
   return (

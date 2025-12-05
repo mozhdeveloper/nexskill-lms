@@ -83,7 +83,7 @@ const SmsTemplatesPanel: React.FC<SmsTemplatesPanelProps> = ({
 
     onChange([...templates, duplicated]);
     console.log('Duplicated SMS template:', templateId);
-    window.alert(`SMS template "${template.name}" duplicated successfully!`);
+    window.alert(`SMS template"${template.name}" duplicated successfully!`);
   };
 
   const handleToggleStatus = (templateId: string) => {
@@ -103,7 +103,7 @@ const SmsTemplatesPanel: React.FC<SmsTemplatesPanelProps> = ({
     if (!template) return;
 
     console.log('Sending test SMS for template:', templateId);
-    window.alert(`Test SMS sent (simulated) for "${template.name}"!`);
+    window.alert(`Test SMS sent (simulated) for"${template.name}"!`);
   };
 
   return (

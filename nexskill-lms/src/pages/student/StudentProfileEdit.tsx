@@ -12,7 +12,7 @@ const StudentProfileEdit: React.FC = () => {
     lastName: 'Johnson',
     displayName: 'Sarah Johnson',
     headline: 'Aspiring Product Designer',
-    bio: "I'm a career switcher passionate about creating user-centered digital experiences. Currently learning UI/UX design fundamentals and building my portfolio.",
+    bio:"I'm a career switcher passionate about creating user-centered digital experiences. Currently learning UI/UX design fundamentals and building my portfolio.",
   });
 
   const [interestsGoals, setInterestsGoals] = useState({

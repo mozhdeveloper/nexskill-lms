@@ -17,7 +17,7 @@ const SupportKnowledgeBasePage = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-blue-700">
             <div>• Use specific keywords for better results</div>
             <div>• Filter by category to narrow down articles</div>
-            <div>• Check "Most Helpful" articles first</div>
+            <div>• Check"Most Helpful" articles first</div>
             <div>• Bookmark frequently used articles</div>
           </div>
         </div>

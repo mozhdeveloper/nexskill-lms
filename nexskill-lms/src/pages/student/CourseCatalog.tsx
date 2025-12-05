@@ -199,9 +199,9 @@ const CourseCatalog: React.FC = () => {
   return (
     <StudentAppLayout>
       {/* Header */}
-      <div className="px-8 py-6 border-b border-[#EDF0FB] dark:border-gray-700">
-        <h1 className="text-2xl font-bold text-text-primary dark:text-dark-text-primary mb-1">Course Catalog</h1>
-        <p className="text-sm text-text-secondary dark:text-dark-text-secondary">
+      <div className="px-8 py-6 border-b border-[#EDF0FB]">
+        <h1 className="text-2xl font-bold text-text-primary mb-1">Course Catalog</h1>
+        <p className="text-sm text-text-secondary">
           Discover courses tailored to your learning goals
         </p>
       </div>
@@ -232,7 +232,7 @@ const CourseCatalog: React.FC = () => {
 
             {/* Results Count */}
             <div className="mb-4">
-              <p className="text-sm text-text-secondary dark:text-dark-text-secondary">
+              <p className="text-sm text-text-secondary">
                 {filteredCourses.length} {filteredCourses.length === 1 ? 'course' : 'courses'} found
               </p>
             </div>
@@ -249,12 +249,12 @@ const CourseCatalog: React.FC = () => {
                 ))}
               </div>
             ) : (
-              <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-card p-12 text-center transition-colors">
+              <div className="bg-white rounded-3xl shadow-card p-12 text-center transition-colors">
                 <div className="text-6xl mb-4">🔍</div>
-                <h3 className="text-xl font-semibold text-text-primary dark:text-dark-text-primary mb-2">
+                <h3 className="text-xl font-semibold text-text-primary mb-2">
                   No courses found
                 </h3>
-                <p className="text-text-secondary dark:text-dark-text-secondary">
+                <p className="text-text-secondary">
                   Try adjusting your filters or search query
                 </p>
               </div>

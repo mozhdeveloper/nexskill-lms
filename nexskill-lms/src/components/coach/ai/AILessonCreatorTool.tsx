@@ -196,7 +196,7 @@ const AILessonCreatorTool: React.FC = () => {
           <div className="flex flex-col items-center justify-center h-64 text-center">
             <div className="text-6xl mb-4">📖</div>
             <p className="text-[#9CA3B5]">
-              Provide your source content and click "Generate Lesson Structure" to create your
+              Provide your source content and click"Generate Lesson Structure" to create your
               lesson.
             </p>
           </div>

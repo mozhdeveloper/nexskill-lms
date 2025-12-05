@@ -95,7 +95,7 @@ const WhatsappBroadcastCenterPanel: React.FC<WhatsappBroadcastCenterPanelProps> 
       scheduledAt: '',
     });
     setIsCreating(false);
-    window.alert(`Broadcast "${newBroadcast.name}" has been saved!`);
+    window.alert(`Broadcast"${newBroadcast.name}" has been saved!`);
   };
 
   const handleSendTest = (broadcastId: string) => {
@@ -143,14 +143,14 @@ const WhatsappBroadcastCenterPanel: React.FC<WhatsappBroadcastCenterPanelProps> 
 
     onChange([...broadcasts, duplicated]);
     console.log('Duplicated broadcast:', broadcastId);
-    window.alert(`Broadcast duplicated as "${duplicated.name}"`);
+    window.alert(`Broadcast duplicated as"${duplicated.name}"`);
   };
 
   const handleArchive = (broadcastId: string) => {
     const broadcast = broadcasts.find((b) => b.id === broadcastId);
     if (!broadcast) return;
 
-    if (!window.confirm(`Archive broadcast "${broadcast.name}"?`)) return;
+    if (!window.confirm(`Archive broadcast"${broadcast.name}"?`)) return;
 
     const updated = broadcasts.filter((b) => b.id !== broadcastId);
     onChange(updated);

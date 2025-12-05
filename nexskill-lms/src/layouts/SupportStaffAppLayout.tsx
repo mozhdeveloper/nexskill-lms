@@ -23,17 +23,17 @@ const SupportStaffAppLayout: React.FC<SupportStaffAppLayoutProps> = ({ children 
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#EFF6FF] via-[#E0F2FE] to-[#DBEAFE] dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-8 transition-colors">
-      <div className="max-w-[1440px] mx-auto bg-white dark:bg-dark-background-shell rounded-[32px] shadow-card overflow-hidden flex transition-colors" style={{ minHeight: 'calc(100vh - 64px)' }}>
+    <div className="min-h-screen bg-gradient-to-br from-[#EFF6FF] via-[#E0F2FE] to-[#DBEAFE] p-8 transition-colors">
+      <div className="max-w-[1440px] mx-auto bg-white rounded-[32px] shadow-card overflow-hidden flex transition-colors" style={{ minHeight: 'calc(100vh - 64px)' }}>
         {/* Left Sidebar */}
-        <aside className="w-[240px] flex-shrink-0 flex flex-col p-6 border-r border-[#EDF0FB] dark:border-gray-700">
+        <aside className="w-[240px] flex-shrink-0 flex flex-col p-6 border-r border-[#EDF0FB]">
           {/* Logo */}
           <div className="mb-8">
             <Link to="/support/dashboard" className="flex items-center gap-3">
               <BrandLogo size="md" showText={false} />
               <div>
-                <span className="text-xl font-bold text-blue-600 dark:text-blue-400 block leading-tight">NexSkill</span>
-                <span className="text-xs text-slate-600 dark:text-gray-400">Support Staff</span>
+                <span className="text-xl font-bold text-blue-600 block leading-tight">NexSkill</span>
+                <span className="text-xs text-slate-600">Support Staff</span>
               </div>
             </Link>
           </div>
@@ -47,7 +47,7 @@ const SupportStaffAppLayout: React.FC<SupportStaffAppLayoutProps> = ({ children 
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                   isActive(item.path)
                     ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md'
-                    : 'text-text-secondary dark:text-dark-text-secondary hover:bg-[#EFF6FF] dark:hover:bg-gray-800 hover:text-text-primary dark:hover:text-dark-text-primary'
+                    : 'text-text-secondary hover:bg-[#EFF6FF] hover:text-text-primary'
                 }`}
               >
                 <span className="text-lg">{item.icon}</span>

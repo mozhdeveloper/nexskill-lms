@@ -97,7 +97,7 @@ const BulkEmailCampaignsPanel: React.FC<BulkEmailCampaignsPanelProps> = ({
       scheduledAt: '',
     });
     setIsCreating(false);
-    window.alert(`Campaign "${newCampaign.name}" has been saved!`);
+    window.alert(`Campaign"${newCampaign.name}" has been saved!`);
   };
 
   const handleSendTest = (campaignId: string) => {
@@ -146,14 +146,14 @@ const BulkEmailCampaignsPanel: React.FC<BulkEmailCampaignsPanelProps> = ({
 
     onChange([...campaigns, duplicated]);
     console.log('Duplicated campaign:', campaignId);
-    window.alert(`Campaign duplicated as "${duplicated.name}"`);
+    window.alert(`Campaign duplicated as"${duplicated.name}"`);
   };
 
   const handleArchive = (campaignId: string) => {
     const campaign = campaigns.find((c) => c.id === campaignId);
     if (!campaign) return;
 
-    if (!window.confirm(`Archive campaign "${campaign.name}"?`)) return;
+    if (!window.confirm(`Archive campaign"${campaign.name}"?`)) return;
 
     const updated = campaigns.filter((c) => c.id !== campaignId);
     onChange(updated);

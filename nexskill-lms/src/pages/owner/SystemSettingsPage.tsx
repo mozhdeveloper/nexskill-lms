@@ -49,13 +49,6 @@ const SystemSettingsPage: React.FC = () => {
       enabled: true,
       category: 'Engagement',
     },
-    {
-      id: 'dark-mode',
-      name: 'Dark Mode',
-      description: 'Allow users to switch to dark theme',
-      enabled: true,
-      category: 'UI/UX',
-    },
   ]);
 
   const toggleFeature = (id: string) => {

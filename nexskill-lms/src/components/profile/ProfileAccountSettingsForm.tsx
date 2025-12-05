@@ -94,7 +94,7 @@ const ProfileAccountSettingsForm: React.FC<ProfileAccountSettingsFormProps> = ({
           <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
             <h3 className="text-xl font-bold text-slate-900 mb-4">Change password</h3>
             <p className="text-sm text-slate-600 mb-4">
-              Password change functionality coming soon. For now, use the "Forgot password" link on the
+              Password change functionality coming soon. For now, use the"Forgot password" link on the
               login page.
             </p>
             <button

@@ -24,7 +24,7 @@ const dummyThread: Thread = {
   createdAt: '2 hours ago',
   body: `I've been working on a large application and struggling to decide between Context API and Redux. What do you all recommend for managing global state?
 
-My app has about 20 different components that need access to user authentication state, theme preferences, and some shared data from API calls. I've heard Context can cause performance issues with frequent updates, but Redux seems like overkill for my use case.
+My app has about 20 different components that need access to user authentication state and some shared data from API calls. I've heard Context can cause performance issues with frequent updates, but Redux seems like overkill for my use case.
 
 Has anyone dealt with a similar situation? What factors helped you make your decision? I'd love to hear about your experiences and any gotchas to watch out for.`,
   reactions: [
@@ -55,7 +55,7 @@ const dummyComments = [
         id: 'c1-r2',
         authorName: 'Michael Torres',
         createdAt: '30 minutes ago',
-        body: 'Not really. The key is splitting your contexts by concern. I have separate contexts for auth, theme, and API data. This way, components only re-render when their specific context changes.',
+        body: 'Not really. The key is splitting your contexts by concern. I have separate contexts for auth and API data. This way, components only re-render when their specific context changes.',
         reactions: [
           { type: 'like', count: 5 },
           { type: 'helpful', count: 3, emoji: '💡' },

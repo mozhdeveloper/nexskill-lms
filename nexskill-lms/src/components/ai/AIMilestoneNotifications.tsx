@@ -28,7 +28,7 @@ const AIMilestoneNotifications: React.FC<AIMilestoneNotificationsProps> = ({ pro
     {
       id: 2,
       icon: '⭐',
-      text: "You're 2 quizzes away from the 'Frontend Beginner' badge.",
+      text:"You're 2 quizzes away from the 'Frontend Beginner' badge.",
       tag: 'Upcoming',
       tagColor: 'bg-purple-100 text-purple-700',
     },
@@ -42,7 +42,7 @@ const AIMilestoneNotifications: React.FC<AIMilestoneNotificationsProps> = ({ pro
     {
       id: 4,
       icon: '🏆',
-      text: 'You earned the "Quick Learner" achievement for completing 10 lessons in a week!',
+      text: 'You earned the"Quick Learner" achievement for completing 10 lessons in a week!',
       tag: 'Achieved',
       tagColor: 'bg-green-100 text-green-700',
     },

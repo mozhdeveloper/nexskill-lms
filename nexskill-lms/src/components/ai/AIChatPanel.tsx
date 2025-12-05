@@ -43,22 +43,22 @@ const AIChatPanel: React.FC = () => {
     const lowerMessage = userMessage.toLowerCase();
 
     if (lowerMessage.includes('quiz')) {
-      return "You've scored an average of 82% on quizzes. Keep up the great work! Need help preparing for your next quiz?";
+      return"You've scored an average of 82% on quizzes. Keep up the great work! Need help preparing for your next quiz?";
     }
     if (lowerMessage.includes('stuck') || lowerMessage.includes('help')) {
-      return "I'm here to help! Can you tell me which lesson or concept you're struggling with? I can explain it in simpler terms.";
+      return"I'm here to help! Can you tell me which lesson or concept you're struggling with? I can explain it in simpler terms.";
     }
     if (lowerMessage.includes('schedule') || lowerMessage.includes('time')) {
-      return "Based on your pattern, you're most active on Wednesdays. I recommend scheduling 30-minute blocks at 7 PM for best retention.";
+      return"Based on your pattern, you're most active on Wednesdays. I recommend scheduling 30-minute blocks at 7 PM for best retention.";
     }
     if (lowerMessage.includes('recommend') || lowerMessage.includes('next course')) {
-      return "Based on your progress in UI Design, I recommend exploring 'Advanced Figma Techniques' or 'Design Systems Fundamentals' next. Both align with your learning goals!";
+      return"Based on your progress in UI Design, I recommend exploring 'Advanced Figma Techniques' or 'Design Systems Fundamentals' next. Both align with your learning goals!";
     }
     if (lowerMessage.includes('motivation') || lowerMessage.includes('tired')) {
-      return "Remember why you started! You've already completed 35% of your learning path. Small daily progress adds up to big achievements. You've got this! 💪";
+      return"Remember why you started! You've already completed 35% of your learning path. Small daily progress adds up to big achievements. You've got this! 💪";
     }
 
-    return "Great question! I can help you with course recommendations, study schedules, quiz preparation, or explain difficult concepts. What would you like to focus on?";
+    return"Great question! I can help you with course recommendations, study schedules, quiz preparation, or explain difficult concepts. What would you like to focus on?";
   };
 
   const handleSend = () => {

@@ -186,7 +186,7 @@ const OrgLearnersPage: React.FC = () => {
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-purple-600 mt-0.5">•</span>
-                    <span>Learners marked "At Risk" haven't been active in 5+ days</span>
+                    <span>Learners marked"At Risk" haven't been active in 5+ days</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-purple-600 mt-0.5">•</span>

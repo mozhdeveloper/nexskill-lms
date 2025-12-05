@@ -10,13 +10,7 @@
   }
   
   body {
-    @apply m-0 font-sans text-text-primary dark:text-dark-text-primary antialiased;
-    @apply bg-white dark:bg-dark-background-shell;
-    transition: background-color 0.3s ease, color 0.3s ease;
-  }
-
-  /* Dark mode transitions for common elements */
-  html.dark {
-    color-scheme: dark;
+    @apply m-0 font-sans text-text-primary antialiased;
+    @apply bg-white;
   }
 }

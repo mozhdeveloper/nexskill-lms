@@ -222,7 +222,7 @@ const SubCoachStudentsPage: React.FC = () => {
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-cyan-600">•</span>
-                    <span>Students marked "At Risk" need immediate attention - reach out to them</span>
+                    <span>Students marked"At Risk" need immediate attention - reach out to them</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-cyan-600">•</span>

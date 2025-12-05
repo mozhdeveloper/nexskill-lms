@@ -90,7 +90,7 @@ const FunnelsManagerPanel: React.FC<FunnelsManagerPanelProps> = ({ funnels, onCh
       step3: '',
     });
     setIsCreating(false);
-    window.alert(`Funnel "${newFunnel.name}" has been created!`);
+    window.alert(`Funnel"${newFunnel.name}" has been created!`);
   };
 
   const handleToggleStatus = (funnelId: string) => {
@@ -134,14 +134,14 @@ const FunnelsManagerPanel: React.FC<FunnelsManagerPanelProps> = ({ funnels, onCh
     if (!funnel) return;
 
     console.log('Viewing analytics for funnel:', funnelId);
-    window.alert(`Analytics for "${funnel.name}":\n\nLeads in funnel: ${funnel.leadsInFunnel}\nConversion rate: ${funnel.conversionRate}%\n\nDetailed analytics coming soon!`);
+    window.alert(`Analytics for"${funnel.name}":\n\nLeads in funnel: ${funnel.leadsInFunnel}\nConversion rate: ${funnel.conversionRate}%\n\nDetailed analytics coming soon!`);
   };
 
   const handleArchive = (funnelId: string) => {
     const funnel = funnels.find((f) => f.id === funnelId);
     if (!funnel) return;
 
-    if (!window.confirm(`Archive funnel "${funnel.name}"?`)) return;
+    if (!window.confirm(`Archive funnel"${funnel.name}"?`)) return;
 
     const updated = funnels.map((f) =>
       f.id === funnelId ? { ...f, status: 'archived' as const } : f

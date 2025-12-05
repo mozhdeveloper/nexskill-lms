@@ -221,7 +221,7 @@ const AICourseOutlineTool: React.FC = () => {
           <div className="flex flex-col items-center justify-center h-64 text-center">
             <div className="text-6xl mb-4">📋</div>
             <p className="text-[#9CA3B5]">
-              Fill in the form and click "Generate Outline" to see your course structure.
+              Fill in the form and click"Generate Outline" to see your course structure.
             </p>
           </div>
         ) : (

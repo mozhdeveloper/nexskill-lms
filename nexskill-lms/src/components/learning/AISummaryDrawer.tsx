@@ -92,7 +92,7 @@ const AISummaryDrawer: React.FC<AISummaryDrawerProps> = ({ isOpen, onClose, less
               <ul className="space-y-2 text-sm text-text-secondary">
                 <li>• Practice building custom hooks with the provided exercises</li>
                 <li>• Review the performance optimization checklist</li>
-                <li>• Move on to the next lesson: "Advanced Context Patterns"</li>
+                <li>• Move on to the next lesson:"Advanced Context Patterns"</li>
               </ul>
             </div>
 

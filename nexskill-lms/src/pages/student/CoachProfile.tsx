@@ -11,13 +11,13 @@ const coachesData: Record<string, any> = {
     rating: 4.9,
     sessionsCount: 245,
     tags: ['Career Growth', 'Interview Prep', 'Resume Review'],
-    bio: "With over 15 years of experience in career development and executive coaching, I've helped hundreds of professionals navigate career transitions, land dream jobs, and develop leadership skills. My approach combines practical strategies with empathetic guidance tailored to your unique journey.",
+    bio:"With over 15 years of experience in career development and executive coaching, I've helped hundreds of professionals navigate career transitions, land dream jobs, and develop leadership skills. My approach combines practical strategies with empathetic guidance tailored to your unique journey.",
     expertise: ['Career Transitions', 'Leadership Development', 'Personal Branding', 'Salary Negotiation'],
     education: ['PhD in Organizational Psychology, Stanford University', 'Certified Executive Coach (ICF)'],
     experience: [
       'Former VP of Talent at TechCorp (2015-2020)',
       'Senior Career Advisor at LinkedIn (2010-2015)',
-      'Published author of "Navigate Your Career"',
+      'Published author of"Navigate Your Career"',
     ],
     testimonials: [
       {

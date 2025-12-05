@@ -36,10 +36,10 @@ const AIVideoScriptTool: React.FC = () => {
 
       // Hook/Intro
       const toneIntros: Record<string, string> = {
-        friendly: "Hey there! Welcome back to the channel. Today, we're diving into something really exciting",
-        professional: "Good day. In today's lesson, we'll be examining the critical aspects of",
-        inspirational: "Imagine being able to master this skill completely. That's exactly what we're going to achieve today as we explore",
-        casual: "What's up everyone! So today I want to talk about something super cool",
+        friendly:"Hey there! Welcome back to the channel. Today, we're diving into something really exciting",
+        professional:"Good day. In today's lesson, we'll be examining the critical aspects of",
+        inspirational:"Imagine being able to master this skill completely. That's exactly what we're going to achieve today as we explore",
+        casual:"What's up everyone! So today I want to talk about something super cool",
       };
 
       sections.push({
@@ -57,7 +57,7 @@ const AIVideoScriptTool: React.FC = () => {
       for (let i = 1; i <= segmentCount; i++) {
         sections.push({
           title: `Segment ${i}: Core Concept ${i}`,
-          content: `Now, let's talk about the ${i === 1 ? 'first' : i === 2 ? 'second' : i === 3 ? 'third' : 'fourth'} key element of ${formData.topic}. This is crucial because it forms the foundation of everything else we'll cover. Here's what you need to know: [Explain the concept with examples]. Remember, the key here is to understand not just the "what" but also the "why" behind it. Let me show you a practical example... [Demonstrate with specifics]. This is something you can start applying immediately in your own projects.`,
+          content: `Now, let's talk about the ${i === 1 ? 'first' : i === 2 ? 'second' : i === 3 ? 'third' : 'fourth'} key element of ${formData.topic}. This is crucial because it forms the foundation of everything else we'll cover. Here's what you need to know: [Explain the concept with examples]. Remember, the key here is to understand not just the"what" but also the "why" behind it. Let me show you a practical example... [Demonstrate with specifics]. This is something you can start applying immediately in your own projects.`,
         });
       }
 
@@ -66,10 +66,10 @@ const AIVideoScriptTool: React.FC = () => {
         title: 'Recap & Call-to-Action',
         content: `Alright, let's quickly recap what we've covered today about ${formData.topic}. We explored the core concepts, looked at practical applications, and discussed how you can implement these techniques right away. ${
           formData.tone === 'inspirational'
-            ? "Remember, every expert was once a beginner. You've got this!"
+            ?"Remember, every expert was once a beginner. You've got this!"
             : formData.tone === 'professional'
             ? 'These principles will serve as a strong foundation for your continued learning.'
-            : "I hope you found this helpful!"
+            :"I hope you found this helpful!"
         } If you enjoyed this video, don't forget to like and subscribe for more content. Drop a comment below letting me know what topic you'd like me to cover next. Thanks for watching, and I'll see you in the next one!`,
       });
 
@@ -176,7 +176,7 @@ const AIVideoScriptTool: React.FC = () => {
           <div className="flex flex-col items-center justify-center h-64 text-center">
             <div className="text-6xl mb-4">🎬</div>
             <p className="text-[#9CA3B5]">
-              Fill in the details and click "Generate Script" to create your video script.
+              Fill in the details and click"Generate Script" to create your video script.
             </p>
           </div>
         ) : (
