@@ -21,7 +21,6 @@ const AdminAppLayout: React.FC<AdminAppLayoutProps> = ({ children }) => {
     { label: 'CRM & Marketing', path: '/admin/crm-marketing', icon: '📢' },
     { label: 'Notifications', path: '/admin/notifications', icon: '🔔' },
     { label: 'Analytics', path: '/admin/analytics', icon: '📈' },
-    { label: 'Reports', path: '/admin/reports', icon: '📋' },
     { label: 'Security', path: '/admin/security', icon: '🔒' },
     { label: 'Settings', path: '/admin/settings', icon: '⚙️' },
   ];

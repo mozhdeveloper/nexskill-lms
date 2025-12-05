@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import OrgOwnerLayout from '../../layouts/OrgOwnerLayout';
+import OrgOwnerAppLayout from '../../layouts/OrgOwnerAppLayout';
 import OrgSeatsSummaryCard from '../../components/org/OrgSeatsSummaryCard';
 
 interface SeatAllocation {
@@ -38,8 +38,13 @@ const OrgSeatsPage: React.FC = () => {
     setSelectedAllocation(null);
   };
 
+  const handlePurchaseSeats = () => {
+    console.log('Opening purchase modal...');
+    alert('Purchase seats modal would open here');
+  };
+
   return (
-    <OrgOwnerLayout>
+    <OrgOwnerAppLayout>
       {/* Header */}
       <div className="px-8 py-6 border-b border-[#EDF0FB]">
         <div className="flex items-start justify-between">
@@ -49,7 +54,10 @@ const OrgSeatsPage: React.FC = () => {
               Manage license allocation across your organization
             </p>
           </div>
-          <button className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl hover:shadow-lg transition-all text-sm font-semibold">
+          <button 
+            onClick={handlePurchaseSeats}
+            className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl hover:shadow-lg transition-all text-sm font-semibold"
+          >
             🛒 Purchase More Seats
           </button>
         </div>
@@ -262,7 +270,7 @@ const OrgSeatsPage: React.FC = () => {
           </div>
         </div>
       )}
-    </OrgOwnerLayout>
+    </OrgOwnerAppLayout>
   );
 };
 

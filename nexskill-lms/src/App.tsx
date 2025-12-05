@@ -48,6 +48,7 @@ import CoachProfilePage from './pages/coach/CoachProfilePage';
 import AdminLogin from './pages/auth/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import UsersManagementPage from './pages/admin/UsersManagementPage';
+import CoachesManagementPage from './pages/admin/CoachesManagementPage';
 import CourseModerationPage from './pages/admin/CourseModerationPage';
 import FinancialControlPage from './pages/admin/FinancialControlPage';
 import AdminCrmMarketingPage from './pages/admin/AdminCrmMarketingPage';
@@ -104,6 +105,11 @@ import OrgTeamPage from './pages/org/OrgTeamPage';
 import OrgSeatsPage from './pages/org/OrgSeatsPage';
 import OrgLearnersPage from './pages/org/OrgLearnersPage';
 import OrgAnalyticsPage from './pages/org/OrgAnalyticsPage';
+import OrgProgramsPage from './pages/org/OrgProgramsPage';
+import OrgLicensesPage from './pages/org/OrgLicensesPage';
+import OrgBillingPage from './pages/org/OrgBillingPage';
+import OrgBrandingPage from './pages/org/OrgBrandingPage';
+import OrgSettingsPage from './pages/org/OrgSettingsPage';
 
 // Content Editor Pages
 import ContentEditorDashboardPage from './pages/content/ContentEditorDashboardPage';
@@ -148,6 +154,7 @@ function App() {
         {/* Admin Routes - accessible by PLATFORM_OWNER and ADMIN */}
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/users" element={<UsersManagementPage />} />
+        <Route path="/admin/coaches" element={<CoachesManagementPage />} />
         <Route path="/admin/courses/moderation" element={<CourseModerationPage />} />
         <Route path="/admin/funnels" element={<FunnelDashboardPage />} />
         <Route path="/admin/funnels/:funnelId" element={<FunnelBuilderPage />} />
@@ -214,6 +221,11 @@ function App() {
         <Route path="/org/seats" element={<OrgSeatsPage />} />
         <Route path="/org/learners" element={<OrgLearnersPage />} />
         <Route path="/org/analytics" element={<OrgAnalyticsPage />} />
+        <Route path="/org/programs" element={<OrgProgramsPage />} />
+        <Route path="/org/licenses" element={<OrgLicensesPage />} />
+        <Route path="/org/billing" element={<OrgBillingPage />} />
+        <Route path="/org/branding" element={<OrgBrandingPage />} />
+        <Route path="/org/settings" element={<OrgSettingsPage />} />
         
         {/* Student Routes */}
         <Route path="/student/dashboard" element={<StudentDashboard />} />

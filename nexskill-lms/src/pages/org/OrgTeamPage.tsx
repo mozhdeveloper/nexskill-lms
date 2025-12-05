@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import OrgOwnerLayout from '../../layouts/OrgOwnerLayout';
+import OrgOwnerAppLayout from '../../layouts/OrgOwnerAppLayout';
 import OrgTeamTable from '../../components/org/OrgTeamTable';
 
 const OrgTeamPage: React.FC = () => {
@@ -18,7 +18,7 @@ const OrgTeamPage: React.FC = () => {
   };
 
   return (
-    <OrgOwnerLayout>
+    <OrgOwnerAppLayout>
       {/* Header */}
       <div className="px-8 py-6 border-b border-[#EDF0FB]">
         <div className="flex items-start justify-between">
@@ -157,7 +157,7 @@ const OrgTeamPage: React.FC = () => {
           </div>
         </div>
       )}
-    </OrgOwnerLayout>
+    </OrgOwnerAppLayout>
   );
 };
 

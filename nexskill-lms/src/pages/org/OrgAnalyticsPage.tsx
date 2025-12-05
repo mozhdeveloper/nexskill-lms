@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import OrgOwnerLayout from '../../layouts/OrgOwnerLayout';
+import OrgOwnerAppLayout from '../../layouts/OrgOwnerAppLayout';
 import OrgAnalyticsOverview from '../../components/org/OrgAnalyticsOverview';
 
 const OrgAnalyticsPage: React.FC = () => {
@@ -13,8 +13,13 @@ const OrgAnalyticsPage: React.FC = () => {
     'UI/UX Design Principles',
   ];
 
+  const handleDownloadReport = () => {
+    console.log('Downloading analytics report...');
+    alert('Analytics report download started!');
+  };
+
   return (
-    <OrgOwnerLayout>
+    <OrgOwnerAppLayout>
       {/* Header */}
       <div className="px-8 py-6 border-b border-[#EDF0FB]">
         <div className="flex items-start justify-between">
@@ -24,7 +29,10 @@ const OrgAnalyticsPage: React.FC = () => {
               Analytics specific to your organization's learners and performance
             </p>
           </div>
-          <button className="px-4 py-2 bg-white border border-gray-200 text-text-primary rounded-xl hover:bg-gray-50 transition-all text-sm font-medium">
+          <button 
+            onClick={handleDownloadReport}
+            className="px-4 py-2 bg-white border border-gray-200 text-text-primary rounded-xl hover:bg-gray-50 transition-all text-sm font-medium"
+          >
             📥 Download Report
           </button>
         </div>
@@ -259,7 +267,7 @@ const OrgAnalyticsPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </OrgOwnerLayout>
+    </OrgOwnerAppLayout>
   );
 };
 

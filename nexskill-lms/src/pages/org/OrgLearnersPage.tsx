@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import OrgOwnerLayout from '../../layouts/OrgOwnerLayout';
+import OrgOwnerAppLayout from '../../layouts/OrgOwnerAppLayout';
 import OrgLearnersTable from '../../components/org/OrgLearnersTable';
 
 const OrgLearnersPage: React.FC = () => {
@@ -17,8 +17,18 @@ const OrgLearnersPage: React.FC = () => {
 
   const statuses = ['Active', 'Completed', 'At Risk'];
 
+  const handleExportData = () => {
+    console.log('Exporting learners data...');
+    alert('Data export started!');
+  };
+
+  const handleAddLearner = () => {
+    console.log('Opening add learner modal...');
+    alert('Add learner modal would open here');
+  };
+
   return (
-    <OrgOwnerLayout>
+    <OrgOwnerAppLayout>
       {/* Header */}
       <div className="px-8 py-6 border-b border-[#EDF0FB]">
         <div className="flex items-start justify-between">
@@ -29,10 +39,16 @@ const OrgLearnersPage: React.FC = () => {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button className="px-4 py-2 bg-white border border-gray-200 text-text-primary rounded-xl hover:bg-gray-50 transition-all text-sm font-medium">
+            <button 
+              onClick={handleExportData}
+              className="px-4 py-2 bg-white border border-gray-200 text-text-primary rounded-xl hover:bg-gray-50 transition-all text-sm font-medium"
+            >
               📥 Export Data
             </button>
-            <button className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl hover:shadow-lg transition-all text-sm font-semibold">
+            <button 
+              onClick={handleAddLearner}
+              className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl hover:shadow-lg transition-all text-sm font-semibold"
+            >
               + Add Learner
             </button>
           </div>
@@ -198,7 +214,7 @@ const OrgLearnersPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </OrgOwnerLayout>
+    </OrgOwnerAppLayout>
   );
 };
 

@@ -1,13 +1,23 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import OrgOwnerLayout from '../../layouts/OrgOwnerLayout';
+import OrgOwnerAppLayout from '../../layouts/OrgOwnerAppLayout';
 import OrgOwnerKpiStrip from '../../components/org/OrgOwnerKpiStrip';
 import OrgSeatsSummaryCard from '../../components/org/OrgSeatsSummaryCard';
 import OrgAnalyticsOverview from '../../components/org/OrgAnalyticsOverview';
 
 const OrgDashboardPage: React.FC = () => {
+  const handleDownloadReport = () => {
+    console.log('Downloading report...');
+    alert('Report download started!');
+  };
+
+  const handleInviteMembers = () => {
+    console.log('Opening invite modal...');
+    alert('Invite members modal would open here');
+  };
+
   return (
-    <OrgOwnerLayout>
+    <OrgOwnerAppLayout>
       {/* Header */}
       <div className="px-8 py-6 border-b border-[#EDF0FB]">
         <div className="flex items-start justify-between">
@@ -20,10 +30,16 @@ const OrgDashboardPage: React.FC = () => {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button className="px-4 py-2 bg-white border border-gray-200 text-text-primary rounded-xl hover:bg-gray-50 transition-all text-sm font-medium">
+            <button 
+              onClick={handleDownloadReport}
+              className="px-4 py-2 bg-white border border-gray-200 text-text-primary rounded-xl hover:bg-gray-50 transition-all text-sm font-medium"
+            >
               📥 Download Report
             </button>
-            <button className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl hover:shadow-lg transition-all text-sm font-semibold">
+            <button 
+              onClick={handleInviteMembers}
+              className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl hover:shadow-lg transition-all text-sm font-semibold"
+            >
               👥 Invite Members
             </button>
           </div>
@@ -131,7 +147,7 @@ const OrgDashboardPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </OrgOwnerLayout>
+    </OrgOwnerAppLayout>
   );
 };
 
