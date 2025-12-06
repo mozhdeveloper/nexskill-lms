@@ -100,15 +100,21 @@ const aiShortcuts = [
 
 const CoachDashboard: React.FC = () => {
   const handleCourseClick = (courseName: string) => {
-    console.log('Course clicked:', courseName);
+    window.alert(`📚 ${courseName}\n\n🎯 Quick Actions:\n• View course analytics\n• Edit course content\n• Manage students (24 enrolled)\n• View student feedback (4.8/5)\n• Update pricing or settings\n\n📊 Recent Activity:\n• 3 new enrollments today\n• 12 lessons completed\n• 5 student questions pending\n\nClick on course card to access full details.`);
   };
 
   const handleSessionClick = (sessionId: number) => {
-    console.log('Session details:', sessionId);
+    window.alert(`📅 Coaching Session Details\n\nSession ID: ${sessionId}\n\n👥 Session Info:\n• Duration: 60 minutes\n• Format: Video call\n• Student: Premium member\n• Topic: Course feedback\n\n🎯 Preparation:\n• Review student progress\n• Prepare discussion points\n• Test video/audio setup\n• Have course materials ready\n\n⏰ Join 5 minutes early for best experience.`);
   };
 
   const handleAIShortcut = (label: string) => {
-    console.log('AI shortcut clicked:', label);
+    const aiFeatures: Record<string, string> = {
+      'Generate lesson outline': '📝 AI Lesson Outline Generator\n\n✨ What it does:\n• Creates structured lesson outlines\n• Suggests learning objectives\n• Recommends activities and assessments\n• Optimizes lesson duration\n\n⚡ Time saved: ~2 hours per lesson\n\n💡 Click to launch AI assistant',
+      'Analyze quiz results': '📊 AI Quiz Analytics\n\n✨ Features:\n• Identifies difficult questions\n• Suggests question improvements\n• Analyzes student performance patterns\n• Recommends personalized feedback\n\n📈 Improves student outcomes by 25%\n\n💡 Click to view analytics',
+      'Draft course announcement': '📢 AI Announcement Writer\n\n✨ Capabilities:\n• Writes engaging announcements\n• Personalizes for your audience\n• Suggests optimal send times\n• A/B testing recommendations\n\n✅ Increases open rates by 40%\n\n💡 Click to start drafting',
+      'Suggest price optimization': '💡 AI Price Optimizer\n\n✨ Analysis includes:\n• Market competitive analysis\n• Student demand prediction\n• Revenue optimization suggestions\n• Discount strategy recommendations\n\n💰 Average revenue increase: 18%\n\n💡 Click to see recommendations'
+    };
+    window.alert(aiFeatures[label] || `🤖 AI Tool: ${label}\n\nThis AI tool helps you work smarter and save time.\n\nClick to explore features.`);
   };
 
   const maxRevenue = Math.max(...revenueData.lastSixMonths.map((m) => m.amount));

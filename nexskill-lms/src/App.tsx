@@ -45,6 +45,9 @@ import CourseStudents from './pages/coach/CourseStudents';
 import CoachingToolsHub from './pages/coach/CoachingToolsHub';
 import EarningsDashboard from './pages/coach/EarningsDashboard';
 import CoachProfilePage from './pages/coach/CoachProfilePage';
+import CoachMessagesPage from './pages/coach/CoachMessagesPage';
+import CoachStudentsPage from './pages/coach/CoachStudentsPage';
+import CoachQuizzesPage from './pages/coach/CoachQuizzesPage';
 import AdminLogin from './pages/auth/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import UsersManagementPage from './pages/admin/UsersManagementPage';
@@ -177,6 +180,9 @@ function App() {
         <Route path="/coach/coaching-tools" element={<CoachingToolsHub />} />
         <Route path="/coach/earnings" element={<EarningsDashboard />} />
         <Route path="/coach/profile" element={<CoachProfilePage />} />
+        <Route path="/coach/messages" element={<CoachMessagesPage />} />
+        <Route path="/coach/students" element={<CoachStudentsPage />} />
+        <Route path="/coach/quizzes" element={<CoachQuizzesPage />} />
         
         {/* Sub-Coach Routes */}
         <Route path="/subcoach/dashboard" element={<SubCoachDashboardPage />} />

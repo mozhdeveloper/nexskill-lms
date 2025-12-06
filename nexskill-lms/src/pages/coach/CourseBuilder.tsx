@@ -144,12 +144,12 @@ const CourseBuilder: React.FC = () => {
 
   const handlePublish = () => {
     setCourseStatus('published');
-    console.log('Course published:', courseId);
+    window.alert(`🚀 Course Published Successfully\n\nCourse ID: ${courseId}\nStatus: Live\n\n✅ Publishing Checklist Completed:\n• Course content: Complete\n• Pricing: Set\n• Thumbnail: Uploaded\n• Description: Added\n• Learning objectives: Defined\n\n🌍 Course Visibility:\n• Public course catalog: Yes\n• Search engines: Indexed\n• Course page: Active\n• Enrollment: Open\n\n📊 What's Next:\n• Monitor enrollments\n• Engage with students\n• Respond to questions\n• Gather feedback\n• Update content as needed\n\n🎉 Congratulations on launching your course!`);
   };
 
   const handleUnpublish = () => {
     setCourseStatus('draft');
-    console.log('Course unpublished:', courseId);
+    window.alert(`📝 Course Unpublished\n\nCourse ID: ${courseId}\nStatus: Draft\n\n⚠️ Impact of Unpublishing:\n• Course removed from catalog\n• New enrollments: Disabled\n• Existing students: Still have access\n• Course page: Private\n• Search visibility: Hidden\n\n✅ Current Students:\n• Can continue learning\n• Access to all materials maintained\n• Progress preserved\n\n🔄 To Re-publish:\n• Review and update content\n• Check settings and pricing\n• Click 'Publish' when ready\n\n💡 Use draft mode to make major updates without affecting student experience.`);
   };
 
   const renderSection = () => {

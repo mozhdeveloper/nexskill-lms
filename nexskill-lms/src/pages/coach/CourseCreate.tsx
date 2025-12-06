@@ -38,7 +38,7 @@ const CourseCreate: React.FC = () => {
     e.preventDefault();
     // Generate dummy courseId
     const courseId = `course-${Date.now()}`;
-    console.log('Creating course:', { id: courseId, ...formData });
+    window.alert(`✅ Course Created Successfully\n\nCourse: ${formData.title}\nCategory: ${formData.category}\nLevel: ${formData.level}\nLanguage: ${formData.language}\n\n📚 Course Setup:\n• Course ID: ${courseId}\n• Status: Draft\n• Visibility: Private\n\n🎯 Next Steps:\n1. Add course description and objectives\n2. Upload course thumbnail\n3. Create curriculum and lessons\n4. Set pricing and enrollment options\n5. Preview and publish\n\n💡 You can save your progress at any time and return later.`);
     // Navigate to builder with initial data
     navigate(`/coach/courses/${courseId}/edit`, { state: { newCourse: true, ...formData } });
   };
