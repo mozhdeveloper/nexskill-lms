@@ -148,9 +148,6 @@ const CoachesManagementPage: React.FC = () => {
               <h1 className="text-3xl font-bold text-[#111827] mb-2">Coaches Management</h1>
               <p className="text-[#5F6473]">Manage and monitor all coaches on the platform</p>
             </div>
-            <button className="px-6 py-3 bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white font-semibold rounded-full hover:shadow-lg transition-all">
-              + Add New Coach
-            </button>
           </div>
 
           {/* Stats Cards */}
