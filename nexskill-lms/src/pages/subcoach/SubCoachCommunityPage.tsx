@@ -3,6 +3,12 @@ import SubCoachAppLayout from '../../layouts/SubCoachAppLayout';
 
 const SubCoachCommunityPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'recent' | 'reported'>('recent');
+  const [showReplyModal, setShowReplyModal] = useState(false);
+  const [showReportedModal, setShowReportedModal] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [moderationNote, setModerationNote] = useState('');
+
 
   // Dummy recent posts
   const recentPosts = [
@@ -58,6 +64,43 @@ const SubCoachCommunityPage: React.FC = () => {
       status: 'Under Review' as const,
     },
   ];
+
+  const handleReplyToPost = (postId: string) => {
+    setSelectedPost(postId);
+    setShowReplyModal(true);
+  };
+
+  const handleSubmitReply = () => {
+    const post = recentPosts.find((p) => p.id === selectedPost);
+    console.log('Reply submitted:', { postId: selectedPost, reply: replyText });
+    alert(`✅ Reply posted successfully!\n\nReplying to: ${post?.author}\nYour reply: ${replyText}`);
+    setShowReplyModal(false);
+    setReplyText('');
+    setSelectedPost(null);
+  };
+
+  const handleRemovePost = (postId: string) => {
+    const item = reportedContent.find((i) => i.id === postId);
+    console.log('Removing post:', postId, moderationNote);
+    alert(`❌ Post removed\n\nAuthor: ${item?.author}\nReason: ${moderationNote || 'Violated community guidelines'}`);
+    setShowReportedModal(false);
+    setModerationNote('');
+  };
+
+  const handleApprovePost = (postId: string) => {
+    const item = reportedContent.find((i) => i.id === postId);
+    console.log('Approving post:', postId);
+    alert(`✅ Post approved\n\nAuthor: ${item?.author}\nThe post will remain visible in the community.`);
+    setShowReportedModal(false);
+  };
+
+  const handleEscalate = (postId: string) => {
+    const item = reportedContent.find((i) => i.id === postId);
+    console.log('Escalating to coach:', postId, moderationNote);
+    alert(`⬆️ Post escalated to supervising coach\n\nAuthor: ${item?.author}\nNote: ${moderationNote || 'Requires coach review'}`);
+    setShowReportedModal(false);
+    setModerationNote('');
+  };
 
   return (
     <SubCoachAppLayout>
@@ -155,7 +198,7 @@ const SubCoachCommunityPage: React.FC = () => {
                           ❤️ {post.likes} likes
                         </button>
                         <button 
-                          onClick={() => console.log('Reply to post:', post.id)}
+                          onClick={() => handleReplyToPost(post.id)}
                           className="text-xs text-teal-600 hover:text-teal-700 font-medium ml-auto"
                         >
                           Reply
@@ -201,22 +244,13 @@ const SubCoachCommunityPage: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-3">
                           <button 
-                            onClick={() => console.log('Remove post:', item.id)}
-                            className="px-3 py-1.5 text-xs font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors"
+                            onClick={() => {
+                              setSelectedPost(item.id);
+                              setShowReportedModal(true);
+                            }}
+                            className="px-3 py-1.5 text-xs font-medium text-white bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 rounded-lg transition-all"
                           >
-                            Remove Post
-                          </button>
-                          <button 
-                            onClick={() => console.log('Approve post:', item.id)}
-                            className="px-3 py-1.5 text-xs font-medium text-white bg-green-500 hover:bg-green-600 rounded-lg transition-colors"
-                          >
-                            Approve Post
-                          </button>
-                          <button 
-                            onClick={() => console.log('Escalate post to coach:', item.id)}
-                            className="px-3 py-1.5 text-xs font-medium text-text-secondary hover:bg-gray-100 rounded-lg transition-colors"
-                          >
-                            Escalate to Coach
+                            Review
                           </button>
                         </div>
                       </div>
@@ -277,6 +311,143 @@ const SubCoachCommunityPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Reply Modal */}
+      {showReplyModal && selectedPost && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full">
+            <div className="p-6 border-b border-[#EDF0FB]">
+              <h3 className="text-xl font-bold text-text-primary">Reply to Post</h3>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {(() => {
+                const post = recentPosts.find((p) => p.id === selectedPost);
+                return post ? (
+                  <div className="bg-gray-50 rounded-xl p-4 mb-4">
+                    <div className="text-sm font-semibold text-text-primary mb-1">{post.author}</div>
+                    <p className="text-sm text-text-secondary">{post.content}</p>
+                  </div>
+                ) : null;
+              })()}
+
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-2">
+                  Your Reply
+                </label>
+                <textarea
+                  rows={4}
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder="Write your reply..."
+                  className="w-full px-4 py-2 border border-[#EDF0FB] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-[#EDF0FB] flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowReplyModal(false);
+                  setReplyText('');
+                }}
+                className="px-6 py-2 text-sm font-medium text-text-secondary hover:bg-gray-100 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitReply}
+                className="px-6 py-2 text-sm font-medium text-white bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 rounded-xl transition-all"
+              >
+                Post Reply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reported Content Review Modal */}
+      {showReportedModal && selectedPost && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-[#EDF0FB] flex items-center justify-between">
+              <h3 className="text-xl font-bold text-text-primary">Review Reported Content</h3>
+              <button
+                onClick={() => setShowReportedModal(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {(() => {
+                const item = reportedContent.find((i) => i.id === selectedPost);
+                if (!item) return null;
+                return (
+                  <>
+                    <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-sm font-semibold text-text-primary">{item.author}</div>
+                        <span className="px-2 py-1 text-xs font-medium rounded-lg bg-amber-100 text-amber-700">
+                          {item.status}
+                        </span>
+                      </div>
+                      <div className="text-xs text-text-secondary mb-2">{item.courseName}</div>
+                      <p className="text-sm text-text-primary italic">{item.content}</p>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <div className="text-xs font-medium text-text-secondary mb-2">Report Details</div>
+                      <div className="text-sm text-text-primary">
+                        <div><strong>Reported by:</strong> {item.reportedBy}</div>
+                        <div><strong>Reason:</strong> {item.reportReason}</div>
+                        <div><strong>Time:</strong> {item.timestamp}</div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-text-secondary mb-2">
+                        Moderation Note (optional)
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={moderationNote}
+                        onChange={(e) => setModerationNote(e.target.value)}
+                        placeholder="Add notes about your decision..."
+                        className="w-full px-4 py-2 border border-[#EDF0FB] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 resize-none"
+                      />
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            <div className="p-6 border-t border-[#EDF0FB] flex justify-between">
+              <button
+                onClick={() => handleEscalate(selectedPost)}
+                className="px-4 py-2 text-sm font-medium text-amber-600 border border-amber-600 hover:bg-amber-50 rounded-xl transition-all"
+              >
+                ⬆️ Escalate to Coach
+              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleRemovePost(selectedPost)}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-xl transition-all"
+                >
+                  ❌ Remove Post
+                </button>
+                <button
+                  onClick={() => handleApprovePost(selectedPost)}
+                  className="px-4 py-2 text-sm font-medium text-white bg-green-500 hover:bg-green-600 rounded-xl transition-all"
+                >
+                  ✅ Approve Post
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </SubCoachAppLayout>
   );
 };

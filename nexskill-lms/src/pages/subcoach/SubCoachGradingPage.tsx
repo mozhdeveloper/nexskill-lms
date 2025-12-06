@@ -6,6 +6,7 @@ const SubCoachGradingPage: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterCourse, setFilterCourse] = useState('all');
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
+  const [gradeData, setGradeData] = useState({ score: '', feedback: '' });
 
   // Dummy grading queue data
   const allGradingItems = [
@@ -79,9 +80,11 @@ const SubCoachGradingPage: React.FC = () => {
   };
 
   const handleSubmitGrade = () => {
-    // Simulate grading submission
-    console.log('Grade submitted for item:', selectedItem);
+    const item = allGradingItems.find((i) => i.id === selectedItem);
+    console.log('Grade submitted:', { itemId: selectedItem, student: item?.studentName, ...gradeData });
+    alert(`✅ Grade submitted successfully!\n\nStudent: ${item?.studentName}\nScore: ${gradeData.score}/100\nFeedback: ${gradeData.feedback}`);
     setSelectedItem(null);
+    setGradeData({ score: '', feedback: '' });
   };
 
   return (
@@ -248,6 +251,8 @@ const SubCoachGradingPage: React.FC = () => {
                   type="number"
                   min="0"
                   max="100"
+                  value={gradeData.score}
+                  onChange={(e) => setGradeData({ ...gradeData, score: e.target.value })}
                   placeholder="Enter score..."
                   className="w-full px-4 py-2 border border-[#EDF0FB] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
                 />
@@ -260,6 +265,8 @@ const SubCoachGradingPage: React.FC = () => {
                 </label>
                 <textarea
                   rows={5}
+                  value={gradeData.feedback}
+                  onChange={(e) => setGradeData({ ...gradeData, feedback: e.target.value })}
                   placeholder="Provide constructive feedback for the student..."
                   className="w-full px-4 py-2 border border-[#EDF0FB] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 resize-none"
                 />

@@ -4,6 +4,17 @@ import GroupSessionsList from '../../components/subcoach/GroupSessionsList';
 
 const SubCoachGroupsPage: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('all');
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<string | null>(null);
+  const [newSession, setNewSession] = useState({
+    title: '',
+    course: '',
+    date: '',
+    time: '',
+    maxCapacity: '20',
+    description: '',
+  });
 
   // Dummy sessions data
   const allSessions = [
@@ -74,6 +85,18 @@ const SubCoachGroupsPage: React.FC = () => {
   const completedCount = allSessions.filter((s) => s.status === 'Completed').length;
   const cancelledCount = allSessions.filter((s) => s.status === 'Cancelled').length;
 
+  const handleScheduleSession = () => {
+    console.log('Scheduling session:', newSession);
+    alert(`✅ Session scheduled successfully!\n\nTitle: ${newSession.title}\nCourse: ${newSession.course}\nDate & Time: ${newSession.date} at ${newSession.time}\nMax Capacity: ${newSession.maxCapacity} students`);
+    setShowScheduleModal(false);
+    setNewSession({ title: '', course: '', date: '', time: '', maxCapacity: '20', description: '' });
+  };
+
+  const handleViewDetails = (id: string) => {
+    setSelectedSession(id);
+    setShowDetailsModal(true);
+  };
+
   return (
     <SubCoachAppLayout>
       {/* Header */}
@@ -139,7 +162,7 @@ const SubCoachGroupsPage: React.FC = () => {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-text-primary">Your Sessions</h3>
               <button 
-                onClick={() => console.log('Schedule new session')}
+                onClick={() => setShowScheduleModal(true)}
                 className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 rounded-xl transition-all"
               >
                 + Schedule Session
@@ -147,7 +170,7 @@ const SubCoachGroupsPage: React.FC = () => {
             </div>
             <GroupSessionsList
               sessions={filteredSessions}
-              onViewDetails={(id: string) => console.log('View session:', id)}
+              onViewDetails={handleViewDetails}
             />
           </div>
 
@@ -201,6 +224,199 @@ const SubCoachGroupsPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Schedule Session Modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-[#EDF0FB]">
+              <h3 className="text-xl font-bold text-text-primary">Schedule New Session</h3>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-2">
+                  Session Title
+                </label>
+                <input
+                  type="text"
+                  value={newSession.title}
+                  onChange={(e) => setNewSession({ ...newSession, title: e.target.value })}
+                  placeholder="e.g., Q&A Session - UI Principles"
+                  className="w-full px-4 py-2 border border-[#EDF0FB] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-2">
+                  Course
+                </label>
+                <select
+                  value={newSession.course}
+                  onChange={(e) => setNewSession({ ...newSession, course: e.target.value })}
+                  className="w-full px-4 py-2 border border-[#EDF0FB] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+                >
+                  <option value="">Select a course</option>
+                  <option value="UI Design Fundamentals">UI Design Fundamentals</option>
+                  <option value="JavaScript Mastery">JavaScript Mastery</option>
+                  <option value="Product Management">Product Management</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-text-secondary mb-2">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    value={newSession.date}
+                    onChange={(e) => setNewSession({ ...newSession, date: e.target.value })}
+                    className="w-full px-4 py-2 border border-[#EDF0FB] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-text-secondary mb-2">
+                    Time
+                  </label>
+                  <input
+                    type="time"
+                    value={newSession.time}
+                    onChange={(e) => setNewSession({ ...newSession, time: e.target.value })}
+                    className="w-full px-4 py-2 border border-[#EDF0FB] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-2">
+                  Max Capacity
+                </label>
+                <input
+                  type="number"
+                  value={newSession.maxCapacity}
+                  onChange={(e) => setNewSession({ ...newSession, maxCapacity: e.target.value })}
+                  min="1"
+                  className="w-full px-4 py-2 border border-[#EDF0FB] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-2">
+                  Description
+                </label>
+                <textarea
+                  rows={3}
+                  value={newSession.description}
+                  onChange={(e) => setNewSession({ ...newSession, description: e.target.value })}
+                  placeholder="Brief description of the session..."
+                  className="w-full px-4 py-2 border border-[#EDF0FB] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-[#EDF0FB] flex justify-end gap-3">
+              <button
+                onClick={() => setShowScheduleModal(false)}
+                className="px-6 py-2 text-sm font-medium text-text-secondary hover:bg-gray-100 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleScheduleSession}
+                className="px-6 py-2 text-sm font-medium text-white bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 rounded-xl transition-all"
+              >
+                Schedule Session
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Session Details Modal */}
+      {showDetailsModal && selectedSession && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-[#EDF0FB] flex items-center justify-between">
+              <h3 className="text-xl font-bold text-text-primary">Session Details</h3>
+              <button
+                onClick={() => setShowDetailsModal(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {(() => {
+                const session = allSessions.find((s) => s.id === selectedSession);
+                if (!session) return null;
+                return (
+                  <>
+                    <div className="bg-gradient-to-br from-teal-50 to-cyan-50 rounded-xl p-5 border border-teal-200">
+                      <h4 className="text-lg font-bold text-text-primary mb-2">{session.title}</h4>
+                      <p className="text-sm text-text-secondary">{session.courseName}</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-gray-50 rounded-xl p-4">
+                        <div className="text-xs text-text-secondary mb-1">Date & Time</div>
+                        <div className="text-sm font-semibold text-text-primary">{session.dateTime}</div>
+                      </div>
+                      <div className="bg-gray-50 rounded-xl p-4">
+                        <div className="text-xs text-text-secondary mb-1">Status</div>
+                        <span className={`inline-block px-2 py-1 text-xs font-medium rounded-lg ${
+                          session.status === 'Upcoming' ? 'bg-blue-100 text-blue-700' :
+                          session.status === 'Completed' ? 'bg-green-100 text-green-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>{session.status}</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <div className="text-xs text-text-secondary mb-1">Registrations</div>
+                      <div className="text-sm font-semibold text-text-primary">
+                        {session.registeredStudents} / {session.maxCapacity} students
+                      </div>
+                      <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-teal-500 to-cyan-500"
+                          style={{ width: `${(session.registeredStudents / session.maxCapacity) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        onClick={() => {
+                          alert('✉️ Email sent to all registered students!');
+                          console.log('Send reminder for session:', selectedSession);
+                        }}
+                        className="flex-1 px-4 py-2 text-sm font-medium text-teal-600 border border-teal-600 hover:bg-teal-50 rounded-xl transition-all"
+                      >
+                        Send Reminder
+                      </button>
+                      {session.status === 'Upcoming' && (
+                        <button
+                          onClick={() => {
+                            if (confirm('Are you sure you want to cancel this session?')) {
+                              alert('❌ Session cancelled. Students will be notified.');
+                              setShowDetailsModal(false);
+                            }
+                          }}
+                          className="flex-1 px-4 py-2 text-sm font-medium text-red-600 border border-red-600 hover:bg-red-50 rounded-xl transition-all"
+                        >
+                          Cancel Session
+                        </button>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
     </SubCoachAppLayout>
   );
 };

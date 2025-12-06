@@ -84,10 +84,12 @@ const SubCoachNotificationsPage: React.FC = () => {
 
   const handleMarkAsRead = (id: string) => {
     console.log('Mark as read:', id);
+    alert('✅ Notification marked as read!');
   };
 
   const handleMarkAllAsRead = () => {
     console.log('Mark all as read');
+    alert(`✅ All ${unreadCount} unread notifications marked as read!`);
   };
 
   return (

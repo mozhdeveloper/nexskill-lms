@@ -4,6 +4,8 @@ import AssignedLessonsList from '../../components/subcoach/AssignedLessonsList';
 
 const SubCoachLessonsPage: React.FC = () => {
   const [filterCourse, setFilterCourse] = useState('all');
+  const [showLessonModal, setShowLessonModal] = useState(false);
+  const [selectedLesson, setSelectedLesson] = useState<string | null>(null);
 
   // Dummy lessons data
   const allLessons = [
@@ -87,6 +89,11 @@ const SubCoachLessonsPage: React.FC = () => {
   const publishedLessons = allLessons.filter((l) => l.status === 'Published').length;
   const draftLessons = allLessons.filter((l) => l.status === 'Draft').length;
 
+  const handleViewLesson = (id: string) => {
+    setSelectedLesson(id);
+    setShowLessonModal(true);
+  };
+
   return (
     <SubCoachAppLayout>
       {/* Header */}
@@ -150,7 +157,7 @@ const SubCoachLessonsPage: React.FC = () => {
             <h3 className="text-lg font-bold text-text-primary mb-4">Lesson Content</h3>
             <AssignedLessonsList
               lessons={filteredLessons}
-              onLessonClick={(id: string) => console.log('View lesson:', id)}
+              onLessonClick={handleViewLesson}
             />
           </div>
 
@@ -209,6 +216,98 @@ const SubCoachLessonsPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Lesson Detail Modal */}
+      {showLessonModal && selectedLesson && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-[#EDF0FB] flex items-center justify-between">
+              <h3 className="text-xl font-bold text-text-primary">Lesson Details</h3>
+              <button
+                onClick={() => setShowLessonModal(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {(() => {
+                const lesson = allLessons.find((l) => l.id === selectedLesson);
+                if (!lesson) return null;
+                return (
+                  <>
+                    <div className="bg-gradient-to-br from-teal-50 to-cyan-50 rounded-xl p-5 border border-teal-200">
+                      <div className="flex items-start gap-3 mb-3">
+                        <div className="text-2xl">
+                          {lesson.type === 'Video' ? '🎥' :
+                           lesson.type === 'PDF' ? '📝' :
+                           lesson.type === 'Quiz' ? '❓' : '📚'}
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="text-lg font-bold text-text-primary mb-1">{lesson.lessonTitle}</h4>
+                          <p className="text-sm text-text-secondary">{lesson.courseName}</p>
+                        </div>
+                        <span className={`px-2 py-1 text-xs font-medium rounded-lg ${
+                          lesson.status === 'Published' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {lesson.status}
+                        </span>
+                      </div>
+                      <div className="text-sm text-text-secondary">{lesson.moduleName}</div>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <div className="text-xs font-medium text-text-secondary mb-2">Lesson Type</div>
+                      <div className="text-sm font-semibold text-text-primary">{lesson.type}</div>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <div className="text-xs font-medium text-text-secondary mb-2">Preview Content</div>
+                      <p className="text-sm text-text-secondary italic">
+                        [Lesson content preview would be displayed here. This is a read-only view for sub-coaches to help answer student questions.]
+                      </p>
+                    </div>
+
+                    <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+                      <div className="flex items-start gap-2">
+                        <div className="text-lg">🔒</div>
+                        <div>
+                          <div className="text-xs font-bold text-amber-700 mb-1">Read-Only Access</div>
+                          <p className="text-xs text-amber-600">
+                            You can view this lesson to help students but cannot edit the content. Contact your supervising coach to suggest changes.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        onClick={() => {
+                          alert('📚 Resource downloaded!');
+                          console.log('Download lesson:', selectedLesson);
+                        }}
+                        className="flex-1 px-4 py-2 text-sm font-medium text-teal-600 border border-teal-600 hover:bg-teal-50 rounded-xl transition-all"
+                      >
+                        📥 Download Resources
+                      </button>
+                      <button
+                        onClick={() => {
+                          alert('📊 Viewing student progress for this lesson...');
+                          console.log('View progress for lesson:', selectedLesson);
+                        }}
+                        className="flex-1 px-4 py-2 text-sm font-medium text-text-primary border border-gray-300 hover:bg-gray-50 rounded-xl transition-all"
+                      >
+                        📊 View Student Progress
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
     </SubCoachAppLayout>
   );
 };

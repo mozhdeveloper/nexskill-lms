@@ -6,6 +6,8 @@ const SubCoachStudentsPage: React.FC = () => {
   const [filterCourse, setFilterCourse] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
 
   // Dummy students data
   const allStudents = [
@@ -100,6 +102,11 @@ const SubCoachStudentsPage: React.FC = () => {
   const activeCount = allStudents.filter((s) => s.status === 'active').length;
   const needsSupportCount = allStudents.filter((s) => s.status === 'needs-support').length;
   const atRiskCount = allStudents.filter((s) => s.status === 'at-risk').length;
+
+  const handleViewStudent = (id: string) => {
+    setSelectedStudent(id);
+    setShowDetailModal(true);
+  };
 
   return (
     <SubCoachAppLayout>
@@ -200,7 +207,7 @@ const SubCoachStudentsPage: React.FC = () => {
             <h3 className="text-lg font-bold text-text-primary mb-4">Student List</h3>
             <AssignedStudentsTable
               students={filteredStudents}
-              onStudentClick={(id) => console.log('View student:', id)}
+              onStudentClick={handleViewStudent}
             />
           </div>
 
@@ -238,6 +245,125 @@ const SubCoachStudentsPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Student Detail Modal */}
+      {showDetailModal && selectedStudent && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-[#EDF0FB] flex items-center justify-between">
+              <h3 className="text-xl font-bold text-text-primary">Student Details</h3>
+              <button
+                onClick={() => setShowDetailModal(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {(() => {
+                const student = allStudents.find((s) => s.id === selectedStudent);
+                if (!student) return null;
+                return (
+                  <>
+                    <div className="bg-gradient-to-br from-teal-50 to-cyan-50 rounded-xl p-5 border border-teal-200">
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center text-white text-xl font-bold">
+                          {student.name.split(' ').map((n) => n[0]).join('')}
+                        </div>
+                        <div>
+                          <h4 className="text-lg font-bold text-text-primary">{student.name}</h4>
+                          <p className="text-sm text-text-secondary">{student.email}</p>
+                          <span className={`inline-block mt-1 px-2 py-1 text-xs font-medium rounded-lg ${
+                            student.status === 'active' ? 'bg-green-100 text-green-700' :
+                            student.status === 'needs-support' ? 'bg-amber-100 text-amber-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {student.status === 'active' ? '✅ Active' :
+                             student.status === 'needs-support' ? '⚠️ Needs Support' :
+                             '🔴 At Risk'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-xl p-5">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <div className="text-xs text-text-secondary">Course Progress</div>
+                          <div className="text-lg font-bold text-text-primary">{student.course}</div>
+                        </div>
+                        <div className="text-2xl font-bold text-teal-600">{student.progress}%</div>
+                      </div>
+                      <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-teal-500 to-cyan-500"
+                          style={{ width: `${student.progress}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="bg-blue-50 rounded-xl p-4 text-center">
+                        <div className="text-2xl font-bold text-blue-700">12</div>
+                        <div className="text-xs text-blue-600 mt-1">Lessons Completed</div>
+                      </div>
+                      <div className="bg-purple-50 rounded-xl p-4 text-center">
+                        <div className="text-2xl font-bold text-purple-700">3</div>
+                        <div className="text-xs text-purple-600 mt-1">Assignments Graded</div>
+                      </div>
+                      <div className="bg-green-50 rounded-xl p-4 text-center">
+                        <div className="text-2xl font-bold text-green-700">85%</div>
+                        <div className="text-xs text-green-600 mt-1">Avg. Score</div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <div className="text-xs text-text-secondary mb-1">Last Active</div>
+                      <div className="text-sm font-semibold text-text-primary">{student.lastActive}</div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => {
+                          alert(`✉️ Email sent to ${student.name}!`);
+                          console.log('Send message to:', student.id);
+                        }}
+                        className="flex-1 px-4 py-2 text-sm font-medium text-teal-600 border border-teal-600 hover:bg-teal-50 rounded-xl transition-all"
+                      >
+                        📧 Send Message
+                      </button>
+                      <button
+                        onClick={() => {
+                          alert(`📊 Viewing detailed progress for ${student.name}`);
+                          console.log('View progress for:', student.id);
+                        }}
+                        className="flex-1 px-4 py-2 text-sm font-medium text-text-primary border border-gray-300 hover:bg-gray-50 rounded-xl transition-all"
+                      >
+                        📊 View Full Progress
+                      </button>
+                    </div>
+
+                    {student.status === 'at-risk' && (
+                      <div className="bg-red-50 rounded-xl p-4 border border-red-200">
+                        <div className="flex items-start gap-3">
+                          <div className="text-xl">🚨</div>
+                          <div>
+                            <div className="text-sm font-bold text-red-700 mb-1">Student At Risk</div>
+                            <p className="text-xs text-red-600">
+                              This student hasn't been active recently and may need additional support. Consider reaching out to check on their progress.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
     </SubCoachAppLayout>
   );
 };
