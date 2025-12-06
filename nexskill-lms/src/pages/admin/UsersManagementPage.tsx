@@ -5,6 +5,7 @@ import UsersTable from '../../components/admin/users/UsersTable';
 import UserFormDrawer from '../../components/admin/users/UserFormDrawer';
 import UserRolesPanel from '../../components/admin/users/UserRolesPanel';
 import OrganizationManagementPanel from '../../components/admin/users/OrganizationManagementPanel';
+import PendingCoachesPanel from '../../components/admin/users/PendingCoachesPanel';
 
 interface User {
   id: string;
@@ -213,6 +214,7 @@ const UsersManagementPage: React.FC = () => {
     organizationId: 'all',
   });
 
+  const [activeTab, setActiveTab] = useState<'users' | 'pending-coaches'>('users');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('create');
   const [editingUser, setEditingUser] = useState<User | undefined>(undefined);
@@ -340,20 +342,57 @@ const UsersManagementPage: React.FC = () => {
               Manage users, roles, and organizations across NexSkill
             </p>
           </div>
-          <button
-            onClick={handleCreateUser}
-            className="px-6 py-3 bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white font-semibold rounded-full hover:shadow-lg transition-all flex items-center gap-2"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            Create User
-          </button>
+          {activeTab === 'users' && (
+            <button
+              onClick={handleCreateUser}
+              className="px-6 py-3 bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white font-semibold rounded-full hover:shadow-lg transition-all flex items-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+              Create User
+            </button>
+          )}
+        </div>
+
+        {/* Tabs */}
+        <div className="border-b border-[#EDF0FB]">
+          <nav className="flex gap-8">
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`pb-4 text-sm font-medium transition-colors relative ${
+                activeTab === 'users'
+                  ? 'text-[#304DB5]'
+                  : 'text-[#5F6473] hover:text-[#111827]'
+              }`}
+            >
+              All Users
+              {activeTab === 'users' && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#304DB5]" />
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('pending-coaches')}
+              className={`pb-4 text-sm font-medium transition-colors relative flex items-center gap-2 ${
+                activeTab === 'pending-coaches'
+                  ? 'text-[#304DB5]'
+                  : 'text-[#5F6473] hover:text-[#111827]'
+              }`}
+            >
+              Pending Coaches
+              <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-yellow-100 text-yellow-700">
+                4
+              </span>
+              {activeTab === 'pending-coaches' && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#304DB5]" />
+              )}
+            </button>
+          </nav>
         </div>
 
         {/* Status Message */}
@@ -371,34 +410,50 @@ const UsersManagementPage: React.FC = () => {
           </div>
         )}
 
-        {/* Filters */}
-        <UserFiltersBar value={filters} organizations={organizations} onChange={setFilters} />
+        {/* Tab Content */}
+        {activeTab === 'users' ? (
+          <>
+            {/* Filters */}
+            <UserFiltersBar value={filters} organizations={organizations} onChange={setFilters} />
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left: Users Table (2/3 width) */}
-          <div className="lg:col-span-2">
-            <UsersTable
-              users={filteredUsers}
-              onEdit={handleEditUser}
-              onToggleBan={handleToggleBan}
-              onSelect={setSelectedUserId}
-            />
-          </div>
+            {/* Main Content Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left: Users Table (2/3 width) */}
+              <div className="lg:col-span-2">
+                <UsersTable
+                  users={filteredUsers}
+                  onEdit={handleEditUser}
+                  onToggleBan={handleToggleBan}
+                  onSelect={setSelectedUserId}
+                />
+              </div>
 
-          {/* Right: Side Panels (1/3 width) */}
-          <div className="space-y-6">
-            <UserRolesPanel
-              selectedUser={selectedUser}
-              onUpdate={handleUpdateUser}
-              onToggleBan={handleToggleBan}
-            />
-            <OrganizationManagementPanel
-              organizations={organizations}
-              onFilterByOrg={handleFilterByOrg}
-            />
-          </div>
-        </div>
+              {/* Right: Side Panels (1/3 width) */}
+              <div className="space-y-6">
+                <UserRolesPanel
+                  selectedUser={selectedUser}
+                  onUpdate={handleUpdateUser}
+                  onToggleBan={handleToggleBan}
+                />
+                <OrganizationManagementPanel
+                  organizations={organizations}
+                  onFilterByOrg={handleFilterByOrg}
+                />
+              </div>
+            </div>
+          </>
+        ) : (
+          <PendingCoachesPanel
+            onApprove={(coachId) => {
+              showStatusMessage(`Coach application approved successfully`);
+              console.log('Approved coach:', coachId);
+            }}
+            onReject={(coachId, reason) => {
+              showStatusMessage(`Coach application rejected`);
+              console.log('Rejected coach:', coachId, 'Reason:', reason);
+            }}
+          />
+        )}
       </div>
 
       {/* User Form Drawer */}

@@ -112,10 +112,6 @@ const AdminDashboard: React.FC = () => {
             <p className="text-[#5F6473]">Monitor NexSkill usage, revenue, and system health</p>
           </div>
           <div className="flex items-center gap-3">
-            {/* Environment Tag */}
-            <span className="px-4 py-2 bg-gradient-to-r from-[#22C55E] to-[#10B981] text-white text-sm font-semibold rounded-full shadow-md">
-              🟢 Production (simulated)
-            </span>
 
             {/* Timeframe Dropdown */}
             <div className="relative">
