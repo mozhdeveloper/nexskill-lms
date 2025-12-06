@@ -13,7 +13,11 @@ interface Ticket {
   messages: number;
 }
 
-const SupportTicketsTable = () => {
+interface SupportTicketsTableProps {
+  onViewTicket?: (ticket: Ticket) => void;
+}
+
+const SupportTicketsTable = ({ onViewTicket }: SupportTicketsTableProps) => {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [filter, setFilter] = useState<'all' | 'open' | 'in-progress' | 'pending' | 'resolved'>('all');
 
@@ -120,7 +124,7 @@ const SupportTicketsTable = () => {
                   </td>
                   <td className="py-4 px-4">
                     <button
-                      onClick={() => setSelectedTicket(ticket)}
+                      onClick={() => onViewTicket ? onViewTicket(ticket) : setSelectedTicket(ticket)}
                       className="p-2 hover:bg-blue-100 rounded-xl transition-colors"
                       title="View Details"
                     >

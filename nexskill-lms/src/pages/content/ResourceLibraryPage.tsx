@@ -10,10 +10,31 @@ const ResourceLibraryPage: React.FC = () => {
   });
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadData, setUploadData] = useState({
+    course: '',
+    title: '',
+    type: 'pdf',
+    description: '',
+    file: null as File | null
+  });
 
   const courses = ['JavaScript Mastery', 'UI/UX Design', 'Product Management', 'Data Analytics'];
   const types = ['PDF', 'Image', 'Video', 'Archive'];
   const statuses = ['Active', 'Draft', 'Archived'];
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setUploadData({ ...uploadData, file: e.target.files[0] });
+    }
+  };
+
+  const handleUploadResource = () => {
+    console.log('Uploading resource:', uploadData);
+    alert(`Resource "${uploadData.title}" uploaded successfully!`);
+    setShowUploadModal(false);
+    setUploadData({ course: '', title: '', type: 'pdf', description: '', file: null });
+  };
 
   return (
     <ContentEditorLayout>
@@ -28,7 +49,7 @@ const ResourceLibraryPage: React.FC = () => {
           </div>
           <div className="flex items-center gap-3">
             <button 
-              onClick={() => console.log('Upload resource clicked')}
+              onClick={() => setShowUploadModal(true)}
               className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl hover:shadow-lg transition-all text-sm font-semibold"
             >
               📤 Upload Resource
@@ -217,6 +238,129 @@ const ResourceLibraryPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Upload Resource Modal */}
+      {showUploadModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-2xl w-full shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Upload Resource</h2>
+              <button
+                onClick={() => setShowUploadModal(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Course
+                </label>
+                <select
+                  value={uploadData.course}
+                  onChange={(e) => setUploadData({ ...uploadData, course: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="">Select a course</option>
+                  {courses.map(course => (
+                    <option key={course} value={course}>{course}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Resource Title
+                </label>
+                <input
+                  type="text"
+                  value={uploadData.title}
+                  onChange={(e) => setUploadData({ ...uploadData, title: e.target.value })}
+                  placeholder="e.g., JavaScript Cheat Sheet"
+                  className="w-full px-4 py-3 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Resource Type
+                </label>
+                <select
+                  value={uploadData.type}
+                  onChange={(e) => setUploadData({ ...uploadData, type: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="pdf">PDF Document</option>
+                  <option value="image">Image</option>
+                  <option value="video">Video</option>
+                  <option value="archive">Archive (ZIP/RAR)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description (Optional)
+                </label>
+                <textarea
+                  rows={3}
+                  value={uploadData.description}
+                  onChange={(e) => setUploadData({ ...uploadData, description: e.target.value })}
+                  placeholder="Brief description of the resource..."
+                  className="w-full px-4 py-3 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Upload File
+                </label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-amber-500 transition-colors">
+                  <input
+                    type="file"
+                    onChange={handleFileChange}
+                    className="hidden"
+                    id="file-upload"
+                  />
+                  <label htmlFor="file-upload" className="cursor-pointer">
+                    <div className="text-4xl mb-2">📁</div>
+                    {uploadData.file ? (
+                      <p className="text-sm text-gray-900 font-medium">{uploadData.file.name}</p>
+                    ) : (
+                      <>
+                        <p className="text-sm text-gray-700 font-medium mb-1">Click to browse files</p>
+                        <p className="text-xs text-gray-500">or drag and drop</p>
+                      </>
+                    )}
+                  </label>
+                </div>
+              </div>
+
+              <div className="p-4 bg-blue-50 rounded-xl border-2 border-blue-200">
+                <p className="text-sm text-blue-800">
+                  📌 <strong>Note:</strong> Max file size: 100MB. Supported formats: PDF, JPG, PNG, MP4, ZIP
+                </p>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowUploadModal(false)}
+                  className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUploadResource}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-lg hover:shadow-lg transition-all"
+                >
+                  Upload Resource
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </ContentEditorLayout>
   );
 };

@@ -11,7 +11,12 @@ interface KBArticle {
   excerpt: string;
 }
 
-const KnowledgeBaseList = () => {
+interface KnowledgeBaseListProps {
+  onViewArticle?: (articleId: string) => void;
+  onBookmark?: (articleId: string) => void;
+}
+
+const KnowledgeBaseList = ({ onViewArticle, onBookmark }: KnowledgeBaseListProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedArticle, setSelectedArticle] = useState<KBArticle | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -95,12 +100,22 @@ const KnowledgeBaseList = () => {
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => setSelectedArticle(article)}
-                  className="ml-4 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl font-medium hover:shadow-lg transition-all"
-                >
-                  View Article
-                </button>
+                <div className="ml-4 flex gap-2">
+                  {onBookmark && (
+                    <button
+                      onClick={() => onBookmark(article.id)}
+                      className="px-4 py-2 bg-white border-2 border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-all"
+                    >
+                      🔖 Bookmark
+                    </button>
+                  )}
+                  <button
+                    onClick={() => onViewArticle ? onViewArticle(article.id) : setSelectedArticle(article)}
+                    className="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl font-medium hover:shadow-lg transition-all"
+                  >
+                    View Article
+                  </button>
+                </div>
               </div>
             </div>
           ))}

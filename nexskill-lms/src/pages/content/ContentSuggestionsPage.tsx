@@ -1,8 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ContentEditorLayout from '../../layouts/ContentEditorLayout';
 import ContentSuggestionsList from '../../components/content/ContentSuggestionsList';
 
 const ContentSuggestionsPage: React.FC = () => {
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newSuggestion, setNewSuggestion] = useState({
+    course: '',
+    title: '',
+    description: '',
+    priority: 'medium',
+    category: 'content'
+  });
+
+  const handleCreateSuggestion = () => {
+    console.log('Creating suggestion:', newSuggestion);
+    alert('Suggestion submitted successfully!');
+    setShowCreateModal(false);
+    setNewSuggestion({ course: '', title: '', description: '', priority: 'medium', category: 'content' });
+  };
+
   return (
     <ContentEditorLayout>
       {/* Header */}
@@ -16,7 +32,7 @@ const ContentSuggestionsPage: React.FC = () => {
           </div>
           <div className="flex items-center gap-3">
             <button 
-              onClick={() => console.log('New suggestion clicked')}
+              onClick={() => setShowCreateModal(true)}
               className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl hover:shadow-lg transition-all text-sm font-semibold"
             >
               ✏️ New Suggestion
@@ -148,6 +164,122 @@ const ContentSuggestionsPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Create Suggestion Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">New Content Suggestion</h2>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Course
+                </label>
+                <select
+                  value={newSuggestion.course}
+                  onChange={(e) => setNewSuggestion({ ...newSuggestion, course: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="">Select a course</option>
+                  <option value="JavaScript Mastery">JavaScript Mastery</option>
+                  <option value="UI/UX Design">UI/UX Design</option>
+                  <option value="Product Management">Product Management</option>
+                  <option value="Data Analytics">Data Analytics</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Suggestion Title
+                </label>
+                <input
+                  type="text"
+                  value={newSuggestion.title}
+                  onChange={(e) => setNewSuggestion({ ...newSuggestion, title: e.target.value })}
+                  placeholder="Brief, clear title for your suggestion"
+                  className="w-full px-4 py-3 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Category
+                  </label>
+                  <select
+                    value={newSuggestion.category}
+                    onChange={(e) => setNewSuggestion({ ...newSuggestion, category: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="content">Content Improvement</option>
+                    <option value="structure">Course Structure</option>
+                    <option value="resources">Additional Resources</option>
+                    <option value="quiz">Quiz/Assessment</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Priority
+                  </label>
+                  <select
+                    value={newSuggestion.priority}
+                    onChange={(e) => setNewSuggestion({ ...newSuggestion, priority: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Detailed Description
+                </label>
+                <textarea
+                  rows={6}
+                  value={newSuggestion.description}
+                  onChange={(e) => setNewSuggestion({ ...newSuggestion, description: e.target.value })}
+                  placeholder="Explain your suggestion in detail. Include why it would improve the course and how it benefits learners..."
+                  className="w-full px-4 py-3 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none"
+                />
+              </div>
+
+              <div className="p-4 bg-amber-50 rounded-xl border-2 border-amber-200">
+                <p className="text-sm text-amber-800">
+                  💡 <strong>Tip:</strong> Great suggestions are specific, actionable, and explain the benefit to learners.
+                </p>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateSuggestion}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-lg hover:shadow-lg transition-all"
+                >
+                  Submit Suggestion
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </ContentEditorLayout>
   );
 };

@@ -12,7 +12,11 @@ interface Student {
   status: 'active' | 'inactive' | 'suspended';
 }
 
-const SupportStudentList = () => {
+interface SupportStudentListProps {
+  onViewStudent?: (student: Student) => void;
+}
+
+const SupportStudentList = ({ onViewStudent }: SupportStudentListProps) => {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -112,7 +116,7 @@ const SupportStudentList = () => {
                   </td>
                   <td className="py-4 px-4">
                     <button
-                      onClick={() => setSelectedStudent(student)}
+                      onClick={() => onViewStudent ? onViewStudent(student) : setSelectedStudent(student)}
                       className="p-2 hover:bg-blue-100 rounded-xl transition-colors"
                       title="View Details"
                     >
