@@ -86,8 +86,7 @@ const SubCoachGroupsPage: React.FC = () => {
   const cancelledCount = allSessions.filter((s) => s.status === 'Cancelled').length;
 
   const handleScheduleSession = () => {
-    console.log('Scheduling session:', newSession);
-    alert(`✅ Session scheduled successfully!\n\nTitle: ${newSession.title}\nCourse: ${newSession.course}\nDate & Time: ${newSession.date} at ${newSession.time}\nMax Capacity: ${newSession.maxCapacity} students`);
+    window.alert(`✅ Group Session Scheduled Successfully\n\nTitle: ${newSession.title}\nCourse: ${newSession.course}\nDate: ${newSession.date}\nTime: ${newSession.time}\nCapacity: ${newSession.maxCapacity} students\n\n📋 Session Details:\n${newSession.description}\n\n📧 Student Notifications:\n• Email invitations: Sending\n• Calendar invites: Sent\n• In-app reminders: Scheduled\n• SMS notifications: 1 hour before\n\n🔗 Session Access:\n• Meeting link: Generated\n• Materials: Ready to upload\n• Recording: Will be enabled\n• Chat: Available\n\n⏰ Automated Reminders:\n• 24 hours before\n• 1 hour before\n• 15 minutes before\n\n💡 Students can join 10 minutes early. Prepare your materials and test your setup beforehand.`);
     setShowScheduleModal(false);
     setNewSession({ title: '', course: '', date: '', time: '', maxCapacity: '20', description: '' });
   };
@@ -390,7 +389,8 @@ const SubCoachGroupsPage: React.FC = () => {
                       <button
                         onClick={() => {
                           alert('✉️ Email sent to all registered students!');
-                          console.log('Send reminder for session:', selectedSession);
+                          const session = allSessions.find(s => s.id === selectedSession);
+                          window.alert(`📧 Session Reminder Sent\n\nSession: ${session?.title}\nScheduled: ${session?.dateTime}\n\n👥 Notifications Sent To:\n• Registered students: ${session?.registeredStudents}\n• Total recipients: ${session?.registeredStudents}\n\n📨 Reminder Contents:\n• Session details and time\n• Meeting link\n• Preparation materials\n• What to bring\n• Technical requirements\n\n✅ Delivery Status:\n• Email: Sent\n• Push notifications: Delivered\n• SMS: Sent (optional)\n• In-app: Posted\n\n💡 Reminders help ensure better attendance and student preparation for your sessions.`);
                         }}
                         className="flex-1 px-4 py-2 text-sm font-medium text-teal-600 border border-teal-600 hover:bg-teal-50 rounded-xl transition-all"
                       >

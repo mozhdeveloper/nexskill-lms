@@ -162,8 +162,7 @@ const SubCoachProfilePage: React.FC = () => {
                   <div className="flex justify-end">
                     <button 
                       onClick={() => {
-                        console.log('Save profile changes');
-                        alert('✅ Profile updated successfully!');
+                        window.alert('✅ Profile Updated Successfully\n\n📝 Changes Saved:\n• Personal information\n• Professional bio\n• Contact details\n• Availability schedule\n• Teaching preferences\n\n🌟 Profile Impact:\n• Visibility: Enhanced\n• Student trust: Improved\n• Professionalism: Complete\n\n💡 Your updated profile will be visible to students and the supervising coach immediately.');
                       }}
                       className="px-6 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 rounded-xl transition-all"
                     >
@@ -194,7 +193,9 @@ const SubCoachProfilePage: React.FC = () => {
                           </div>
                         </div>
                         <button 
-                          onClick={() => console.log('View course:', course.id)}
+                          onClick={() => {
+                            window.alert(`📚 Course Details\n\nCourse: ${course.name}\nStudents: ${course.studentsAssigned}\n\n📋 Your Responsibilities:\n• Teach assigned lessons\n• Grade assignments and quizzes\n• Monitor student progress\n• Respond to student questions\n• Hold office hours\n• Provide feedback\n\n✅ Course Access:\n• Full lesson materials\n• Teaching resources\n• Student roster\n• Grading tools\n• Communication platform\n\n💡 Contact supervising coach for curriculum questions or adjustments.`);
+                          }}
                           className="px-4 py-2 text-xs font-medium text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded-lg transition-colors"
                         >
                           View Course
@@ -311,8 +312,7 @@ const SubCoachProfilePage: React.FC = () => {
                   <div className="flex justify-end">
                     <button 
                       onClick={() => {
-                        console.log('Save notification preferences');
-                        alert('✅ Notification preferences saved successfully!');
+                        window.alert('✅ Notification Preferences Saved\n\n🔔 Active Notifications:\n• Student questions: Enabled\n• Assignment submissions: Enabled\n• Grade reminders: Enabled\n• Session reminders: Enabled\n• Coach announcements: Enabled\n\n📧 Delivery Channels:\n• Email: Immediate\n• In-app: Real-time\n• Push notifications: Enabled\n• Daily digest: 8:00 AM\n\n⚙️ Quiet Hours:\n• Active: 10 PM - 7 AM\n• Emergency override: Enabled\n\n💡 You can adjust these settings anytime to match your workflow.');
                       }}
                       className="px-6 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 rounded-xl transition-all"
                     >

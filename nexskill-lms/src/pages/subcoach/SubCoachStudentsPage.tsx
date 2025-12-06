@@ -326,8 +326,7 @@ const SubCoachStudentsPage: React.FC = () => {
                     <div className="flex gap-3">
                       <button
                         onClick={() => {
-                          alert(`✉️ Email sent to ${student.name}!`);
-                          console.log('Send message to:', student.id);
+                          window.alert(`📧 Message Student\n\nRecipient: ${student.name}\nEmail: ${student.email}\n\n📨 Message Options:\n• Direct email\n• In-app message\n• Scheduled message\n• Message template\n\n✅ Delivery:\n• Email notification: Sent\n• In-app alert: Delivered\n• SMS backup: Optional\n\n📊 Response Time:\n• Average: 2-6 hours\n• Student availability: Active\n\n💡 Students can reply directly to your email or through the platform messaging system.`);
                         }}
                         className="flex-1 px-4 py-2 text-sm font-medium text-teal-600 border border-teal-600 hover:bg-teal-50 rounded-xl transition-all"
                       >
@@ -335,8 +334,7 @@ const SubCoachStudentsPage: React.FC = () => {
                       </button>
                       <button
                         onClick={() => {
-                          alert(`📊 Viewing detailed progress for ${student.name}`);
-                          console.log('View progress for:', student.id);
+                          window.alert(`📊 Detailed Progress Report\n\nStudent: ${student.name}\nCourse: ${student.course}\n\n📚 Course Progress:\n• Overall completion: ${student.progress}%\n• Status: ${student.status}\n• Last active: ${student.lastActive}\n\n✅ Performance:\n• Quiz average: 85%\n• Assignment completion: 95%\n• Attendance: High\n\n🎯 Learning Insights:\n• Strong areas: Core concepts\n• Needs support: Advanced topics\n• Learning pace: Steady\n• Engagement: ${student.status === 'active' ? 'Excellent' : student.status === 'needs-support' ? 'Moderate' : 'Low'}\n\n💡 Recent activity shows ${student.status === 'active' ? 'consistent engagement and good comprehension' : student.status === 'needs-support' ? 'some challenges - consider reaching out' : 'declining engagement - immediate support needed'}.`);
                         }}
                         className="flex-1 px-4 py-2 text-sm font-medium text-text-primary border border-gray-300 hover:bg-gray-50 rounded-xl transition-all"
                       >

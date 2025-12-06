@@ -284,8 +284,8 @@ const SubCoachLessonsPage: React.FC = () => {
                     <div className="flex gap-3 pt-2">
                       <button
                         onClick={() => {
-                          alert('📚 Resource downloaded!');
-                          console.log('Download lesson:', selectedLesson);
+                          const lesson = allLessons.find(l => l.id === selectedLesson);
+                          window.alert(`📥 Downloading Lesson Resources\n\nLesson: ${lesson?.lessonTitle}\nCourse: ${lesson?.courseName}\n\n📦 Package Contents:\n• Presentation slides (PDF)\n• Student handouts\n• Activity worksheets\n• Supplementary materials\n• Answer keys\n\n💾 Download Size: ~15 MB\n⏱️ Processing: 5-10 seconds\n\n💡 All resources will be saved to your downloads folder.`);
                         }}
                         className="flex-1 px-4 py-2 text-sm font-medium text-teal-600 border border-teal-600 hover:bg-teal-50 rounded-xl transition-all"
                       >
@@ -293,8 +293,8 @@ const SubCoachLessonsPage: React.FC = () => {
                       </button>
                       <button
                         onClick={() => {
-                          alert('📊 Viewing student progress for this lesson...');
-                          console.log('View progress for lesson:', selectedLesson);
+                          const lesson = allLessons.find(l => l.id === selectedLesson);
+                          window.alert(`📊 Student Progress Analytics\n\nLesson: ${lesson?.lessonTitle}\nCourse: ${lesson?.courseName}\n\n📈 Progress Overview:\n• Students assigned: 24\n• Completed: 18 (75%)\n• In progress: 5 (21%)\n• Not started: 1 (4%)\n\n⭐ Performance Metrics:\n• Average score: 82%\n• Completion rate: 75%\n• Time to complete: 45 min avg\n\n💡 View detailed breakdown by student to identify those needing support.`);
                         }}
                         className="flex-1 px-4 py-2 text-sm font-medium text-text-primary border border-gray-300 hover:bg-gray-50 rounded-xl transition-all"
                       >

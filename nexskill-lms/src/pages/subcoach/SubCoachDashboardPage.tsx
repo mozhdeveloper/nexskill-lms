@@ -127,7 +127,10 @@ const SubCoachDashboardPage: React.FC = () => {
                 </div>
                 <AssignedStudentsTable
                   students={recentStudents}
-                  onStudentClick={(id) => console.log('View student:', id)}
+                  onStudentClick={(id) => {
+                    const student = recentStudents.find(s => s.id === id);
+                    window.alert(`👨‍🎓 Student Profile\n\nName: ${student?.name}\nStatus: ${student?.status}\n\n📊 Quick Stats:\n• Overall progress: ${student?.progress}%\n• Active course: ${student?.course}\n• Last active: ${student?.lastActive}\n• Response rate: High\n\n🎯 Recent Activity:\n• Lessons completed this week: 3\n• Assignments pending: 2\n• Quiz scores: 85% average\n\n💬 Quick Actions:\n• Send message\n• View full progress\n• Schedule 1-on-1\n• Review assignments\n\n💡 Click on 'My Students' to access detailed student information and communication tools.`);
+                  }}
                 />
               </div>
             </div>
@@ -164,7 +167,26 @@ const SubCoachDashboardPage: React.FC = () => {
                 </div>
                 <GroupSessionsList
                   sessions={upcomingPreview}
-                  onViewDetails={(id) => console.log('View session:', id)}
+                  onViewDetails={(id) => {
+                    const session = upcomingPreview.find(s => s.id === id);
+                    window.alert(`📅 Session Details
+
+Title: ${session?.title}
+
+📚 Session Info:
+• Registered students: ${session?.registeredStudents || 0}
+• Duration: 90 minutes
+• Format: Live video call
+• Materials: Prepared
+• Recording: Enabled
+\n✅ Preparation:
+• Review lesson plan
+• Test video/audio
+• Prepare materials
+• Send reminders 24h before
+
+💡 Join 10 minutes early to greet students and handle any technical setup.`);
+                  }}
                 />
               </div>
             </div>
