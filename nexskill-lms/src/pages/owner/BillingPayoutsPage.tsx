@@ -23,6 +23,18 @@ interface CoachPayout {
 
 const BillingPayoutsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'transactions' | 'payouts'>('overview');
+  const [showPayoutModal, setShowPayoutModal] = useState(false);
+  const [processingPayouts, setProcessingPayouts] = useState(false);
+
+  const handleProcessPayouts = () => {
+    console.log('Process payouts');
+    setProcessingPayouts(true);
+    setTimeout(() => {
+      alert('✅ Payouts processed successfully!\n\nTotal payouts: $28,450\nCoaches paid: 12\nAll payments have been initiated.');
+      setProcessingPayouts(false);
+      setShowPayoutModal(false);
+    }, 1500);
+  };
 
   // Dummy financial overview data
   const financialOverview = {
@@ -293,7 +305,7 @@ const BillingPayoutsPage: React.FC = () => {
                       </p>
                     </div>
                     <button
-                      onClick={() => console.log('Process payouts')}
+                      onClick={() => setShowPayoutModal(true)}
                       className="w-full py-3 bg-brand-primary text-white rounded-xl font-medium text-sm hover:bg-brand-primary-dark transition-colors"
                     >
                       Process All Payouts
@@ -448,6 +460,79 @@ const BillingPayoutsPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Process Payouts Confirmation Modal */}
+      {showPayoutModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md">
+            <div className="p-6 border-b border-[#EDF0FB]">
+              <h2 className="text-xl font-bold text-text-primary">Process Payouts</h2>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-4 border border-amber-200">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                    <span className="text-xl">💰</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-text-primary">Payout Summary</p>
+                    <p className="text-xs text-text-muted">Review before processing</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-text-secondary">Total Amount:</span>
+                    <span className="text-lg font-bold text-amber-700">
+                      ${financialOverview.pendingPayouts.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-text-secondary">Number of Coaches:</span>
+                    <span className="text-sm font-semibold text-text-primary">
+                      {coachPayouts.filter((p) => p.status === 'pending').length}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-text-secondary">Processing Time:</span>
+                    <span className="text-sm font-semibold text-text-primary">2-3 business days</span>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <p className="text-xs text-blue-800">
+                  ℹ️ Processing will initiate bank transfers to all pending coaches. This action cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="p-6 border-t border-[#EDF0FB] flex justify-end gap-3">
+              <button
+                onClick={() => setShowPayoutModal(false)}
+                disabled={processingPayouts}
+                className="px-6 py-2 text-text-secondary font-medium rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleProcessPayouts}
+                disabled={processingPayouts}
+                className="px-6 py-2 bg-brand-primary text-white font-medium rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {processingPayouts ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Processing...
+                  </>
+                ) : (
+                  'Process Payouts'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </PlatformOwnerAppLayout>
   );
 };

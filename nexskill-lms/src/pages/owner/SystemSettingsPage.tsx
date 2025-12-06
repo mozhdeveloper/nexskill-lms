@@ -56,6 +56,18 @@ const SystemSettingsPage: React.FC = () => {
       flag.id === id ? { ...flag, enabled: !flag.enabled } : flag
     ));
     console.log(`Toggle feature: ${id}`);
+    const flag = featureFlags.find(f => f.id === id);
+    alert(`⚙️ Feature ${flag?.enabled ? 'disabled' : 'enabled'}\n\n${flag?.name} is now ${flag?.enabled ? 'OFF' : 'ON'}`);
+  };
+
+  const handleSaveSettings = () => {
+    console.log('Save general settings');
+    alert('✅ Settings saved successfully!\n\nAll platform settings have been updated.');
+  };
+
+  const handleConfigureIntegration = (service: string) => {
+    console.log(`Configure ${service}`);
+    alert(`🔧 Configure ${service}\n\nOpening ${service} integration settings...`);
   };
 
   // Group features by category
@@ -218,7 +230,7 @@ const SystemSettingsPage: React.FC = () => {
               {/* Save Button */}
               <div className="flex justify-end">
                 <button
-                  onClick={() => console.log('Save general settings')}
+                  onClick={handleSaveSettings}
                   className="px-6 py-3 bg-brand-primary text-white rounded-xl font-medium text-sm hover:bg-brand-primary-dark transition-colors"
                 >
                   Save Changes
@@ -278,7 +290,7 @@ const SystemSettingsPage: React.FC = () => {
                       </div>
                     </div>
                     <button
-                      onClick={() => console.log('Configure Stripe')}
+                      onClick={() => handleConfigureIntegration('Stripe')}
                       className="text-sm text-brand-primary hover:text-brand-primary-dark font-medium"
                     >
                       Configure
@@ -295,7 +307,7 @@ const SystemSettingsPage: React.FC = () => {
                       </div>
                     </div>
                     <button
-                      onClick={() => console.log('Connect PayPal')}
+                      onClick={() => handleConfigureIntegration('PayPal')}
                       className="text-sm text-brand-primary hover:text-brand-primary-dark font-medium"
                     >
                       Connect
@@ -319,7 +331,7 @@ const SystemSettingsPage: React.FC = () => {
                       </div>
                     </div>
                     <button
-                      onClick={() => console.log('Configure SendGrid')}
+                      onClick={() => handleConfigureIntegration('SendGrid')}
                       className="text-sm text-brand-primary hover:text-brand-primary-dark font-medium"
                     >
                       Configure
@@ -343,7 +355,7 @@ const SystemSettingsPage: React.FC = () => {
                       </div>
                     </div>
                     <button
-                      onClick={() => console.log('Configure Vimeo')}
+                      onClick={() => handleConfigureIntegration('Vimeo')}
                       className="text-sm text-brand-primary hover:text-brand-primary-dark font-medium"
                     >
                       Configure

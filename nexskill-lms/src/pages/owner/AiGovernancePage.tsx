@@ -20,6 +20,28 @@ interface UsageByTool {
 
 const AiGovernancePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'models' | 'usage' | 'policies'>('overview');
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
+  const [showModelModal, setShowModelModal] = useState('');
+  const [budgetSettings, setBudgetSettings] = useState({
+    monthlyLimit: 5000,
+    alertThreshold: 80,
+    notifyEmail: 'admin@nexskill.com',
+  });
+
+  const handleSaveBudget = () => {
+    console.log('Configure budget alerts:', budgetSettings);
+    alert(`✅ Budget alerts configured!\n\nMonthly limit: $${budgetSettings.monthlyLimit}\nAlert at: ${budgetSettings.alertThreshold}%\nNotify: ${budgetSettings.notifyEmail}`);
+    setShowBudgetModal(false);
+  };
+
+  const handleConfigureModel = (modelId: string) => {
+    setShowModelModal(modelId);
+  };
+
+  const handleSaveAiPolicies = () => {
+    console.log('Save AI policies');
+    alert('✅ AI policies saved successfully!\n\nAll policy changes have been applied to the platform.');
+  };
 
   // Dummy AI usage overview
   const aiOverview = {
@@ -227,7 +249,7 @@ const AiGovernancePage: React.FC = () => {
                     </div>
                   </div>
                   <button
-                    onClick={() => console.log('Configure budget alerts')}
+                    onClick={() => setShowBudgetModal(true)}
                     className="w-full py-3 bg-purple-600 text-white rounded-xl font-medium text-sm hover:bg-purple-700 transition-colors"
                   >
                     Configure Budget Alerts
@@ -296,7 +318,7 @@ const AiGovernancePage: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <button
-                            onClick={() => console.log('Configure model:', model.id)}
+                            onClick={() => handleConfigureModel(model.id)}
                             className="text-sm text-brand-primary hover:text-brand-primary-dark font-medium"
                           >
                             Configure
@@ -421,7 +443,7 @@ const AiGovernancePage: React.FC = () => {
 
               <div className="flex justify-end">
                 <button
-                  onClick={() => console.log('Save AI policies')}
+                  onClick={handleSaveAiPolicies}
                   className="px-6 py-3 bg-brand-primary text-white rounded-xl font-medium text-sm hover:bg-brand-primary-dark transition-colors"
                 >
                   Save Policies
@@ -431,6 +453,134 @@ const AiGovernancePage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Budget Alert Modal */}
+      {showBudgetModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md">
+            <div className="p-6 border-b border-[#EDF0FB]">
+              <h2 className="text-xl font-bold text-text-primary">Configure Budget Alert</h2>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  Monthly Budget Limit ($)
+                </label>
+                <input
+                  type="number"
+                  value={budgetSettings.monthlyLimit}
+                  onChange={(e) => setBudgetSettings({ ...budgetSettings, monthlyLimit: parseInt(e.target.value) || 0 })}
+                  className="w-full px-4 py-2 border border-[#EDF0FB] rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                  placeholder="5000"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  Alert Threshold (%)
+                </label>
+                <input
+                  type="number"
+                  value={budgetSettings.alertThreshold}
+                  onChange={(e) => setBudgetSettings({ ...budgetSettings, alertThreshold: parseInt(e.target.value) || 0 })}
+                  className="w-full px-4 py-2 border border-[#EDF0FB] rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                  placeholder="80"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  Notification Email
+                </label>
+                <input
+                  type="email"
+                  value={budgetSettings.notifyEmail}
+                  onChange={(e) => setBudgetSettings({ ...budgetSettings, notifyEmail: e.target.value })}
+                  className="w-full px-4 py-2 border border-[#EDF0FB] rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                  placeholder="admin@example.com"
+                />
+              </div>
+            </div>
+            <div className="p-6 border-t border-[#EDF0FB] flex justify-end gap-3">
+              <button
+                onClick={() => setShowBudgetModal(false)}
+                className="px-6 py-2 text-text-secondary font-medium rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveBudget}
+                className="px-6 py-2 bg-brand-primary text-white font-medium rounded-xl hover:bg-indigo-700 transition-colors"
+              >
+                Save Budget Settings
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Model Configuration Modal */}
+      {showModelModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg">
+            <div className="p-6 border-b border-[#EDF0FB]">
+              <h2 className="text-xl font-bold text-text-primary">Configure AI Model</h2>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-4 border border-purple-200">
+                <p className="text-sm text-text-primary mb-2">
+                  <span className="font-semibold">Model ID:</span> {showModelModal}
+                </p>
+                <p className="text-xs text-text-muted">
+                  Configure model parameters, rate limits, and usage policies.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  Max Tokens Per Request
+                </label>
+                <input
+                  type="number"
+                  defaultValue="2048"
+                  className="w-full px-4 py-2 border border-[#EDF0FB] rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  Temperature
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  defaultValue="0.7"
+                  className="w-full px-4 py-2 border border-[#EDF0FB] rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                />
+              </div>
+              <div>
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" defaultChecked className="rounded" />
+                  <span className="text-sm text-text-primary">Enable for all users</span>
+                </label>
+              </div>
+            </div>
+            <div className="p-6 border-t border-[#EDF0FB] flex justify-end gap-3">
+              <button
+                onClick={() => setShowModelModal('')}
+                className="px-6 py-2 text-text-secondary font-medium rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  alert(`✅ Model configuration saved for ${showModelModal}`);
+                  setShowModelModal('');
+                }}
+                className="px-6 py-2 bg-brand-primary text-white font-medium rounded-xl hover:bg-indigo-700 transition-colors"
+              >
+                Save Configuration
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </PlatformOwnerAppLayout>
   );
 };

@@ -17,6 +17,14 @@ const UsersRolesPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
+  const handleViewUser = (user: User) => {
+    console.log('View user:', user.id);
+    setSelectedUser(user);
+    setShowUserModal(true);
+  };
 
   // Dummy user data
   const allUsers: User[] = [
@@ -302,7 +310,7 @@ const UsersRolesPage: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <button
-                          onClick={() => console.log('View user:', user.id)}
+                          onClick={() => handleViewUser(user)}
                           className="text-sm text-brand-primary hover:text-brand-primary-dark font-medium"
                         >
                           View
@@ -327,6 +335,130 @@ const UsersRolesPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* User Detail Modal */}
+      {showUserModal && selectedUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl">
+            <div className="p-6 border-b border-[#EDF0FB]">
+              <h2 className="text-xl font-bold text-text-primary">User Details</h2>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="flex items-start gap-4">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-2xl font-bold">
+                  {selectedUser.name.charAt(0)}
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-text-primary">{selectedUser.name}</h3>
+                  <p className="text-sm text-text-secondary mb-2">{selectedUser.email}</p>
+                  <div className="flex gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
+                        roleColors[selectedUser.role as keyof typeof roleColors]
+                      }`}
+                    >
+                      {roleIcons[selectedUser.role as keyof typeof roleIcons]}
+                      {labelByRole[selectedUser.role as keyof typeof labelByRole]}
+                    </span>
+                    <span
+                      className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${
+                        selectedUser.status === 'active'
+                          ? 'bg-green-100 text-green-800'
+                          : selectedUser.status === 'suspended'
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}
+                    >
+                      {selectedUser.status}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-xs text-text-muted mb-1">Last Active</p>
+                  <p className="text-sm font-semibold text-text-primary">{selectedUser.lastActive}</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-xs text-text-muted mb-1">Account Created</p>
+                  <p className="text-sm font-semibold text-text-primary">{selectedUser.createdAt}</p>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <h4 className="text-sm font-semibold text-text-primary mb-3">Actions</h4>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      alert(`✅ Sending password reset email to ${selectedUser.email}`);
+                    }}
+                    className="flex-1 px-4 py-2 bg-white border border-gray-300 text-text-primary text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors"
+                  >
+                    Reset Password
+                  </button>
+                  {selectedUser.status === 'active' ? (
+                    <button
+                      onClick={() => {
+                        alert(`⚠️ User ${selectedUser.name} has been suspended`);
+                        setShowUserModal(false);
+                        setSelectedUser(null);
+                      }}
+                      className="flex-1 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-xl hover:bg-red-700 transition-colors"
+                    >
+                      Suspend User
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        alert(`✅ User ${selectedUser.name} has been activated`);
+                        setShowUserModal(false);
+                        setSelectedUser(null);
+                      }}
+                      className="flex-1 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-xl hover:bg-green-700 transition-colors"
+                    >
+                      Activate User
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  Change Role
+                </label>
+                <select
+                  defaultValue={selectedUser.role}
+                  onChange={(e) => {
+                    alert(`✅ User role changed to ${labelByRole[e.target.value as keyof typeof labelByRole]}`);
+                  }}
+                  className="w-full px-4 py-2 border border-[#EDF0FB] rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                >
+                  <option value="STUDENT">Student</option>
+                  <option value="COACH">Coach</option>
+                  <option value="SUB_COACH">Sub-Coach</option>
+                  <option value="CONTENT_EDITOR">Content Editor</option>
+                  <option value="COMMUNITY_MANAGER">Community Manager</option>
+                  <option value="SUPPORT_STAFF">Support Staff</option>
+                  <option value="ORG_OWNER">B2B Org Owner</option>
+                  <option value="ADMIN">Admin</option>
+                </select>
+              </div>
+            </div>
+            <div className="p-6 border-t border-[#EDF0FB] flex justify-end">
+              <button
+                onClick={() => {
+                  setShowUserModal(false);
+                  setSelectedUser(null);
+                }}
+                className="px-6 py-2 bg-brand-primary text-white font-medium rounded-xl hover:bg-indigo-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </PlatformOwnerAppLayout>
   );
 };

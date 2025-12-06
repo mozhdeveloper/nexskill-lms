@@ -22,6 +22,32 @@ interface AccessLog {
 
 const SecurityCompliancePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'alerts' | 'logs' | 'compliance'>('overview');
+  const [showScanModal, setShowScanModal] = useState(false);
+  const [showAuditModal, setShowAuditModal] = useState(false);
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [selectedAlert, setSelectedAlert] = useState<SecurityAlert | null>(null);
+  const [scanning, setScanning] = useState(false);
+
+  const handleRunScan = () => {
+    console.log('Run security scan');
+    setScanning(true);
+    setTimeout(() => {
+      alert('✅ Security scan completed!\n\nVulnerabilities found: 0\nWarnings: 2\nLast scan: Just now\n\nAll critical systems are secure.');
+      setScanning(false);
+      setShowScanModal(false);
+    }, 2000);
+  };
+
+  const handleViewAuditLogs = () => {
+    console.log('View audit logs');
+    setShowAuditModal(true);
+  };
+
+  const handleInvestigateAlert = (alert: SecurityAlert) => {
+    console.log('Investigate alert:', alert.id);
+    setSelectedAlert(alert);
+    setShowAlertModal(true);
+  };
 
   // Dummy security metrics
   const securityMetrics = {
@@ -273,7 +299,7 @@ const SecurityCompliancePage: React.FC = () => {
               {/* Quick Actions */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button
-                  onClick={() => console.log('Run security scan')}
+                  onClick={() => setShowScanModal(true)}
                   className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl p-6 border border-purple-200 text-left hover:shadow-lg transition-shadow"
                 >
                   <span className="text-2xl mb-3 block">🔍</span>
@@ -284,7 +310,7 @@ const SecurityCompliancePage: React.FC = () => {
                 </button>
 
                 <button
-                  onClick={() => console.log('View audit logs')}
+                  onClick={handleViewAuditLogs}
                   className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-6 border border-blue-200 text-left hover:shadow-lg transition-shadow"
                 >
                   <span className="text-2xl mb-3 block">📋</span>
@@ -338,7 +364,7 @@ const SecurityCompliancePage: React.FC = () => {
                   <p className="text-sm text-text-secondary mb-4">{alert.description}</p>
                   {alert.status === 'active' && (
                     <button
-                      onClick={() => console.log('Investigate alert:', alert.id)}
+                      onClick={() => handleInvestigateAlert(alert)}
                       className="text-sm text-brand-primary hover:text-brand-primary-dark font-medium"
                     >
                       Investigate →
@@ -448,6 +474,234 @@ const SecurityCompliancePage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Security Scan Modal */}
+      {showScanModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg">
+            <div className="p-6 border-b border-[#EDF0FB]">
+              <h2 className="text-xl font-bold text-text-primary">Security Scan</h2>
+            </div>
+            <div className="p-6 space-y-4">
+              {scanning ? (
+                <div className="text-center py-8">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-purple-100 mb-4">
+                    <svg className="animate-spin h-8 w-8 text-brand-primary" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  </div>
+                  <p className="text-lg font-semibold text-text-primary mb-2">Scanning system...</p>
+                  <p className="text-sm text-text-secondary">This may take a few moments</p>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-4 border border-purple-200">
+                    <p className="text-sm text-text-primary mb-2">
+                      <span className="font-semibold">Scan Type:</span> Full System Scan
+                    </p>
+                    <p className="text-xs text-text-muted">
+                      Checks for vulnerabilities, security misconfigurations, and compliance issues.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" defaultChecked className="rounded" />
+                      <span className="text-sm text-text-primary">Check for vulnerabilities</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" defaultChecked className="rounded" />
+                      <span className="text-sm text-text-primary">Verify compliance status</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" defaultChecked className="rounded" />
+                      <span className="text-sm text-text-primary">Audit access permissions</span>
+                    </label>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="p-6 border-t border-[#EDF0FB] flex justify-end gap-3">
+              <button
+                onClick={() => setShowScanModal(false)}
+                disabled={scanning}
+                className="px-6 py-2 text-text-secondary font-medium rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRunScan}
+                disabled={scanning}
+                className="px-6 py-2 bg-brand-primary text-white font-medium rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50"
+              >
+                {scanning ? 'Scanning...' : 'Start Scan'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Audit Logs Modal */}
+      {showAuditModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-[#EDF0FB]">
+              <h2 className="text-xl font-bold text-text-primary">Audit Logs</h2>
+            </div>
+            <div className="p-6 overflow-y-auto flex-1">
+              <div className="mb-4 flex gap-3">
+                <input
+                  type="text"
+                  placeholder="Search logs..."
+                  className="flex-1 px-4 py-2 border border-[#EDF0FB] rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                />
+                <select className="px-4 py-2 border border-[#EDF0FB] rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary">
+                  <option>All Actions</option>
+                  <option>Login</option>
+                  <option>Update</option>
+                  <option>Delete</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <p className="text-sm font-semibold text-text-primary">User Login</p>
+                      <p className="text-xs text-text-muted mt-1">admin@example.com logged in from 192.168.1.1</p>
+                    </div>
+                    <span className="text-xs text-text-muted">2 hours ago</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      Success
+                    </span>
+                    <span className="text-xs text-text-muted">IP: 192.168.1.1</span>
+                  </div>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <p className="text-sm font-semibold text-text-primary">Settings Updated</p>
+                      <p className="text-xs text-text-muted mt-1">AI model configuration changed</p>
+                    </div>
+                    <span className="text-xs text-text-muted">5 hours ago</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      Update
+                    </span>
+                    <span className="text-xs text-text-muted">User: admin@example.com</span>
+                  </div>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <p className="text-sm font-semibold text-text-primary">Failed Login Attempt</p>
+                      <p className="text-xs text-text-muted mt-1">Multiple failed password attempts detected</p>
+                    </div>
+                    <span className="text-xs text-text-muted">1 day ago</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                      Failed
+                    </span>
+                    <span className="text-xs text-text-muted">IP: 45.67.89.123</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 border-t border-[#EDF0FB] flex justify-end">
+              <button
+                onClick={() => setShowAuditModal(false)}
+                className="px-6 py-2 bg-brand-primary text-white font-medium rounded-xl hover:bg-indigo-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alert Investigation Modal */}
+      {showAlertModal && selectedAlert && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl">
+            <div className="p-6 border-b border-[#EDF0FB]">
+              <h2 className="text-xl font-bold text-text-primary">Investigate Alert</h2>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-xl p-4 border border-red-200">
+                <div className="flex items-center gap-3 mb-3">
+                  <span
+                    className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${
+                      selectedAlert.severity === 'critical'
+                        ? 'bg-red-100 text-red-800'
+                        : selectedAlert.severity === 'high'
+                        ? 'bg-orange-100 text-orange-800'
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}
+                  >
+                    {selectedAlert.severity.toUpperCase()}
+                  </span>
+                  <span className="text-xs text-text-muted">{selectedAlert.timestamp}</span>
+                </div>
+                <h3 className="text-lg font-bold text-text-primary mb-2">{selectedAlert.title}</h3>
+                <p className="text-sm text-text-secondary">{selectedAlert.description}</p>
+              </div>
+
+              <div className="bg-gray-50 rounded-xl p-4">
+                <h4 className="text-sm font-semibold text-text-primary mb-3">Alert Details</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-text-secondary">Alert ID:</span>
+                    <span className="text-text-primary font-mono">{selectedAlert.id}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-text-secondary">Status:</span>
+                    <span className="text-text-primary capitalize">{selectedAlert.status}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-text-secondary">First Detected:</span>
+                    <span className="text-text-primary">{selectedAlert.timestamp}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  Resolution Notes
+                </label>
+                <textarea
+                  rows={4}
+                  className="w-full px-4 py-2 border border-[#EDF0FB] rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                  placeholder="Enter investigation notes and resolution steps..."
+                />
+              </div>
+            </div>
+            <div className="p-6 border-t border-[#EDF0FB] flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowAlertModal(false);
+                  setSelectedAlert(null);
+                }}
+                className="px-6 py-2 text-text-secondary font-medium rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  alert(`✅ Alert ${selectedAlert.id} marked as resolved`);
+                  setShowAlertModal(false);
+                  setSelectedAlert(null);
+                }}
+                className="px-6 py-2 bg-brand-primary text-white font-medium rounded-xl hover:bg-indigo-700 transition-colors"
+              >
+                Mark as Resolved
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </PlatformOwnerAppLayout>
   );
 };
