@@ -1,7 +1,22 @@
+import { useState } from 'react';
 import SupportStaffAppLayout from '../../layouts/SupportStaffAppLayout';
 import { Bell, Mail, Clock, Award } from 'lucide-react';
 
 const SupportProfilePage = () => {
+  const [preferences, setPreferences] = useState({
+    newTicketAlerts: true,
+    emailNotifications: true,
+    slaReminders: true,
+    performanceUpdates: false
+  });
+
+  const handleSavePreferences = () => {
+    alert(`✅ Preferences Saved Successfully\n\n🔔 Notification Settings Updated:\n• New Ticket Alerts: ${preferences.newTicketAlerts ? 'ON' : 'OFF'}\n• Email Notifications: ${preferences.emailNotifications ? 'ON' : 'OFF'}\n• SLA Reminders: ${preferences.slaReminders ? 'ON' : 'OFF'}\n• Performance Updates: ${preferences.performanceUpdates ? 'ON' : 'OFF'}\n\n💬 Your preferences will take effect immediately.\n\n📧 You'll receive a confirmation email within 5 minutes.`);
+  };
+
+  const handleTogglePreference = (key: keyof typeof preferences) => {
+    setPreferences(prev => ({ ...prev, [key]: !prev[key] }));
+  };
   return (
     <SupportStaffAppLayout>
       <div className="space-y-6">
@@ -51,7 +66,12 @@ const SupportProfilePage = () => {
                       <span className="text-sm text-gray-600">Get notified when new tickets are assigned</span>
                     </div>
                   </div>
-                  <input type="checkbox" defaultChecked className="w-5 h-5 text-blue-600 rounded" />
+                  <input 
+                    type="checkbox" 
+                    checked={preferences.newTicketAlerts}
+                    onChange={() => handleTogglePreference('newTicketAlerts')}
+                    className="w-5 h-5 text-blue-600 rounded" 
+                  />
                 </label>
 
                 <label className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl cursor-pointer hover:bg-blue-50 transition-colors">
@@ -62,7 +82,12 @@ const SupportProfilePage = () => {
                       <span className="text-sm text-gray-600">Receive urgent ticket updates via email</span>
                     </div>
                   </div>
-                  <input type="checkbox" defaultChecked className="w-5 h-5 text-blue-600 rounded" />
+                  <input 
+                    type="checkbox" 
+                    checked={preferences.emailNotifications}
+                    onChange={() => handleTogglePreference('emailNotifications')}
+                    className="w-5 h-5 text-blue-600 rounded" 
+                  />
                 </label>
 
                 <label className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl cursor-pointer hover:bg-blue-50 transition-colors">
@@ -73,7 +98,12 @@ const SupportProfilePage = () => {
                       <span className="text-sm text-gray-600">Alert when tickets are approaching SLA deadline</span>
                     </div>
                   </div>
-                  <input type="checkbox" defaultChecked className="w-5 h-5 text-blue-600 rounded" />
+                  <input 
+                    type="checkbox" 
+                    checked={preferences.slaReminders}
+                    onChange={() => handleTogglePreference('slaReminders')}
+                    className="w-5 h-5 text-blue-600 rounded" 
+                  />
                 </label>
 
                 <label className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl cursor-pointer hover:bg-blue-50 transition-colors">
@@ -84,8 +114,21 @@ const SupportProfilePage = () => {
                       <span className="text-sm text-gray-600">Weekly summary of your support metrics</span>
                     </div>
                   </div>
-                  <input type="checkbox" className="w-5 h-5 text-blue-600 rounded" />
+                  <input 
+                    type="checkbox" 
+                    checked={preferences.performanceUpdates}
+                    onChange={() => handleTogglePreference('performanceUpdates')}
+                    className="w-5 h-5 text-blue-600 rounded" 
+                  />
                 </label>
+              </div>
+              <div className="mt-6">
+                <button
+                  onClick={handleSavePreferences}
+                  className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl hover:shadow-lg transition-all"
+                >
+                  Save Preferences
+                </button>
               </div>
             </div>
           </div>

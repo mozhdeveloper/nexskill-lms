@@ -26,14 +26,12 @@ const SupportKnowledgeBasePage = () => {
     setNewArticle({ title: '', category: 'technical', content: '', tags: '' });
   };
 
-  const handleBookmarkArticle = (articleId: string) => {
-    console.log('Bookmarking article:', articleId);
-    alert('Article bookmarked!');
+  const handleBookmark = (articleId: string) => {
+    alert(`🔖 Article Bookmarked\n\nArticle ID: ${articleId}\n\n✅ Saved to Your Bookmarks:\n• Quick access from sidebar\n• Offline availability\n• Sync across devices\n\n📚 Your Bookmark Collections:\n• Technical Issues (12 articles)\n• Account Support (8 articles)\n• Billing & Payments (5 articles)\n• Course Access (15 articles)\n\nAccess all bookmarks from the 'My Bookmarks' section.`);
   };
 
   const handleRateArticle = (articleId: string, rating: number) => {
-    console.log('Rating article:', articleId, 'with', rating, 'stars');
-    alert(`Article rated ${rating} stars!`);
+    alert(`⭐ Article Rated: ${rating} stars\n\nArticle ID: ${articleId}\n\n📊 Your Feedback:\n• Your rating: ${rating}/5 stars\n• Average rating: 4.2/5\n• Total ratings: 48\n\n✅ Impact:\n• Helps improve content quality\n• Guides future article updates\n• Assists other support staff\n\n💡 Tip: Add a comment to help the author understand your rating and improve the article further.`);
   };
 
   return (
@@ -102,7 +100,7 @@ const SupportKnowledgeBasePage = () => {
         {/* Knowledge Base List */}
         <KnowledgeBaseList 
           onViewArticle={handleViewArticle}
-          onBookmark={handleBookmarkArticle}
+          onBookmark={handleBookmark}
         />
       </div>
 
@@ -153,7 +151,7 @@ const SupportKnowledgeBasePage = () => {
                   </div>
                 </div>
                 <button
-                  onClick={() => handleBookmarkArticle('article-1')}
+                  onClick={() => handleBookmark('article-1')}
                   className="px-4 py-2 bg-purple-50 text-purple-700 font-medium rounded-lg hover:bg-purple-100 transition-colors"
                 >
                   🔖 Bookmark

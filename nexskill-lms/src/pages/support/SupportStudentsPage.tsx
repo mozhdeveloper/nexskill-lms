@@ -33,8 +33,7 @@ const SupportStudentsPage = () => {
   };
 
   const handleSuspendAccount = (studentId: string) => {
-    console.log('Suspending account:', studentId);
-    alert('Account suspended!');
+    alert(`⚠️ Account Suspended\n\nStudent ID: ${studentId}\n\n🚫 Suspension Details:\n• Access: Blocked immediately\n• Course progress: Preserved\n• Certificates: Temporarily unavailable\n\n📧 Student Notification:\n• Suspension reason sent\n• Appeal process included\n• Support contact provided\n\n📝 Next Steps:\n• Document suspension reason\n• Set review date\n• Notify relevant instructors`);
   };
 
   const handleExportData = () => {
