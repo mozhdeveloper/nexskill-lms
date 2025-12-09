@@ -24,6 +24,8 @@ interface SubCoachAssignment {
   assignedDate: string;
   requiredCourses: string[];
   studentsAssigned: number;
+  assignedStudentIds?: string[];
+  assignedStudentNames?: string[];
   status: 'active' | 'pending' | 'inactive';
 }
 
@@ -135,7 +137,10 @@ const SubCoachManagement: React.FC = () => {
   const handleViewDetails = (assignment: SubCoachAssignment) => {
     setShowActionsMenu(null);
     // Could open a detail modal here
-    alert(`Viewing details for ${assignment.subCoachName}\n\nAssigned to: ${assignment.courseTitle}\nRequired courses: ${assignment.requiredCourses.join(', ')}\nStudents assigned: ${assignment.studentsAssigned}`);
+    const studentsList = assignment.assignedStudentNames?.length 
+      ? `\n\nAssigned Students:\n${assignment.assignedStudentNames.map((name, i) => `${i + 1}. ${name}`).join('\n')}`
+      : '';
+    alert(`Viewing details for ${assignment.subCoachName}\n\nAssigned to: ${assignment.courseTitle}\nRequired courses: ${assignment.requiredCourses.join(', ')}\nStudents assigned: ${assignment.studentsAssigned}${studentsList}`);
   };
 
   const getStatusBadge = (status: SubCoachAssignment['status']) => {
