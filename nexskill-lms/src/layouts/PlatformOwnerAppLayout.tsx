@@ -68,11 +68,11 @@ const PlatformOwnerAppLayout: React.FC<PlatformOwnerAppLayoutProps> = ({ childre
           <div className="pt-6 mt-6 border-t border-[#EDF0FB]">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-indigo-400 flex items-center justify-center text-white font-semibold">
-                {currentUser?.name.charAt(0).toUpperCase() || 'P'}
+                {currentUser?.firstName?.charAt(0).toUpperCase() || 'P'}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-text-primary truncate">
-                  {currentUser?.name || 'Platform Owner'}
+                  {currentUser?.firstName || 'Platform Owner'}
                 </p>
                 <p className="text-xs text-text-muted">Super Admin</p>
               </div>

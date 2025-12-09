@@ -87,7 +87,7 @@ const Login: React.FC = () => {
           {/* Display Name Input */}
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-text-primary mb-2">
-              Display Name (Optional)
+              Display Name
             </label>
             <input
               type="text"

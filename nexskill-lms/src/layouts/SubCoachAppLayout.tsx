@@ -70,11 +70,11 @@ const SubCoachAppLayout: React.FC<SubCoachAppLayoutProps> = ({ children }) => {
           <div className="pt-6 mt-6 border-t border-[#EDF0FB]">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-400 to-cyan-400 flex items-center justify-center text-white font-semibold">
-                {currentUser?.name.charAt(0).toUpperCase() || 'S'}
+                {currentUser?.firstName?.charAt(0).toUpperCase() || 'S'}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-text-primary truncate">
-                  {currentUser?.name || 'Sub-Coach'}
+                  {currentUser?.firstName || 'Sub-Coach'}
                 </p>
                 <p className="text-xs text-text-muted">Assistant Instructor</p>
               </div>

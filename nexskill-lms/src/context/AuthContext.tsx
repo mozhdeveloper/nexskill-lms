@@ -9,6 +9,7 @@ import { defaultLandingRouteByRole } from '../types/roles';
 export interface User {
   id: string;
   name: string;
+  firstName: string;
   role: UserRole;
 }
 
@@ -64,11 +65,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   /**
    * Mock login - accepts name and role, generates fake user ID
+   * Extracts first name from full display name for personalized greetings
    */
   const loginMock = (name: string, role: UserRole) => {
+    const trimmedName = name.trim() || 'Anonymous User';
+    // Extract first name (first word before any space)
+    const firstName = trimmedName.split(' ')[0];
+    
     const user: User = {
       id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      name: name.trim() || 'Anonymous User',
+      name: trimmedName,
+      firstName,
       role,
     };
 

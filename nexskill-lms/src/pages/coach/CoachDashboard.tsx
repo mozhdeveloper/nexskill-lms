@@ -1,5 +1,6 @@
 import React from 'react';
 import CoachAppLayout from '../../layouts/CoachAppLayout';
+import { useAuth } from '../../context/AuthContext';
 
 // Dummy data
 const revenueData = {
@@ -99,6 +100,8 @@ const aiShortcuts = [
 ];
 
 const CoachDashboard: React.FC = () => {
+  const { currentUser } = useAuth();
+
   const handleCourseClick = (courseName: string) => {
     window.alert(`📚 ${courseName}\n\n🎯 Quick Actions:\n• View course analytics\n• Edit course content\n• Manage students (24 enrolled)\n• View student feedback (4.8/5)\n• Update pricing or settings\n\n📊 Recent Activity:\n• 3 new enrollments today\n• 12 lessons completed\n• 5 student questions pending\n\nClick on course card to access full details.`);
   };
@@ -126,7 +129,7 @@ const CoachDashboard: React.FC = () => {
         <div className="bg-white dark:bg-dark-background-card border-b border-slate-200 dark:border-gray-700 dark:border-gray-700 px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-slate-900 dark:text-dark-text-primary mb-2">Welcome back, Coach</h1>
+              <h1 className="text-3xl font-bold text-slate-900 dark:text-dark-text-primary mb-2">Welcome back, {currentUser?.firstName || 'Coach'}</h1>
               <p className="text-slate-600 dark:text-dark-text-secondary">Here's an overview of your teaching performance</p>
             </div>
             <div className="flex gap-3">

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
+import { useAuth } from '../../context/AuthContext';
 // test changes
 // Dummy data
 const courses = [
@@ -56,6 +57,7 @@ const liveClasses = [
 
 const StudentDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
   const [showAICoach, setShowAICoach] = useState(true);
   const [timeFilter] = useState('This week');
 
@@ -74,7 +76,7 @@ const StudentDashboard: React.FC = () => {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-text-primary dark:text-dark-text-primary mb-1">
-              {getGreeting()}, Student 👋
+              {getGreeting()}, {currentUser?.firstName || 'Student'} 👋
             </h1>
             <p className="text-sm text-text-secondary dark:text-dark-text-secondary">
               Keep learning, you're doing great!
