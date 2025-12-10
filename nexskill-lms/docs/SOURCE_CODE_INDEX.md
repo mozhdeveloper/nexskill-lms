@@ -823,17 +823,33 @@ Example components for session expiry handling.
 
 ---
 
+## 🎨 Assets & Static Files
+
+### `src/assets/branding/nexskill-logo.png`
+Platform logo image file (PNG format).
+
+### `src/assets/react.svg`
+React logo SVG (default Vite asset).
+
+### `src/constants/`
+Constants folder (currently empty - reserved for future application constants).
+
+---
+
 ## 📊 File Statistics
 
 - **Total Files:** 343
+- **TypeScript/TSX Files:** 341
+- **CSS Files:** 2
 - **Pages:** 118
-- **Components:** 218
+- **Components:** 201
 - **Layouts:** 14
 - **Context Providers:** 2
 - **Utilities:** 3
 - **Type Definitions:** 1
-- **Style Files:** 2
-- **Entry Points:** 2
+- **Examples:** 1
+- **Assets:** 2
+- **Library Integrations:** 1
 
 ---
 
