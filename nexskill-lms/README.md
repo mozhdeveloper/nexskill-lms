@@ -114,10 +114,14 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 2. **Open your browser**
    Navigate to `http://localhost:5173`
 
-3. **Login with any role**
-   - Use the login page at `/auth/login`
+3. **Login with demo credentials**
+   - Go to the login page at `/auth/login`
    - Select any role from the dropdown
-   - Enter any name (optional) and click "Sign In"
+   - **Credentials auto-fill automatically** - just click "Sign In"!
+   - All demo accounts use the surname "Doe" (Alex Doe, Jordan Doe, etc.)
+   - Password for all accounts: `demo1234`
+
+   📖 **[View all demo credentials →](./docs/DEMO_CREDENTIALS.md)**
    - No password validation required (mock authentication)
 
 ### Available Scripts
