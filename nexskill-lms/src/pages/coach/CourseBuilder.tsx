@@ -39,12 +39,20 @@ interface Module {
   lessons: Lesson[];
 }
 
+interface FileUploadConfig {
+  allowedTypes: string[];
+  maxFileSizeMB: number;
+  rubric: string;
+  maxPoints: number;
+}
+
 interface Question {
   id: string;
-  type: 'multiple-choice' | 'true-false' | 'image-choice';
+  type: 'multiple-choice' | 'true-false' | 'image-choice' | 'file-upload';
   question: string;
   options: Array<{ id: string; text: string; isCorrect: boolean }>;
   explanation: string;
+  fileUploadConfig?: FileUploadConfig;
 }
 
 interface ModuleDrip {
