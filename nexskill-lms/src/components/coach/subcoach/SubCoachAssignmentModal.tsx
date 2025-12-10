@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Search, Check, ChevronDown, User, BookOpen, Award, Users, CheckSquare } from 'lucide-react';
+import { X, Search, Check, ChevronDown, User, BookOpen, Award, Users } from 'lucide-react';
 
 interface Course {
   id: string;
