@@ -13,7 +13,8 @@ import DeleteCourseModal from "../../components/courses/DeleteCourseModal";
 import LessonEditorPanel from "../../components/coach/lesson-editor/LessonEditorPanel";
 import LiveSessionManager from "../../components/coach/live-sessions/LiveSessionManager";
 import QuizEditorPanel from "../../components/quiz/QuizEditorPanel";
-import type { Lesson } from "../../types/lesson";
+import CourseGoalsPanel from "../../components/coach/course-builder/CourseGoalsPanel"; // Added import
+import type { Lesson, Module } from "../../types/lesson";
 import type { Quiz, QuizQuestion } from "../../types/quiz";
 import type { ContentItem } from "../../types/content-item";
 import { supabase } from "../../lib/supabaseClient";
@@ -24,6 +25,7 @@ type SectionKey =
   | "live-sessions"
   | "drip"
   | "pricing"
+  | "goals"
   | "publish"
   | "preview";
 
@@ -40,16 +42,10 @@ interface CourseSettings {
   learningObjectives?: string[];
 }
 
-interface Module {
-  id: string;
-  title: string;
-  lessons: ContentItem[];
-}
-
 interface ModuleDrip {
   moduleId: string;
   moduleTitle: string;
-  mode: "immediate" | "days-after-enrollment" | "specific-date";
+  mode: "immediate" | "days-after-enrollment" | "specific-date" | "after-previous";
   daysAfter?: number;
   specificDate?: string;
 }
@@ -234,11 +230,64 @@ const CourseBuilder: React.FC = () => {
       if (saveLessonTimeoutRef.current) {
         clearTimeout(saveLessonTimeoutRef.current);
       }
+      if (saveCurriculumTimeoutRef.current) {
+        clearTimeout(saveCurriculumTimeoutRef.current);
+      }
     };
   }, []);
 
   // Curriculum state
   const [curriculum, setCurriculum] = useState<Module[]>([]);
+  const saveCurriculumTimeoutRef = useRef<any>(null);
+
+  const handleCurriculumChange = (updatedCurriculum: Module[]) => {
+    setCurriculum(updatedCurriculum);
+
+    if (saveCurriculumTimeoutRef.current) clearTimeout(saveCurriculumTimeoutRef.current);
+
+    saveCurriculumTimeoutRef.current = setTimeout(async () => {
+      try {
+        // Prepare updates for modules (title, is_sequential)
+        // Note: We prioritize saving structure properties.
+        // We use upsert to handle both new and existing modules if we generate IDs.
+        // However, CurriculumEditor generates 'module-Date.now()'.
+        // We should check if IDs are valid UUIDs or temp IDs.
+        // If temp ID, we should insert.
+        // Ideally, 'handleAddModule' should handle creation properly.
+
+        // For now, let's assume we update existing modules.
+        // Filter out temp IDs for update? Handled by upsert?
+        // If ID is 'module-...', DB might reject if not UUID.
+        // But CurriculumEditor in this codebase seems to rely on backend generating IDs?
+        // No, line 75 in CurriculumEditor: id: `module-${Date.now()}`.
+        // If we try to upsert this, Postgres uuid check will fail.
+
+        // We'll filter for valid UUIDs to update.
+        // Creating new modules via 'onChange' is tricky if we don't swap the ID.
+        // Let's focus on updating EXISTING modules (title, is_sequential).
+        // New modules should probably have been handled by backend creation if possible, 
+        // or we need to handle creation here and swap ID.
+
+        const validModules = updatedCurriculum.filter(m => !m.id.startsWith('module-'));
+
+        if (validModules.length === 0) return;
+
+        const updates = validModules.map(m => ({
+          id: m.id,
+          title: m.title,
+          is_sequential: m.is_sequential,
+          course_id: courseId,
+          // position: index // If we tracked position
+        }));
+
+        const { error } = await supabase.from('modules').upsert(updates);
+        if (error) console.error("Error saving modules:", error);
+
+      } catch (err) {
+        console.error("Error in module auto-save:", err);
+      }
+    }, 1000);
+  };
 
   // Lesson editor state
   const [editingLesson, setEditingLesson] = useState<{
@@ -254,12 +303,27 @@ const CourseBuilder: React.FC = () => {
   } | null>(null);
 
   // Drip schedule state
-  const dripModules: ModuleDrip[] = curriculum.map((mod) => ({
-    moduleId: mod.id,
-    moduleTitle: mod.title,
-    mode: "immediate",
-  }));
-  const [drip, setDrip] = useState<ModuleDrip[]>(dripModules);
+  const [drip, setDrip] = useState<ModuleDrip[]>([]);
+
+  // Sync drip state with curriculum
+  useEffect(() => {
+    setDrip((prevDrip) => {
+      // Map existing drip settings to preserve local edits
+      const existingMap = new Map(prevDrip.map(d => [d.moduleId, d]));
+
+      return curriculum.map((mod) => {
+        const existing = existingMap.get(mod.id);
+        // Use existing local state if available, otherwise fall back to module data (DB or default)
+        return {
+          moduleId: mod.id,
+          moduleTitle: mod.title,
+          mode: existing?.mode || mod.drip_mode || "immediate",
+          daysAfter: existing?.daysAfter || mod.drip_days,
+          specificDate: existing?.specificDate || mod.drip_date,
+        };
+      });
+    });
+  }, [curriculum]);
 
   // Pricing state
   const [pricing, setPricing] = useState<PricingData>({
@@ -573,6 +637,47 @@ const CourseBuilder: React.FC = () => {
     }, 15000);
   };
 
+  const handleAddModule = async () => {
+    try {
+      const position = curriculum.length;
+      // Insert new module
+      const { data, error } = await supabase.from('modules').insert({
+        course_id: courseId,
+        title: `Module ${position + 1}`,
+        position: position,
+        is_published: false,
+        is_sequential: false
+      }).select().single();
+
+      if (error) throw error;
+
+      if (data) {
+        setCurriculum([...curriculum, { ...data, lessons: [] }]);
+      }
+    } catch (error) {
+      console.error("Error creating module:", error);
+      alert("Failed to create module");
+    }
+  };
+
+  const handleDeleteModule = async (moduleId: string) => {
+    try {
+      // If it's a temp ID (shouldn't happen with valid add), just remove from state
+      if (moduleId.startsWith('module-')) {
+        setCurriculum(curriculum.filter(m => m.id !== moduleId));
+        return;
+      }
+
+      const { error } = await supabase.from('modules').delete().eq('id', moduleId);
+      if (error) throw error;
+
+      setCurriculum(curriculum.filter(m => m.id !== moduleId));
+    } catch (error) {
+      console.error("Error deleting module:", error);
+      alert("Failed to delete module");
+    }
+  };
+
   const handleAddQuiz = async (moduleId: string) => {
     let resolvedModuleId = moduleId;
     try { resolvedModuleId = await resolveModuleId(moduleId); } catch (e) { return; }
@@ -743,6 +848,29 @@ const CourseBuilder: React.FC = () => {
     }
   };
 
+  const handleSaveDrip = async () => {
+    try {
+      const updates = drip.map(async (dripModule) => {
+        const { error } = await supabase
+          .from("modules")
+          .update({
+            drip_mode: dripModule.mode,
+            drip_days: dripModule.daysAfter,
+            drip_date: dripModule.specificDate
+          })
+          .eq("id", dripModule.moduleId);
+
+        if (error) throw error;
+      });
+
+      await Promise.all(updates);
+      alert("Drip schedule saved successfully!");
+    } catch (error) {
+      console.error("Error saving drip schedule:", error);
+      alert("Failed to save drip schedule");
+    }
+  };
+
   const renderSection = () => {
     switch (activeSection) {
       case "settings":
@@ -758,21 +886,25 @@ const CourseBuilder: React.FC = () => {
         return (
           <CurriculumEditor
             curriculum={curriculum}
-            onChange={setCurriculum}
+            onChange={handleCurriculumChange}
             onEditLesson={handleEditLesson}
             onEditQuiz={handleEditQuiz}
             onAddQuiz={handleAddQuiz}
             onAddLesson={handleAddLesson}
             onDeleteLesson={handleDeleteLesson}
             onMoveLesson={handleMoveLesson}
+            onAddModule={handleAddModule}
+            onDeleteModule={handleDeleteModule}
           />
         );
       case "live-sessions":
         return <LiveSessionManager />;
       case "drip":
-        return <DripSchedulePanel modules={drip} onChange={setDrip} />;
+        return <DripSchedulePanel modules={drip} onChange={setDrip} onSave={handleSaveDrip} />;
       case "pricing":
         return <CoursePricingForm pricing={pricing} onChange={setPricing} />;
+      case "goals":
+        return <CourseGoalsPanel courseId={courseId!} />;
       case "publish":
         return (
           <CoursePublishWorkflow

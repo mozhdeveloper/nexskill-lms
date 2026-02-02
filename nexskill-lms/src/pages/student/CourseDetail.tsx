@@ -12,6 +12,34 @@ const coursesData: Record<string, any> = {
   // I will focus on the REAL implementation.
 };
 
+// Define CourseDisplay interface
+interface CourseDisplay {
+  id: string;
+  title: string;
+  category: string;
+  level: string;
+  rating: number;
+  reviewCount: number;
+  studentsCount: number;
+  duration: string;
+  price: number;
+  originalPrice?: number;
+  description: string;
+  whatYouLearn: string[];
+  tools: string[];
+  curriculum: any[];
+  reviews: any[];
+  coach: {
+    name: string;
+    avatar: string;
+    bio: string;
+    studentsCount: number;
+    coursesCount: number;
+    rating: number;
+  } | null;
+  includes: string[];
+}
+
 const CourseDetail: React.FC = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
@@ -63,41 +91,185 @@ const CourseDetail: React.FC = () => {
       try {
         setLoading(true);
 
+        const { data: { user } } = await supabase.auth.getUser();
+
         // 1. Fetch Course Details
         const { data: courseData, error: courseError } = await supabase
           .from('courses')
           .select(`
             *,
             category:categories(name),
-            coach:profiles!courses_coach_id_fkey(first_name, last_name)
+            coach:profiles!courses_coach_id_fkey(first_name, last_name, bio, avatar:avatar_url)
           `)
           .eq('id', courseId)
           .single();
 
         if (courseError) throw courseError;
 
+        // 2. Fetch Course Goals
+        const { data: goalsData } = await supabase
+          .from('course_goals')
+          .select('*')
+          .eq('course_id', courseId)
+          .order('position');
+
+        // 3. Fetch Modules
+        const { data: modulesData, error: modulesError } = await supabase
+          .from('modules')
+          .select('*')
+          .eq('course_id', courseId)
+          .order('position');
+
+        if (modulesError) throw modulesError;
+
+        // 4. Fetch Content Items (Lessons/Quizzes)
+        const moduleIds = modulesData.map(m => m.id);
+        const { data: itemsData, error: itemsError } = await supabase
+          .from('module_content_with_data')
+          .select('*')
+          .in('module_id', moduleIds)
+          .order('position');
+
+        if (itemsError) throw itemsError;
+
+        // 5. Fetch Enrollment & Progress
+        let isUserEnrolled = false;
+        let enrollmentDate: string | null = null;
+        let userProgress: Record<string, boolean> = {};
+
+        if (user) {
+          const { data: enrollment } = await supabase
+            .from('enrollments')
+            .select('enrolled_at')
+            .eq('profile_id', user.id)
+            .eq('course_id', courseId)
+            .maybeSingle();
+
+          if (enrollment) {
+            isUserEnrolled = true;
+            enrollmentDate = enrollment.enrolled_at;
+            setIsEnrolled(true);
+
+            // Fetch progress
+            const { data: progressData } = await supabase
+              .from('user_lesson_progress')
+              .select('lesson_id, is_completed')
+              .eq('user_id', user.id);
+
+            if (progressData) {
+              progressData.forEach(p => {
+                userProgress[p.lesson_id] = p.is_completed;
+              });
+            }
+          }
+        }
+
+        // Helper to check if module is locked via drip
+        // Now returns true/false for date/days checks. 
+        // Sequential check happens in the loop below.
+        const checkDripDateOrDays = (module: any) => {
+          if (!isUserEnrolled) return true;
+
+          if (module.drip_mode === 'specific-date' && module.drip_date) {
+            return new Date() < new Date(module.drip_date);
+          }
+          if (module.drip_mode === 'days-after-enrollment' && module.drip_days && enrollmentDate) {
+            const unlockDate = new Date(new Date(enrollmentDate).getTime() + module.drip_days * 24 * 60 * 60 * 1000);
+            return new Date() < unlockDate;
+          }
+          return false;
+        };
+
+        // Organize content into modules with locking logic
+        let previousModuleCompleted = true; // Track previous module status for sequential unlocking
+
+        const structuredCurriculum = modulesData.map((module, index) => {
+          // 1. Check basic time-based drip locks
+          let isModuleLocked = checkDripDateOrDays(module);
+
+          // 2. Check sequential module lock (after-previous)
+          if (module.drip_mode === 'after-previous') {
+            if (index > 0 && !previousModuleCompleted) {
+              isModuleLocked = true;
+            }
+          }
+
+          const moduleItems = itemsData.filter(item => item.module_id === module.id) || [];
+
+          // 3. Sequential Lesson Check State (within module)
+          let previousLessonCompleted = true;
+
+          const lessonsWithStatus = moduleItems.map((item, idx) => {
+            const itemId = item.lesson_id || item.quiz_id;
+            const isCompleted = userProgress[itemId] || false;
+
+            let isLessonLocked = isModuleLocked;
+
+            // Enforce sequential lesson order if module is sequential
+            if (!isLessonLocked && module.is_sequential) {
+              if (idx > 0 && !previousLessonCompleted) {
+                isLessonLocked = true;
+              }
+            }
+
+            // Update tracker for next lesson
+            if (isCompleted) {
+              previousLessonCompleted = true;
+            } else {
+              previousLessonCompleted = false;
+            }
+
+            return {
+              id: itemId,
+              title: item.lesson_title || item.quiz_title,
+              type: item.content_type,
+              duration: item.estimated_duration_minutes ? `${item.estimated_duration_minutes}m` : '5m',
+              isLocked: isLessonLocked,
+              isCompleted
+            };
+          });
+
+          // Determine if THIS module is completed (all items completed)
+          // Treat empty modules as completed for flow purposes, unless we want to block?
+          // Assuming an empty module doesn't block progress.
+          const isThisModuleCompleted = moduleItems.length === 0 || moduleItems.every(item => {
+            const itemId = item.lesson_id || item.quiz_id;
+            return userProgress[itemId] === true;
+          });
+
+          // Update global tracker for the NEXT module
+          previousModuleCompleted = isThisModuleCompleted;
+
+          return {
+            ...module,
+            lessons: lessonsWithStatus,
+            isLocked: isModuleLocked
+          };
+        });
+
         if (courseData) {
-          // Transform
+          // Map goals to whatYouLearn
+          const goals = goalsData ? goalsData.map(g => g.description) : [];
+
           setCourse({
             id: courseData.id,
             title: courseData.title,
             category: courseData.category?.name || 'General',
             level: courseData.level || 'Beginner',
-            rating: 0, // Mock for now
-            reviewCount: 0,
-            studentsCount: 0,
+            rating: 0, // Mock
+            reviewCount: 0, // Mock
+            studentsCount: 0, // Mock
             duration: courseData.duration_hours ? `${courseData.duration_hours}h` : 'N/A',
             price: courseData.price || 0,
-            originalPrice: undefined, // Column not in standard schema yet
+            originalPrice: undefined,
             description: courseData.long_description || courseData.short_description || 'No description available',
-            // Temporarily placeholder arrays until tables are populated
-            whatYouLearn: [
+            whatYouLearn: goals.length > 0 ? goals : [
               'Master key concepts and practical skills',
               'Apply methodologies to real-world problems',
               'Build a professional portfolio'
             ],
             tools: [],
-            curriculum: [], // We could fetch modules/lessons here with a join
+            curriculum: structuredCurriculum,
             reviews: [],
             coach: courseData.coach ? {
               name: `${courseData.coach.first_name} ${courseData.coach.last_name || ''}`,
@@ -111,27 +283,9 @@ const CourseDetail: React.FC = () => {
           });
         }
 
-        // 2. Check Enrollment (if logged in)
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: enrollment } = await supabase
-            .from('enrollments')
-            .select('enrolled_at')
-            .eq('profile_id', user.id)
-            .eq('course_id', courseId)
-            .maybeSingle();
-
-          if (enrollment) {
-            setIsEnrolled(true);
-          }
-        }
-
       } catch (err: any) {
         console.error('Error fetching course/enrollment:', err);
-        // Fallback or just set null
         setCourse(null);
-        // Debugging Helper: Alert the actual error if in dev
-        // if (process.env.NODE_ENV === 'development') alert('Debug Error: ' + JSON.stringify(err));
       } finally {
         setLoading(false);
       }
@@ -182,6 +336,24 @@ const CourseDetail: React.FC = () => {
     } catch (err: any) {
       console.error('Error enrolling:', err);
       alert('Failed to enroll: ' + err.message);
+    }
+  };
+
+  const handleUnenroll = async () => {
+    try {
+      if (!user || !course) return;
+
+      // Implement unenroll logic or show instructions
+      // For now, simpler to contact support or just remove from enrollments table
+      const { error } = await supabase.from('enrollments').delete().match({ profile_id: user.id, course_id: course.id });
+
+      if (error) throw error;
+
+      setIsEnrolled(false);
+      alert('You have successfully unenrolled from the course.');
+    } catch (error) {
+      console.error("Error unenrolling:", error);
+      alert("Failed to unenroll.");
     }
   };
 
@@ -310,31 +482,32 @@ const CourseDetail: React.FC = () => {
 
             {/* Tab Content */}
             <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-card p-8">
-              <div className="space-y-8">
-                <div>
-                  <h3 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary mb-4">
-                    About this course
-                  </h3>
-                  <p className="text-text-secondary dark:text-dark-text-secondary leading-relaxed">
-                    {course.description}
-                  </p>
-                </div>
-
-                {course.whatYouLearn && course.whatYouLearn.length > 0 && (
+              {activeTab === 'overview' && (
+                <div className="space-y-8">
                   <div>
                     <h3 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary mb-4">
-                      What you'll learn
+                      About this course
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {course.whatYouLearn.map(
-                        (item: string, index: number) => (
-                          <div key={index} className="flex items-start gap-3">
-                            <span className="text-green-500 mt-1">✓</span>
-                            <span className="text-sm text-text-secondary dark:text-dark-text-secondary">
-                              {item}
-                            </span>
-                          </div>
-                        ))}
+                    <p className="text-text-secondary dark:text-dark-text-secondary leading-relaxed">
+                      {course.description}
+                    </p>
+                  </div>
+
+                  {course.whatYouLearn && course.whatYouLearn.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary mb-4">
+                        What you'll learn
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {course.whatYouLearn.map(
+                          (item: string, index: number) => (
+                            <div key={index} className="flex items-start gap-3">
+                              <span className="text-green-500 mt-1">✓</span>
+                              <span className="text-sm text-text-secondary dark:text-dark-text-secondary">
+                                {item}
+                              </span>
+                            </div>
+                          ))}
                       </div>
                     </div>
                   )}
@@ -384,16 +557,31 @@ const CourseDetail: React.FC = () => {
                       {expandedModules.includes(module.id) && (
                         <div className="bg-[#FAFBFF] p-4 space-y-2">
                           {module.lessons && module.lessons.map((lesson: any) => (
-                            <div
+                            <button
                               key={lesson.id}
-                              className="flex items-center justify-between py-2 px-3 hover:bg-white dark:bg-dark-background-card rounded-lg transition-colors"
+                              disabled={lesson.isLocked}
+                              onClick={() => {
+                                // Navigate to lesson player (Not implemented yet)
+                                alert(`Navigate to lesson: ${lesson.title}`);
+                              }}
+                              className={`w-full flex items-center justify-between py-2 px-3 rounded-lg transition-colors text-left ${lesson.isLocked ? 'opacity-60 cursor-not-allowed bg-gray-50 dark:bg-gray-800/50' :
+                                'hover:bg-white dark:hover:bg-dark-background-card cursor-pointer'
+                                }`}
                             >
                               <div className="flex items-center gap-3">
-                                <span className="text-text-muted dark:text-dark-text-muted">▶️</span>
-                                <span className="text-sm text-text-secondary dark:text-dark-text-secondary">{lesson.title}</span>
+                                {lesson.isCompleted ? (
+                                  <span className="text-green-500 text-lg">✓</span>
+                                ) : lesson.isLocked ? (
+                                  <span className="text-gray-400 text-sm">🔒</span>
+                                ) : (
+                                  <span className="text-brand-primary text-sm">▶️</span>
+                                )}
+                                <span className={`text-sm ${lesson.isLocked ? 'text-gray-400' : 'text-text-secondary dark:text-dark-text-secondary'}`}>
+                                  {lesson.title}
+                                </span>
                               </div>
                               <span className="text-xs text-text-muted dark:text-dark-text-muted">{lesson.duration}</span>
-                            </div>
+                            </button>
                           ))}
                         </div>
                       )}
@@ -485,7 +673,7 @@ const CourseDetail: React.FC = () => {
                     </div>
                   )}
                 </div>
-              </div>
+              )}
             </div>
           </div>
 
@@ -509,7 +697,7 @@ const CourseDetail: React.FC = () => {
                     {Math.round(
                       ((course.originalPrice - course.price) /
                         course.originalPrice) *
-                        100,
+                      100,
                     )}
                     %
                   </span>
