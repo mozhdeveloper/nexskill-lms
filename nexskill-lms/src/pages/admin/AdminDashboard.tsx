@@ -108,8 +108,8 @@ const AdminDashboard: React.FC = () => {
         {/* Page Header */}
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-[#111827] mb-2">Admin Dashboard</h1>
-            <p className="text-[#5F6473]">Monitor NexSkill usage, revenue, and system health</p>
+            <h1 className="text-3xl font-bold text-[color:var(--text-primary)] mb-2">Admin Dashboard</h1>
+            <p className="text-[color:var(--text-secondary)]">Monitor NexSkill usage, revenue, and system health</p>
           </div>
           <div className="flex items-center gap-3">
 
@@ -117,7 +117,7 @@ const AdminDashboard: React.FC = () => {
             <div className="relative">
               <button
                 onClick={() => setShowTimeframeDropdown(!showTimeframeDropdown)}
-                className="px-4 py-2 bg-white border border-[#E5E7EB] text-[#111827] text-sm font-semibold rounded-full hover:border-[#304DB5] transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-[color:var(--bg-secondary)] border border-[color:var(--border-base)] text-[color:var(--text-primary)] text-sm font-semibold rounded-full hover:border-[color:var(--color-brand-electric)] hover:text-[color:var(--color-brand-electric)] transition-colors flex items-center gap-2"
               >
                 <span>📅 {timeframe}</span>
                 <svg
@@ -135,7 +135,7 @@ const AdminDashboard: React.FC = () => {
                 </svg>
               </button>
               {showTimeframeDropdown && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-[#E5E7EB] py-2 z-10">
+                <div className="absolute right-0 mt-2 w-48 bg-[color:var(--bg-secondary)] rounded-xl shadow-lg border border-[color:var(--border-base)] py-2 z-10">
                   {timeframeOptions.map((option) => (
                     <button
                       key={option}
@@ -144,9 +144,9 @@ const AdminDashboard: React.FC = () => {
                         setShowTimeframeDropdown(false);
                         window.alert(`📊 Timeframe Updated\n\nSelected Period: ${option}\n\n📈 Dashboard Analytics:\n• Refreshing all metrics\n• Loading comparison data\n• Updating trend graphs\n• Recalculating KPIs\n\n💡 What's Included:\n• Revenue & enrollment data\n• User engagement metrics\n• Course performance stats\n• Growth comparisons\n\nAll widgets will update with ${option} data.`);
                       }}
-                      className={`w-full text-left px-4 py-2 text-sm hover:bg-[#F5F7FF] transition-colors ${timeframe === option
-                        ? 'text-[#304DB5] font-semibold'
-                        : 'text-[#5F6473]'
+                      className={`w-full text-left px-4 py-2 text-sm hover:bg-[color:var(--bg-glass-hover)] transition-colors ${timeframe === option
+                        ? 'text-[color:var(--color-brand-electric)] font-semibold'
+                        : 'text-[color:var(--text-secondary)]'
                         }`}
                     >
                       {option}

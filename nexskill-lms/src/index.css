@@ -5,18 +5,94 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* Brand Colors - Atomic Palette */
+    --color-brand-neon: #22c55e;
+    --color-brand-electric: #3b82f6;
+
+    /* Semantic Backgrounds - Light Mode */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f3f4f6;
+    --bg-glass: rgba(255, 255, 255, 0.7);
+    --bg-glass-hover: rgba(255, 255, 255, 0.9);
+
+    /* Semantic Text - Light Mode */
+    --text-primary: #111827;
+    /* High contrast on light bg */
+    --text-secondary: #4b5563;
+    /* Medium contrast */
+    --text-on-brand: #ffffff;
+    /* Text on electric blue */
+    --text-on-neon: #000000;
+    /* FORCE BLACK on Neon Green for AA compliance */
+
+    /* Semantic Borders */
+    --border-base: #e5e7eb;
+    --border-glow: rgba(34, 197, 94, 0.5);
+    /* Neon glow */
+
+    /* Gradients */
+    --gradient-master: linear-gradient(135deg, #22c55e 0%, #3b82f6 100%);
+  }
+
+  .dark {
+    /* Semantic Backgrounds - Dark Mode */
+    --bg-primary: #0f172a;
+    /* Deep charcoal/black */
+    --bg-secondary: #1e293b;
+    /* Slightly lighter for cards */
+    --bg-glass: rgba(30, 41, 59, 0.7);
+    --bg-glass-hover: rgba(30, 41, 59, 0.9);
+
+    /* Semantic Text - Dark Mode */
+    --text-primary: #f8fafc;
+    /* White/Off-white on dark bg */
+    --text-secondary: #cbd5e1;
+    /* Light grey */
+    --text-on-brand: #ffffff;
+    --text-on-neon: #000000;
+    /* Still black on neon green */
+
+    /* Semantic Borders */
+    --border-base: rgba(255, 255, 255, 0.1);
+    --border-glow: rgba(34, 197, 94, 0.5);
+  }
+
   * {
     @apply box-border;
   }
-  
+
   body {
-    @apply m-0 font-sans text-text-primary dark:text-dark-text-primary antialiased;
-    @apply bg-white dark:bg-dark-background-shell;
+    @apply m-0 font-sans antialiased;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
     transition: background-color 0.3s ease, color 0.3s ease;
   }
 
   /* Dark mode transitions for common elements */
   html.dark {
     color-scheme: dark;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    background: var(--bg-glass);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border-base);
+  }
+
+  .glass-card:hover {
+    background: var(--bg-glass-hover);
+    box-shadow: 0 0 15px var(--border-glow);
+    border-color: var(--color-brand-neon);
+  }
+
+  .text-gradient {
+    background: var(--gradient-master);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 }

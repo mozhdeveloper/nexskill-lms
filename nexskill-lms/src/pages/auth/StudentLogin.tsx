@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import StudentAuthLayout from '../../layouts/StudentAuthLayout';
 import { useAuth } from '../../context/AuthContext';
+import { useUiPreferences } from '../../context/UiPreferencesContext';
 import { supabase } from '../../lib/supabaseClient';
 import { defaultLandingRouteByRole, mapStringToRole } from '../../types/roles';
 
 const StudentLogin: React.FC = () => {
     const { signIn } = useAuth();
     const navigate = useNavigate();
+    const { setTheme } = useUiPreferences();
     const [formData, setFormData] = useState({
         email: '',
         password: '',
@@ -71,6 +73,7 @@ const StudentLogin: React.FC = () => {
                 }
 
                 // Redirect to student dashboard
+                setTheme('dark');
                 navigate(defaultLandingRouteByRole['STUDENT']);
             }
 

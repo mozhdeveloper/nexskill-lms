@@ -9,49 +9,31 @@ export default {
     extend: {
       colors: {
         brand: {
-          primary: '#304DB5',
-          'primary-light': '#5E7BFF',
-          'primary-soft': '#E0E5FF',
-          'primary-dark': '#152457',
-          neon: '#39FF14',
-          electric: '#007BFF',
+          neon: 'var(--color-brand-neon)',
+          electric: 'var(--color-brand-electric)',
+          primary: 'var(--color-brand-primary)', // Keeping existing name but mapping to var
         },
         background: {
-          'app-outer': '#E8ECFD',
-          shell: '#FFFFFF',
-          card: '#FFFFFF',
-          'card-tinted': '#E8EEFF',
+          app: 'var(--color-bg-app)',
+          shell: 'var(--color-bg-shell)',
+          card: 'var(--color-bg-card)',
         },
         text: {
-          primary: '#111827',
-          secondary: '#5F6473',
-          muted: '#9CA3B5',
-          inverse: '#FFFFFF',
-          link: '#304DB5',
+          primary: 'var(--color-text-primary)',
+          secondary: 'var(--color-text-secondary)',
+          muted: 'var(--color-text-muted)',
         },
-        dark: {
-          background: {
-            'app-outer': '#0F172A',
-            shell: '#1E293B',
-            card: '#1E293B',
-            'card-tinted': '#334155',
-          },
-          text: {
-            primary: '#F1F5F9',
-            secondary: '#CBD5E1',
-            muted: '#94A3B8',
-            inverse: '#0F172A',
-          },
-        },
+      },
+      backgroundImage: {
+        'gradient-master': 'var(--gradient-master)',
       },
       borderRadius: {
         'shell': '32px',
         'card': '24px',
       },
       boxShadow: {
-        'card': '0 18px 45px rgba(15, 35, 95, 0.08)',
-        'button-primary': '0 12px 24px rgba(35, 76, 200, 0.35)',
-        'floating-chip': '0 12px 30px rgba(20, 46, 130, 0.12)',
+        'card': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
+        'glow': '0 0 15px rgba(34, 197, 94, 0.5)',
       },
       fontFamily: {
         sans: ['"Inter"', '-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', 'system-ui', 'sans-serif'],

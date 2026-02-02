@@ -36,13 +36,13 @@ const CoachAppLayout: React.FC<CoachAppLayoutProps> = ({ children }) => {
     const isActive = (path: string) => location.pathname === path;
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-[#E7F0FF] via-[#F9F0FF] to-[#E3F4FF] dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-8 transition-colors">
+        <div className="min-h-screen bg-[color:var(--bg-primary)] p-8 transition-colors">
             <div
-                className="max-w-[1440px] mx-auto bg-white dark:bg-dark-background-shell rounded-[32px] shadow-card overflow-hidden flex transition-colors"
+                className="max-w-[1440px] mx-auto bg-[color:var(--bg-secondary)] dark:bg-[color:var(--bg-secondary)] rounded-[32px] shadow-card overflow-hidden flex transition-colors border border-[color:var(--border-base)]"
                 style={{ minHeight: "calc(100vh - 64px)" }}
             >
                 {/* Left Sidebar */}
-                <aside className="w-[240px] flex-shrink-0 flex flex-col p-6 border-r border-[#EDF0FB] dark:border-gray-700">
+                <aside className="w-[240px] flex-shrink-0 flex flex-col p-6 border-r border-[color:var(--border-base)]">
                     {/* Logo */}
                     <div className="mb-8">
                         <Link
@@ -51,10 +51,10 @@ const CoachAppLayout: React.FC<CoachAppLayoutProps> = ({ children }) => {
                         >
                             <BrandLogo size="md" showText={false} />
                             <div>
-                                <span className="text-xl font-bold text-brand-primary block leading-tight">
+                                <span className="text-xl font-bold text-gradient block leading-tight">
                                     NexSkill
                                 </span>
-                                <span className="text-xs text-slate-600 dark:text-gray-400">
+                                <span className="text-xs text-[color:var(--text-secondary)]">
                                     Coach Portal
                                 </span>
                             </div>
@@ -67,11 +67,10 @@ const CoachAppLayout: React.FC<CoachAppLayoutProps> = ({ children }) => {
                             <Link
                                 key={item.path}
                                 to={item.path}
-                                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                                    isActive(item.path)
-                                        ? "bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white font-medium shadow-md"
-                                        : "text-text-secondary dark:text-dark-text-secondary hover:bg-[#F5F7FF] dark:hover:bg-gray-800 hover:text-brand-primary dark:hover:text-blue-400"
-                                }`}
+                                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive(item.path)
+                                        ? "bg-gradient-to-r from-[color:var(--color-brand-neon)] to-[color:var(--color-brand-electric)] text-[color:var(--text-on-neon)] font-medium shadow-md"
+                                        : "text-[color:var(--text-secondary)] hover:bg-[color:var(--bg-glass-hover)] hover:text-[color:var(--color-brand-electric)]"
+                                    }`}
                             >
                                 <span className="text-sm">{item.label}</span>
                             </Link>
@@ -79,16 +78,16 @@ const CoachAppLayout: React.FC<CoachAppLayoutProps> = ({ children }) => {
                     </nav>
 
                     {/* Coach Profile */}
-                    <div className="pt-6 mt-6 border-t border-[#EDF0FB] dark:border-gray-700">
+                    <div className="pt-6 mt-6 border-t border-[color:var(--border-base)]">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-pink-400 flex items-center justify-center text-white font-semibold">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[color:var(--color-brand-neon)] to-[color:var(--color-brand-electric)] flex items-center justify-center text-white font-semibold shadow-lg">
                                 C
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-text-primary dark:text-dark-text-primary truncate">
+                                <p className="text-sm font-medium text-[color:var(--text-primary)] truncate">
                                     Coach User
                                 </p>
-                                <p className="text-xs text-text-muted dark:text-dark-text-muted">
+                                <p className="text-xs text-[color:var(--text-secondary)]">
                                     Instructor
                                 </p>
                             </div>
@@ -96,7 +95,7 @@ const CoachAppLayout: React.FC<CoachAppLayoutProps> = ({ children }) => {
                         {/* Logout Button */}
                         <button
                             onClick={handleLogout}
-                            className="mt-4 w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                            className="mt-4 w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-500/10 transition-all"
                         >
                             <LogOut className="w-5 h-5" />
                             <span className="text-sm font-medium">Logout</span>
@@ -105,9 +104,9 @@ const CoachAppLayout: React.FC<CoachAppLayoutProps> = ({ children }) => {
                 </aside>
 
                 {/* Main Content Area */}
-                <main className="flex-1 flex flex-col overflow-hidden">
+                <main className="flex-1 flex flex-col overflow-hidden bg-[color:var(--bg-primary)]">
                     {/* Top Bar with Global Controls */}
-                    <div className="flex items-center justify-end px-8 pt-6 pb-4 border-b border-[#EDF0FB] dark:border-gray-700">
+                    <div className="flex items-center justify-end px-8 pt-6 pb-4 border-b border-[color:var(--border-base)]">
                         <GlobalTopBarControls />
                     </div>
 
