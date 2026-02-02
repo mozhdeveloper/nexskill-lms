@@ -100,9 +100,9 @@ const CoachStudentsPage: React.FC = () => {
         const mappedStudents: Student[] = studentProfiles?.map((profile: any) => {
           const studentEnrollments = enrollments.filter(e => e.profile_id === profile.id);
 
-          // Calculate Totals
-          const totalProgressSum = studentEnrollments.reduce((sum, e) => sum + (e.progress || 0), 0);
-          const avgProgress = Math.round(totalProgressSum / (studentEnrollments.length || 1));
+          // Note: enrollments table doesn't have progress column
+          // TODO: Calculate real progress from user_module_progress table
+          let avgProgress: number = 0; // Placeholder until we query user_module_progress
 
           // Mock Avg Score (Placeholder logic until quiz_attempts populated)
           const mockAvgScore = Math.min(100, Math.round(avgProgress * (0.8 + Math.random() * 0.4)));
@@ -142,7 +142,7 @@ const CoachStudentsPage: React.FC = () => {
             joinedDate: earliestEnrollment ? earliestEnrollment.toLocaleDateString() : 'N/A',
             status: computedStatus,
             totalTimeSpent: `${Math.floor(avgProgress * 0.5 + Math.random() * 10)}h`, // Mock
-            certificatesEarned: studentEnrollments.filter((e: any) => e.progress === 100).length || 0,
+            certificatesEarned: 0, // TODO: Calculate from actual completion data
           };
         }) || [];
 
