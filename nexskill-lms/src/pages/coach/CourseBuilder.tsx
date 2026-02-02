@@ -69,6 +69,7 @@ const CourseBuilder: React.FC = () => {
 
   // Ref to hold the timeout ID for debouncing
   const saveQuizQuestionsTimeoutRef = useRef<any>(null);
+  const saveLessonTimeoutRef = useRef<any>(null);
 
   const initialData = location.state as CourseSettings | undefined;
 
@@ -229,6 +230,9 @@ const CourseBuilder: React.FC = () => {
     return () => {
       if (saveQuizQuestionsTimeoutRef.current) {
         clearTimeout(saveQuizQuestionsTimeoutRef.current);
+      }
+      if (saveLessonTimeoutRef.current) {
+        clearTimeout(saveLessonTimeoutRef.current);
       }
     };
   }, []);
@@ -533,31 +537,40 @@ const CourseBuilder: React.FC = () => {
 
   const handleSaveLesson = async (updatedLesson: Lesson) => {
     if (!editingLesson || !updatedLesson.id) return;
-    try {
-      const { error } = await supabase.from("lessons").upsert({
-        id: updatedLesson.id,
-        title: updatedLesson.title,
-        description: updatedLesson.description,
-        content_blocks: updatedLesson.content_blocks,
-        estimated_duration_minutes: updatedLesson.estimated_duration_minutes,
-        is_published: updatedLesson.is_published,
-      }, { onConflict: "id" });
 
-      if (error) throw error;
+    // Immediate UI update
+    setEditingLesson({ ...editingLesson, lesson: updatedLesson });
 
-      await supabase.from("module_content_items")
-        .update({ is_published: updatedLesson.is_published })
-        .match({ module_id: editingLesson.moduleId, content_id: updatedLesson.id, content_type: "lesson" });
+    // Update curriculum immediately as well
+    setCurriculum(curriculum.map((mod) =>
+      mod.id === editingLesson.moduleId
+        ? { ...mod, lessons: mod.lessons.map((l) => l.id === updatedLesson.id ? { ...updatedLesson, type: 'lesson' } as ContentItem : l) }
+        : mod
+    ));
 
-      setCurriculum(curriculum.map((mod) =>
-        mod.id === editingLesson.moduleId
-          ? { ...mod, lessons: mod.lessons.map((l) => l.id === updatedLesson.id ? { ...updatedLesson, type: 'lesson' } as ContentItem : l) }
-          : mod
-      ));
-      setEditingLesson({ ...editingLesson, lesson: updatedLesson });
-    } catch (err) {
-      alert("Error saving lesson");
-    }
+    if (saveLessonTimeoutRef.current) clearTimeout(saveLessonTimeoutRef.current);
+
+    saveLessonTimeoutRef.current = setTimeout(async () => {
+      try {
+        const { error } = await supabase.from("lessons").upsert({
+          id: updatedLesson.id,
+          title: updatedLesson.title,
+          description: updatedLesson.description,
+          content_blocks: updatedLesson.content_blocks,
+          estimated_duration_minutes: updatedLesson.estimated_duration_minutes,
+          is_published: updatedLesson.is_published,
+        }, { onConflict: "id" });
+
+        if (error) throw error;
+
+        await supabase.from("module_content_items")
+          .update({ is_published: updatedLesson.is_published })
+          .match({ module_id: editingLesson.moduleId, content_id: updatedLesson.id, content_type: "lesson" });
+
+      } catch (err) {
+        console.error("Error saving lesson:", err);
+      }
+    }, 15000);
   };
 
   const handleAddQuiz = async (moduleId: string) => {
