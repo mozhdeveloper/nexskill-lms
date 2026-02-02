@@ -3,17 +3,22 @@ import React from 'react';
 interface GlassCardProps {
     children: React.ReactNode;
     className?: string;
-    variant?: 'light' | 'dark';
+    hoverEffect?: boolean;
 }
 
-const GlassCard: React.FC<GlassCardProps> = ({ children, className = '', variant = 'dark' }) => {
-    const baseStyles = "backdrop-blur-xl border rounded-2xl p-6 shadow-xl transition-all duration-300";
-    const variantStyles = variant === 'dark'
-        ? "bg-white/5 border-white/10 text-white hover:bg-white/10"
-        : "bg-white/40 border-white/20 text-gray-800 hover:bg-white/50";
-
+const GlassCard: React.FC<GlassCardProps> = ({
+    children,
+    className = '',
+    hoverEffect = true
+}) => {
     return (
-        <div className={`${baseStyles} ${variantStyles} ${className}`}>
+        <div
+            className={`
+        glass-card rounded-[24px] p-6 transition-all duration-300
+        ${hoverEffect ? 'hover:scale-[1.01] hover:-translate-y-1' : ''}
+        ${className}
+      `}
+        >
             {children}
         </div>
     );

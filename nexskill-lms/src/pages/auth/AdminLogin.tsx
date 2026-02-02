@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useUiPreferences } from '../../context/UiPreferencesContext';
 // import { useUser } from '../../context/UserContext';
 
 
 const AdminLogin: React.FC = () => {
   const navigate = useNavigate();
+  const { setTheme } = useUiPreferences();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -78,6 +80,9 @@ const AdminLogin: React.FC = () => {
         setIsLoading(false);
         return;
       }
+
+      // Enforce Dark Mode on successful login
+      setTheme('dark');
 
       // Small delay to ensure state propagates
       setTimeout(() => {
