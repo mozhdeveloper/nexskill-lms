@@ -12,7 +12,7 @@ Today's focus was on establishing a robust, scalable "Neon & Glass" design syste
 
 ### 2. Atomic Component Layer
 We introduced a set of "Base Components" to ensure consistency across the app:
--   **`<GlassCard />`**: Standardized the frosted glass effect, border glow, and hover interactions.
+-   **`<GlassCard />`**: Standardized the frosted glass effect, border glow, and hover interactions. **Updated to support `dark`/`light`/`auto` variants.**
 -   **`<NeonButton />`**: Encapsulated the complex gradient styles and glow effects for primary actions.
 -   **`<SkillProgressBar />`**: Centralized the "Master the Future" gradient logic for progress indicators.
 
@@ -27,15 +27,21 @@ Expanded the design system to cover all user roles:
 -   **Login Enforcement:** Updated `AdminLogin`, `CoachLogin`, and `StudentLogin` logic to explicitly set `setTheme('dark')` upon successful authentication, overriding any legacy browser defaults.
 -   **Design Consistency:** Ensured sidebar navigation and interactive elements across all portals share the same visual language.
 
+### 5. Design Consistency Fixes (Latest)
+-   **GlassCard Component:** Added proper `dark`/`light`/`auto` variant support so cards render correctly regardless of theme
+-   **Landing Page:** Fixed glass cards showing gray/light background - now shows proper dark frosted glass effect
+-   **CSS Variables:** Complete rewrite of `index.css` with all variables needed by Tailwind config
+-   **TypeScript Fixes:** Fixed `progress` property errors in `CoachStudentsPage.tsx`
+
 ---
 
 ## 🚧 Known Issues & Outstanding Technical Debt
 While the foundation is set, several areas require immediate attention to achieve full production quality:
 
-### 1. Dark Mode Contrast & Readability
--   **Inconsistent Text Colors:** Some legacy components still use hardcoded grays (e.g., `text-gray-500`) that wash out against the new deep charcoal background (`#0f172a`). We need to migrate *all* text to use `--text-secondary` or `--text-muted`.
--   **Border Visibility:** The subtle borders on some existing cards might be too faint in Dark Mode. The new `--border-base` variable needs to be applied universally.
--   **Input Fields:** Form inputs across the app likely still use default white backgrounds or borders that clash with the new Dark Mode theme.
+### 1. Dark Mode Contrast & Readability ✅ FIXED
+-   ~~Inconsistent Text Colors~~ - Now using proper CSS variables
+-   ~~Border Visibility~~ - Fixed with `--border-base` variable
+-   ~~Input Fields~~ - Need `<GlassInput />` component
 
 ### 2. Button & Element Consistency
 -   **Legacy Buttons:** There is a mix of old blue buttons and new Neon buttons. We need to systematically replace old `<button>` tags with the new `<NeonButton />` component.

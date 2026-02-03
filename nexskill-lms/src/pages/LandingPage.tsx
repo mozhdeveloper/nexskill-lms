@@ -78,9 +78,9 @@ const LandingPage: React.FC = () => {
                             className="relative w-full max-w-md mx-auto lg:absolute lg:top-[5%] lg:left-[5%] lg:w-[400px] z-30 lg:hover:z-40 transition-all duration-500 hover:scale-[1.02] lg:hover:scale-105 cursor-pointer"
                             onClick={() => navigate('/login')}
                         >
-                            <GlassCard variant="dark" className="border-t-4 border-t-brand-neon bg-[#121212]/80 backdrop-blur-2xl p-8 shadow-2xl shadow-black/50">
+                            <GlassCard variant="dark" className="border-t-4 border-t-brand-neon p-8 shadow-2xl shadow-black/50">
                                 <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-brand-neon to-green-600 mb-6 flex items-center justify-center text-black font-bold text-3xl shadow-lg shadow-brand-neon/20">🎓</div>
-                                <h3 className="text-3xl font-bold mb-3">Student Portal</h3>
+                                <h3 className="text-3xl font-bold mb-3 text-white">Student Portal</h3>
                                 <p className="text-gray-400 text-base leading-relaxed">Personalized learning paths adapted to your pace.</p>
                                 <div className="mt-8 flex items-center text-brand-neon font-bold text-sm tracking-wide uppercase">
                                     Access Portal <span className="ml-2">→</span>
@@ -93,9 +93,9 @@ const LandingPage: React.FC = () => {
                             className="relative w-full max-w-md mx-auto lg:absolute lg:top-[30%] lg:right-[0%] lg:w-[400px] z-20 lg:hover:z-40 transition-all duration-500 hover:scale-[1.02] lg:hover:scale-105 cursor-pointer"
                             onClick={() => navigate('/coach/login')}
                         >
-                            <GlassCard variant="dark" className="border-t-4 border-t-brand-electric bg-[#121212]/80 backdrop-blur-2xl p-8 shadow-2xl shadow-black/50">
+                            <GlassCard variant="dark" className="border-t-4 border-t-brand-electric p-8 shadow-2xl shadow-black/50">
                                 <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-brand-electric to-blue-600 mb-6 flex items-center justify-center text-white font-bold text-3xl shadow-lg shadow-brand-electric/20">👨‍🏫</div>
-                                <h3 className="text-3xl font-bold mb-3">Coach Portal</h3>
+                                <h3 className="text-3xl font-bold mb-3 text-white">Coach Portal</h3>
                                 <p className="text-gray-400 text-base leading-relaxed">Tools to monetize your expertise globally.</p>
                                 <div className="mt-8 flex items-center text-brand-electric font-bold text-sm tracking-wide uppercase">
                                     Access Portal <span className="ml-2">→</span>
@@ -108,9 +108,9 @@ const LandingPage: React.FC = () => {
                             className="relative w-full max-w-md mx-auto lg:absolute lg:bottom-[5%] lg:left-[10%] lg:w-[400px] z-10 lg:hover:z-40 transition-all duration-500 hover:scale-[1.02] lg:hover:scale-105 cursor-pointer"
                             onClick={() => navigate('/admin/login')}
                         >
-                            <GlassCard variant="dark" className="border-t-4 border-t-purple-500 bg-[#121212]/80 backdrop-blur-2xl p-8 shadow-2xl shadow-black/50">
+                            <GlassCard variant="dark" className="border-t-4 border-t-purple-500 p-8 shadow-2xl shadow-black/50">
                                 <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 mb-6 flex items-center justify-center text-white font-bold text-3xl shadow-lg shadow-purple-500/20">🛡️</div>
-                                <h3 className="text-3xl font-bold mb-3">Admin Access</h3>
+                                <h3 className="text-3xl font-bold mb-3 text-white">Admin Access</h3>
                                 <p className="text-gray-400 text-base leading-relaxed">Platform management and analytics control.</p>
                                 <div className="mt-8 flex items-center text-purple-400 font-bold text-sm tracking-wide uppercase">
                                     Secure Login <span className="ml-2">→</span>

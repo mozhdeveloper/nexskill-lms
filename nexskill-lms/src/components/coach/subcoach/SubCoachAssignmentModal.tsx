@@ -1,5 +1,7 @@
-import React, { useState, useMemo } from 'react';
-import { X, Search, Check, ChevronDown, User, BookOpen, Award, Users } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { X, Search, Check, ChevronDown, User, BookOpen, Award, Users, Loader2, AlertCircle } from 'lucide-react';
+import { supabase } from '../../../lib/supabaseClient';
+import { useUser } from '../../../context/UserContext';
 
 interface Course {
   id: string;
@@ -9,207 +11,63 @@ interface Course {
   status: 'published' | 'draft';
 }
 
-interface Student {
+interface EligibleStudent {
   id: string;
   name: string;
   email: string;
-  avatar?: string;
-  completedCourses: string[]; // Array of course codes
+  completedCourseIds: string[];
   enrollmentDate: string;
   overallProgress: number;
 }
 
-interface CourseStudent {
+interface EnrolledStudent {
   id: string;
   name: string;
   email: string;
-  avatar?: string;
   enrollmentDate: string;
   progress: number;
-  lastActive: string;
-}
-
-interface SubCoachAssignment {
-  subCoachId: string;
-  subCoachName: string;
-  subCoachEmail: string;
-  subCoachAvatar?: string;
-  courseId: string;
-  courseTitle: string;
-  courseCode: string;
-  assignedDate: string;
-  requiredCourses: string[];
-  studentsAssigned: number;
-  assignedStudentIds: string[];
-  assignedStudentNames: string[];
-  status: 'active' | 'pending' | 'inactive';
 }
 
 interface SubCoachAssignmentModalProps {
   courses: Course[];
   onClose: () => void;
-  onAssign: (assignment: Omit<SubCoachAssignment, 'id'>) => void;
+  onAssign: (assignment: any) => void;
 }
-
-// Dummy students with completed courses
-const dummyStudents: Student[] = [
-  {
-    id: 'stu-1',
-    name: 'Alex Thompson',
-    email: 'alex.t@email.com',
-    completedCourses: ['PROG1', 'PROG2', 'DS101', 'WEB1'],
-    enrollmentDate: 'Jan 2025',
-    overallProgress: 92,
-  },
-  {
-    id: 'stu-2',
-    name: 'Maria Garcia',
-    email: 'maria.g@email.com',
-    completedCourses: ['PROG1', 'WEB1', 'UI101'],
-    enrollmentDate: 'Feb 2025',
-    overallProgress: 85,
-  },
-  {
-    id: 'stu-3',
-    name: 'Sarah Johnson',
-    email: 'sarah.j@email.com',
-    completedCourses: ['PROG1', 'PROG2', 'WEB1', 'JS201', 'PY101'],
-    enrollmentDate: 'Dec 2024',
-    overallProgress: 95,
-  },
-  {
-    id: 'stu-4',
-    name: 'Michael Chen',
-    email: 'michael.c@email.com',
-    completedCourses: ['PROG1', 'DS101', 'DB101'],
-    enrollmentDate: 'Mar 2025',
-    overallProgress: 78,
-  },
-  {
-    id: 'stu-5',
-    name: 'Lisa Anderson',
-    email: 'lisa.a@email.com',
-    completedCourses: ['PROG1', 'PROG2', 'WEB1', 'JS201', 'UI101', 'PY101'],
-    enrollmentDate: 'Nov 2024',
-    overallProgress: 98,
-  },
-  {
-    id: 'stu-6',
-    name: 'James Rodriguez',
-    email: 'james.r@email.com',
-    completedCourses: ['PROG1', 'PROG2', 'DS101', 'DB101'],
-    enrollmentDate: 'Jan 2025',
-    overallProgress: 88,
-  },
-  {
-    id: 'stu-7',
-    name: 'Emily Davis',
-    email: 'emily.d@email.com',
-    completedCourses: ['WEB1', 'UI101'],
-    enrollmentDate: 'Apr 2025',
-    overallProgress: 65,
-  },
-  {
-    id: 'stu-8',
-    name: 'Robert Wilson',
-    email: 'robert.w@email.com',
-    completedCourses: ['PROG1', 'PY101'],
-    enrollmentDate: 'May 2025',
-    overallProgress: 45,
-  },
-];
-
-// Dummy students enrolled in courses (students that can be assigned to sub-coaches)
-const dummyCourseStudents: Record<string, CourseStudent[]> = {
-  'course-1': [
-    { id: 'cs-1', name: 'David Kim', email: 'david.k@email.com', enrollmentDate: 'Nov 2025', progress: 35, lastActive: '2 hours ago' },
-    { id: 'cs-2', name: 'Jessica Lee', email: 'jessica.l@email.com', enrollmentDate: 'Nov 2025', progress: 42, lastActive: '1 day ago' },
-    { id: 'cs-3', name: 'Ryan Murphy', email: 'ryan.m@email.com', enrollmentDate: 'Nov 2025', progress: 28, lastActive: '5 hours ago' },
-    { id: 'cs-4', name: 'Amanda Foster', email: 'amanda.f@email.com', enrollmentDate: 'Dec 2025', progress: 15, lastActive: '3 days ago' },
-    { id: 'cs-5', name: 'Kevin Zhang', email: 'kevin.z@email.com', enrollmentDate: 'Dec 2025', progress: 52, lastActive: '1 hour ago' },
-    { id: 'cs-6', name: 'Olivia Brown', email: 'olivia.b@email.com', enrollmentDate: 'Nov 2025', progress: 68, lastActive: '4 hours ago' },
-    { id: 'cs-7', name: 'Nathan Park', email: 'nathan.p@email.com', enrollmentDate: 'Dec 2025', progress: 22, lastActive: '2 days ago' },
-    { id: 'cs-8', name: 'Sophie Turner', email: 'sophie.t@email.com', enrollmentDate: 'Nov 2025', progress: 45, lastActive: '6 hours ago' },
-  ],
-  'course-2': [
-    { id: 'cs-9', name: 'Marcus Johnson', email: 'marcus.j@email.com', enrollmentDate: 'Oct 2025', progress: 55, lastActive: '3 hours ago' },
-    { id: 'cs-10', name: 'Isabella Martinez', email: 'isabella.m@email.com', enrollmentDate: 'Nov 2025', progress: 38, lastActive: '1 day ago' },
-    { id: 'cs-11', name: 'Daniel White', email: 'daniel.w@email.com', enrollmentDate: 'Nov 2025', progress: 72, lastActive: '2 hours ago' },
-    { id: 'cs-12', name: 'Rachel Green', email: 'rachel.g@email.com', enrollmentDate: 'Dec 2025', progress: 18, lastActive: '5 days ago' },
-  ],
-  'course-4': [
-    { id: 'cs-13', name: 'Tyler Adams', email: 'tyler.a@email.com', enrollmentDate: 'Sep 2025', progress: 82, lastActive: '1 hour ago' },
-    { id: 'cs-14', name: 'Mia Thompson', email: 'mia.t@email.com', enrollmentDate: 'Oct 2025', progress: 65, lastActive: '4 hours ago' },
-    { id: 'cs-15', name: 'Ethan Clark', email: 'ethan.c@email.com', enrollmentDate: 'Oct 2025', progress: 48, lastActive: '2 days ago' },
-    { id: 'cs-16', name: 'Ava Robinson', email: 'ava.r@email.com', enrollmentDate: 'Nov 2025', progress: 31, lastActive: '1 day ago' },
-    { id: 'cs-17', name: 'Liam Harris', email: 'liam.h@email.com', enrollmentDate: 'Nov 2025', progress: 59, lastActive: '6 hours ago' },
-    { id: 'cs-18', name: 'Emma Scott', email: 'emma.s@email.com', enrollmentDate: 'Dec 2025', progress: 12, lastActive: '3 days ago' },
-  ],
-};
-
-// Generate dummy students for other courses
-['course-3', 'course-5', 'course-6', 'course-7', 'course-8'].forEach((courseId, idx) => {
-  dummyCourseStudents[courseId] = [
-    { id: `cs-${20 + idx * 3}`, name: `Student A${idx}`, email: `studenta${idx}@email.com`, enrollmentDate: 'Nov 2025', progress: 45, lastActive: '2 hours ago' },
-    { id: `cs-${21 + idx * 3}`, name: `Student B${idx}`, email: `studentb${idx}@email.com`, enrollmentDate: 'Dec 2025', progress: 32, lastActive: '1 day ago' },
-    { id: `cs-${22 + idx * 3}`, name: `Student C${idx}`, email: `studentc${idx}@email.com`, enrollmentDate: 'Dec 2025', progress: 58, lastActive: '5 hours ago' },
-  ];
-});
 
 const SubCoachAssignmentModal: React.FC<SubCoachAssignmentModalProps> = ({
   courses,
   onClose,
   onAssign,
 }) => {
+  const { profile } = useUser();
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+
+  // Step 1: Selected course
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
-  const [requiredCourses, setRequiredCourses] = useState<string[]>([]);
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+
+  // Step 2: Required courses (optional)
+  const [requiredCourseIds, setRequiredCourseIds] = useState<string[]>([]);
+
+  // Step 3: Eligible students & selected sub-coach
+  const [eligibleStudents, setEligibleStudents] = useState<EligibleStudent[]>([]);
+  const [selectedSubCoach, setSelectedSubCoach] = useState<EligibleStudent | null>(null);
+  const [loadingEligible, setLoadingEligible] = useState(false);
+
+  // Step 4: Enrolled students in selected course
+  const [enrolledStudents, setEnrolledStudents] = useState<EnrolledStudent[]>([]);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [loadingEnrolled, setLoadingEnrolled] = useState(false);
+
+  // UI state
   const [courseSearchQuery, setCourseSearchQuery] = useState('');
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
-  const [courseStudentSearchQuery, setCourseStudentSearchQuery] = useState('');
+  const [enrolledSearchQuery, setEnrolledSearchQuery] = useState('');
   const [showCourseDropdown, setShowCourseDropdown] = useState(false);
   const [showRequiredDropdown, setShowRequiredDropdown] = useState(false);
-  const [selectedCourseStudents, setSelectedCourseStudents] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-  // Available courses for prerequisite selection
+  // Available courses for selection (only published)
   const availableCourses = courses.filter((c) => c.status === 'published');
-
-  // Get students enrolled in selected course
-  const courseStudents = useMemo(() => {
-    if (!selectedCourse) return [];
-    return dummyCourseStudents[selectedCourse.id] || [];
-  }, [selectedCourse]);
-
-  // Filter course students by search
-  const filteredCourseStudents = useMemo(() => {
-    if (!courseStudentSearchQuery) return courseStudents;
-    return courseStudents.filter(
-      (s) =>
-        s.name.toLowerCase().includes(courseStudentSearchQuery.toLowerCase()) ||
-        s.email.toLowerCase().includes(courseStudentSearchQuery.toLowerCase())
-    );
-  }, [courseStudents, courseStudentSearchQuery]);
-
-  // Filter students who have completed ALL required courses
-  const eligibleStudents = useMemo(() => {
-    if (requiredCourses.length === 0) {
-      return dummyStudents;
-    }
-    return dummyStudents.filter((student) =>
-      requiredCourses.every((courseCode) => student.completedCourses.includes(courseCode))
-    );
-  }, [requiredCourses]);
-
-  // Filtered students by search
-  const filteredStudents = useMemo(() => {
-    if (!studentSearchQuery) return eligibleStudents;
-    return eligibleStudents.filter(
-      (s) =>
-        s.name.toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
-        s.email.toLowerCase().includes(studentSearchQuery.toLowerCase())
-    );
-  }, [eligibleStudents, studentSearchQuery]);
 
   // Filtered courses by search
   const filteredCourses = useMemo(() => {
@@ -221,27 +79,251 @@ const SubCoachAssignmentModal: React.FC<SubCoachAssignmentModalProps> = ({
     );
   }, [availableCourses, courseSearchQuery]);
 
-  const toggleRequiredCourse = (courseCode: string) => {
-    if (requiredCourses.includes(courseCode)) {
-      setRequiredCourses(requiredCourses.filter((c) => c !== courseCode));
+  // Courses available as prerequisites (exclude the selected course)
+  const prerequisiteCourses = useMemo(() => {
+    return availableCourses.filter((c) => c.id !== selectedCourse?.id);
+  }, [availableCourses, selectedCourse]);
+
+  // Toggle a course as required
+  const toggleRequiredCourse = (courseId: string) => {
+    if (requiredCourseIds.includes(courseId)) {
+      setRequiredCourseIds(requiredCourseIds.filter((id) => id !== courseId));
     } else {
-      setRequiredCourses([...requiredCourses, courseCode]);
+      setRequiredCourseIds([...requiredCourseIds, courseId]);
     }
   };
 
-  const handleAssign = () => {
-    if (!selectedCourse || !selectedStudent || selectedCourseStudents.length === 0) return;
+  // Step 3: Fetch students who can be sub-coaches
+  useEffect(() => {
+    const fetchEligibleStudents = async () => {
+      if (step !== 3 || !profile) return;
 
-    // Get the names of selected students for display
-    const assignedStudentNames = courseStudents
-      .filter((s) => selectedCourseStudents.includes(s.id))
+      setLoadingEligible(true);
+      setError(null);
+
+      try {
+        // Get all students enrolled in ANY of the coach's courses
+        const courseIds = courses.map((c) => c.id);
+
+        const { data: enrollments, error: enrollError } = await supabase
+          .from('enrollments')
+          .select('profile_id, course_id, enrolled_at')
+          .in('course_id', courseIds);
+
+        if (enrollError) throw enrollError;
+
+        if (!enrollments || enrollments.length === 0) {
+          setEligibleStudents([]);
+          setLoadingEligible(false);
+          return;
+        }
+
+        // Get unique student IDs
+        const studentIds = [...new Set(enrollments.map((e) => e.profile_id))];
+
+        // Fetch student profiles
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, email, first_name, last_name')
+          .in('id', studentIds)
+          .eq('role', 'student');
+
+        if (profilesError) throw profilesError;
+
+        // If requirements are set, filter by course completion
+        let qualifiedStudentIds = studentIds;
+
+        if (requiredCourseIds.length > 0) {
+          // Get module progress for required courses
+          const { data: progressData, error: progressError } = await supabase
+            .from('user_module_progress')
+            .select('user_id, module_id, completion_percentage')
+            .in('user_id', studentIds);
+
+          if (progressError) throw progressError;
+
+          // Get modules for required courses
+          const { data: modules, error: modulesError } = await supabase
+            .from('modules')
+            .select('id, course_id')
+            .in('course_id', requiredCourseIds);
+
+          if (modulesError) throw modulesError;
+
+          // For each required course, check if all modules are 100% complete
+          qualifiedStudentIds = studentIds.filter((studentId) => {
+            return requiredCourseIds.every((courseId) => {
+              const courseModules = modules?.filter((m) => m.course_id === courseId) || [];
+              if (courseModules.length === 0) return true; // No modules = course complete
+
+              return courseModules.every((module) => {
+                const progress = progressData?.find(
+                  (p) => p.user_id === studentId && p.module_id === module.id
+                );
+                return progress && progress.completion_percentage === 100;
+              });
+            });
+          });
+        }
+
+        // Map to eligible students format
+        const eligible: EligibleStudent[] = (profiles || [])
+          .filter((p) => qualifiedStudentIds.includes(p.id))
+          .map((p) => {
+            const studentEnrollments = enrollments.filter((e) => e.profile_id === p.id);
+            const earliestEnrollment = studentEnrollments.reduce((earliest, e) => {
+              const date = new Date(e.enrolled_at);
+              return !earliest || date < earliest ? date : earliest;
+            }, null as Date | null);
+
+            return {
+              id: p.id,
+              name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.email,
+              email: p.email,
+              completedCourseIds: requiredCourseIds, // Simplified - they qualify
+              enrollmentDate: earliestEnrollment?.toLocaleDateString() || 'N/A',
+              overallProgress: 100, // Placeholder
+            };
+          });
+
+        setEligibleStudents(eligible);
+      } catch (err: any) {
+        console.error('Error fetching eligible students:', err);
+        setError(err.message || 'Failed to load eligible students');
+      } finally {
+        setLoadingEligible(false);
+      }
+    };
+
+    fetchEligibleStudents();
+  }, [step, profile, courses, requiredCourseIds]);
+
+  // Step 4: Fetch students enrolled in the selected course
+  useEffect(() => {
+    const fetchEnrolledStudents = async () => {
+      if (step !== 4 || !selectedCourse) return;
+
+      setLoadingEnrolled(true);
+      setError(null);
+
+      try {
+        // Get enrollments for the selected course
+        const { data: enrollments, error: enrollError } = await supabase
+          .from('enrollments')
+          .select('profile_id, enrolled_at')
+          .eq('course_id', selectedCourse.id);
+
+        if (enrollError) throw enrollError;
+
+        if (!enrollments || enrollments.length === 0) {
+          setEnrolledStudents([]);
+          setLoadingEnrolled(false);
+          return;
+        }
+
+        const studentIds = enrollments.map((e) => e.profile_id);
+
+        // Exclude the selected sub-coach from the list
+        const filteredIds = studentIds.filter((id) => id !== selectedSubCoach?.id);
+
+        if (filteredIds.length === 0) {
+          setEnrolledStudents([]);
+          setLoadingEnrolled(false);
+          return;
+        }
+
+        // Fetch student profiles
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, email, first_name, last_name')
+          .in('id', filteredIds);
+
+        if (profilesError) throw profilesError;
+
+        // Get module progress for the selected course
+        const { data: modules } = await supabase
+          .from('modules')
+          .select('id')
+          .eq('course_id', selectedCourse.id);
+
+        const moduleIds = modules?.map((m) => m.id) || [];
+
+        let progressMap: Record<string, number> = {};
+
+        if (moduleIds.length > 0) {
+          const { data: progressData } = await supabase
+            .from('user_module_progress')
+            .select('user_id, completion_percentage')
+            .in('user_id', filteredIds)
+            .in('module_id', moduleIds);
+
+          // Calculate average progress per student
+          filteredIds.forEach((studentId) => {
+            const studentProgress = progressData?.filter((p) => p.user_id === studentId) || [];
+            if (studentProgress.length > 0) {
+              const avg = studentProgress.reduce((sum, p) => sum + (p.completion_percentage || 0), 0) / moduleIds.length;
+              progressMap[studentId] = Math.round(avg);
+            } else {
+              progressMap[studentId] = 0;
+            }
+          });
+        }
+
+        // Map to enrolled students format
+        const enrolled: EnrolledStudent[] = (profiles || []).map((p) => {
+          const enrollment = enrollments.find((e) => e.profile_id === p.id);
+          return {
+            id: p.id,
+            name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.email,
+            email: p.email,
+            enrollmentDate: enrollment ? new Date(enrollment.enrolled_at).toLocaleDateString() : 'N/A',
+            progress: progressMap[p.id] || 0,
+          };
+        });
+
+        setEnrolledStudents(enrolled);
+      } catch (err: any) {
+        console.error('Error fetching enrolled students:', err);
+        setError(err.message || 'Failed to load enrolled students');
+      } finally {
+        setLoadingEnrolled(false);
+      }
+    };
+
+    fetchEnrolledStudents();
+  }, [step, selectedCourse, selectedSubCoach]);
+
+  // Filtered students by search
+  const filteredEligibleStudents = useMemo(() => {
+    if (!studentSearchQuery) return eligibleStudents;
+    return eligibleStudents.filter(
+      (s) =>
+        s.name.toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
+        s.email.toLowerCase().includes(studentSearchQuery.toLowerCase())
+    );
+  }, [eligibleStudents, studentSearchQuery]);
+
+  const filteredEnrolledStudents = useMemo(() => {
+    if (!enrolledSearchQuery) return enrolledStudents;
+    return enrolledStudents.filter(
+      (s) =>
+        s.name.toLowerCase().includes(enrolledSearchQuery.toLowerCase()) ||
+        s.email.toLowerCase().includes(enrolledSearchQuery.toLowerCase())
+    );
+  }, [enrolledStudents, enrolledSearchQuery]);
+
+  // Handle final assignment
+  const handleAssign = () => {
+    if (!selectedCourse || !selectedSubCoach || selectedStudentIds.length === 0) return;
+
+    const assignedStudentNames = enrolledStudents
+      .filter((s) => selectedStudentIds.includes(s.id))
       .map((s) => s.name);
 
     onAssign({
-      subCoachId: selectedStudent.id,
-      subCoachName: selectedStudent.name,
-      subCoachEmail: selectedStudent.email,
-      subCoachAvatar: selectedStudent.avatar,
+      subCoachId: selectedSubCoach.id,
+      subCoachName: selectedSubCoach.name,
+      subCoachEmail: selectedSubCoach.email,
       courseId: selectedCourse.id,
       courseTitle: selectedCourse.title,
       courseCode: selectedCourse.code,
@@ -250,18 +332,18 @@ const SubCoachAssignmentModal: React.FC<SubCoachAssignmentModalProps> = ({
         day: 'numeric',
         year: 'numeric',
       }),
-      requiredCourses,
-      studentsAssigned: selectedCourseStudents.length,
-      assignedStudentIds: selectedCourseStudents,
+      requiredCourses: requiredCourseIds,
+      studentsAssigned: selectedStudentIds.length,
+      assignedStudentIds: selectedStudentIds,
       assignedStudentNames,
       status: 'pending',
     });
   };
 
   const canProceedStep1 = selectedCourse !== null;
-  const canProceedStep2 = requiredCourses.length > 0;
-  const canProceedStep3 = selectedStudent !== null;
-  const canAssign = selectedCourseStudents.length > 0;
+  const canProceedStep2 = true; // Requirements are optional
+  const canProceedStep3 = selectedSubCoach !== null;
+  const canAssign = selectedStudentIds.length > 0;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -286,13 +368,20 @@ const SubCoachAssignmentModal: React.FC<SubCoachAssignmentModalProps> = ({
             {[1, 2, 3, 4].map((s) => (
               <div
                 key={s}
-                className={`flex-1 h-2 rounded-full ${
-                  s <= step ? 'bg-[#304DB5]' : 'bg-slate-200'
-                }`}
+                className={`flex-1 h-2 rounded-full ${s <= step ? 'bg-[#304DB5]' : 'bg-slate-200'
+                  }`}
               />
             ))}
           </div>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mx-8 mt-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            <span className="text-sm">{error}</span>
+          </div>
+        )}
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-8 py-6">
@@ -324,9 +413,8 @@ const SubCoachAssignmentModal: React.FC<SubCoachAssignmentModalProps> = ({
                     <span className="text-slate-500">Select a course...</span>
                   )}
                   <ChevronDown
-                    className={`w-5 h-5 text-slate-400 transition-transform ${
-                      showCourseDropdown ? 'rotate-180' : ''
-                    }`}
+                    className={`w-5 h-5 text-slate-400 transition-transform ${showCourseDropdown ? 'rotate-180' : ''
+                      }`}
                   />
                 </button>
 
@@ -344,45 +432,49 @@ const SubCoachAssignmentModal: React.FC<SubCoachAssignmentModalProps> = ({
                         />
                       </div>
                     </div>
-                    {filteredCourses.map((course) => (
-                      <button
-                        key={course.id}
-                        onClick={() => {
-                          setSelectedCourse(course);
-                          setShowCourseDropdown(false);
-                          setCourseSearchQuery('');
-                        }}
-                        className={`w-full px-4 py-3 text-left hover:bg-slate-50 flex items-center justify-between ${
-                          selectedCourse?.id === course.id ? 'bg-blue-50' : ''
-                        }`}
-                      >
-                        <div>
-                          <p className="font-medium text-slate-900">{course.title}</p>
-                          <p className="text-sm text-slate-500">
-                            {course.code} • {course.enrolledStudents} students
-                          </p>
-                        </div>
-                        {selectedCourse?.id === course.id && (
-                          <Check className="w-5 h-5 text-[#304DB5]" />
-                        )}
-                      </button>
-                    ))}
+                    {filteredCourses.length === 0 ? (
+                      <div className="px-4 py-3 text-sm text-slate-500">No courses found</div>
+                    ) : (
+                      filteredCourses.map((course) => (
+                        <button
+                          key={course.id}
+                          onClick={() => {
+                            setSelectedCourse(course);
+                            setShowCourseDropdown(false);
+                            setCourseSearchQuery('');
+                          }}
+                          className={`w-full px-4 py-3 text-left hover:bg-slate-50 flex items-center justify-between ${selectedCourse?.id === course.id ? 'bg-blue-50' : ''
+                            }`}
+                        >
+                          <div>
+                            <p className="font-medium text-slate-900">{course.title}</p>
+                            <p className="text-sm text-slate-500">
+                              {course.code} • {course.enrolledStudents} students
+                            </p>
+                          </div>
+                          {selectedCourse?.id === course.id && (
+                            <Check className="w-5 h-5 text-[#304DB5]" />
+                          )}
+                        </button>
+                      ))
+                    )}
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          {/* Step 2: Set Requirements */}
+          {/* Step 2: Set Requirements (Optional) */}
           {step === 2 && (
             <div>
               <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                 <Award className="w-5 h-5 text-[#304DB5]" />
                 Set Course Requirements
+                <span className="text-sm font-normal text-slate-400">(Optional)</span>
               </h3>
               <p className="text-slate-600 mb-6">
-                Select the courses that a student must have completed to qualify as a sub-coach for{' '}
-                <span className="font-semibold">{selectedCourse?.title}</span>.
+                Optionally select courses that a student must have completed to qualify as a sub-coach for{' '}
+                <span className="font-semibold">{selectedCourse?.title}</span>. Skip this step to allow any enrolled student.
               </p>
 
               {/* Required Courses Multi-Select */}
@@ -392,64 +484,71 @@ const SubCoachAssignmentModal: React.FC<SubCoachAssignmentModalProps> = ({
                   className="w-full px-4 py-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between hover:border-[#304DB5] transition-colors"
                 >
                   <div className="flex-1">
-                    {requiredCourses.length > 0 ? (
+                    {requiredCourseIds.length > 0 ? (
                       <div className="flex flex-wrap gap-2">
-                        {requiredCourses.map((code) => (
-                          <span
-                            key={code}
-                            className="px-3 py-1 text-sm font-medium rounded-full bg-blue-100 text-blue-700"
-                          >
-                            {code}
-                          </span>
-                        ))}
+                        {requiredCourseIds.map((id) => {
+                          const course = availableCourses.find((c) => c.id === id);
+                          return (
+                            <span
+                              key={id}
+                              className="px-3 py-1 text-sm font-medium rounded-full bg-blue-100 text-blue-700"
+                            >
+                              {course?.title || id}
+                            </span>
+                          );
+                        })}
                       </div>
                     ) : (
-                      <span className="text-slate-500">Select required courses...</span>
+                      <span className="text-slate-500">No requirements (any student can be sub-coach)</span>
                     )}
                   </div>
                   <ChevronDown
-                    className={`w-5 h-5 text-slate-400 transition-transform flex-shrink-0 ml-2 ${
-                      showRequiredDropdown ? 'rotate-180' : ''
-                    }`}
+                    className={`w-5 h-5 text-slate-400 transition-transform flex-shrink-0 ml-2 ${showRequiredDropdown ? 'rotate-180' : ''
+                      }`}
                   />
                 </button>
 
                 {showRequiredDropdown && (
                   <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-10 max-h-64 overflow-y-auto">
-                    {availableCourses.map((course) => (
-                      <button
-                        key={course.id}
-                        onClick={() => toggleRequiredCourse(course.code)}
-                        className={`w-full px-4 py-3 text-left hover:bg-slate-50 flex items-center justify-between ${
-                          requiredCourses.includes(course.code) ? 'bg-blue-50' : ''
-                        }`}
-                      >
-                        <div>
-                          <p className="font-medium text-slate-900">{course.title}</p>
-                          <p className="text-sm text-slate-500">{course.code}</p>
-                        </div>
-                        <div
-                          className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                            requiredCourses.includes(course.code)
-                              ? 'bg-[#304DB5] border-[#304DB5]'
-                              : 'border-slate-300'
-                          }`}
+                    {prerequisiteCourses.length === 0 ? (
+                      <div className="px-4 py-3 text-sm text-slate-500">No other courses available</div>
+                    ) : (
+                      prerequisiteCourses.map((course) => (
+                        <button
+                          key={course.id}
+                          onClick={() => toggleRequiredCourse(course.id)}
+                          className={`w-full px-4 py-3 text-left hover:bg-slate-50 flex items-center justify-between ${requiredCourseIds.includes(course.id) ? 'bg-blue-50' : ''
+                            }`}
                         >
-                          {requiredCourses.includes(course.code) && (
-                            <Check className="w-3 h-3 text-white" />
-                          )}
-                        </div>
-                      </button>
-                    ))}
+                          <div>
+                            <p className="font-medium text-slate-900">{course.title}</p>
+                            <p className="text-sm text-slate-500">{course.code}</p>
+                          </div>
+                          <div
+                            className={`w-5 h-5 rounded border-2 flex items-center justify-center ${requiredCourseIds.includes(course.id)
+                                ? 'bg-[#304DB5] border-[#304DB5]'
+                                : 'border-slate-300'
+                              }`}
+                          >
+                            {requiredCourseIds.includes(course.id) && (
+                              <Check className="w-3 h-3 text-white" />
+                            )}
+                          </div>
+                        </button>
+                      ))
+                    )}
                   </div>
                 )}
               </div>
 
-              {/* Show eligible count */}
+              {/* Info message */}
               <div className="mt-6 p-4 bg-slate-50 rounded-xl">
                 <p className="text-sm text-slate-600">
-                  <span className="font-semibold text-[#304DB5]">{eligibleStudents.length}</span>{' '}
-                  students meet these requirements
+                  {requiredCourseIds.length === 0 ? (
+                    <>All enrolled students in your courses can be selected as sub-coaches.</>
+                  ) : (
+                    <>Only students who completed all selected courses will be eligible.</>
+                  )}
                 </p>
               </div>
             </div>
@@ -463,8 +562,11 @@ const SubCoachAssignmentModal: React.FC<SubCoachAssignmentModalProps> = ({
                 Select Sub-Coach
               </h3>
               <p className="text-slate-600 mb-6">
-                Choose a qualified student who has completed all required courses:{' '}
-                <span className="font-semibold">{requiredCourses.join(', ')}</span>
+                {requiredCourseIds.length > 0 ? (
+                  <>Choose a student who has completed all required courses.</>
+                ) : (
+                  <>Choose a student to be the sub-coach for this course.</>
+                )}
               </p>
 
               {/* Search */}
@@ -474,56 +576,50 @@ const SubCoachAssignmentModal: React.FC<SubCoachAssignmentModalProps> = ({
                   type="text"
                   value={studentSearchQuery}
                   onChange={(e) => setStudentSearchQuery(e.target.value)}
-                  placeholder="Search eligible students..."
+                  placeholder="Search students..."
                   className="w-full pl-12 pr-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:border-[#304DB5] focus:outline-none focus:ring-2 focus:ring-blue-100"
                 />
               </div>
 
               {/* Students List */}
               <div className="space-y-3 max-h-64 overflow-y-auto">
-                {filteredStudents.length > 0 ? (
-                  filteredStudents.map((student) => (
+                {loadingEligible ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-[#304DB5]" />
+                    <span className="ml-2 text-slate-500">Loading students...</span>
+                  </div>
+                ) : filteredEligibleStudents.length > 0 ? (
+                  filteredEligibleStudents.map((student) => (
                     <button
                       key={student.id}
-                      onClick={() => setSelectedStudent(student)}
-                      className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
-                        selectedStudent?.id === student.id
+                      onClick={() => setSelectedSubCoach(student)}
+                      className={`w-full p-4 rounded-xl border-2 transition-all text-left ${selectedSubCoach?.id === student.id
                           ? 'border-[#304DB5] bg-blue-50'
                           : 'border-slate-200 hover:border-slate-300'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#304DB5] to-[#5E7BFF] flex items-center justify-center text-white font-semibold text-lg">
-                          {student.name.charAt(0)}
+                          {student.name.charAt(0).toUpperCase()}
                         </div>
                         <div className="flex-1">
                           <p className="font-semibold text-slate-900">{student.name}</p>
                           <p className="text-sm text-slate-500">{student.email}</p>
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {student.completedCourses.map((code) => (
-                              <span
-                                key={code}
-                                className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                                  requiredCourses.includes(code)
-                                    ? 'bg-green-100 text-green-700'
-                                    : 'bg-slate-100 text-slate-600'
-                                }`}
-                              >
-                                {code}
-                              </span>
-                            ))}
-                          </div>
+                          <p className="text-xs text-slate-400 mt-1">Enrolled: {student.enrollmentDate}</p>
                         </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-[#304DB5]">{student.overallProgress}%</p>
-                          <p className="text-xs text-slate-500">Progress</p>
-                        </div>
+                        {selectedSubCoach?.id === student.id && (
+                          <Check className="w-6 h-6 text-[#304DB5]" />
+                        )}
                       </div>
                     </button>
                   ))
                 ) : (
                   <div className="text-center py-8">
-                    <p className="text-slate-500">No students match the requirements</p>
+                    <p className="text-slate-500">
+                      {requiredCourseIds.length > 0
+                        ? 'No students have completed all required courses'
+                        : 'No students found in your courses'}
+                    </p>
                   </div>
                 )}
               </div>
@@ -540,7 +636,7 @@ const SubCoachAssignmentModal: React.FC<SubCoachAssignmentModalProps> = ({
               <p className="text-slate-600 mb-6">
                 Choose which students enrolled in{' '}
                 <span className="font-semibold">{selectedCourse?.title}</span> will be managed by{' '}
-                <span className="font-semibold">{selectedStudent?.name}</span>.
+                <span className="font-semibold">{selectedSubCoach?.name}</span>.
               </p>
 
               {/* Search and Select All */}
@@ -549,23 +645,23 @@ const SubCoachAssignmentModal: React.FC<SubCoachAssignmentModalProps> = ({
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <input
                     type="text"
-                    value={courseStudentSearchQuery}
-                    onChange={(e) => setCourseStudentSearchQuery(e.target.value)}
+                    value={enrolledSearchQuery}
+                    onChange={(e) => setEnrolledSearchQuery(e.target.value)}
                     placeholder="Search enrolled students..."
                     className="w-full pl-12 pr-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:border-[#304DB5] focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
                 </div>
                 <button
                   onClick={() => {
-                    if (selectedCourseStudents.length === filteredCourseStudents.length) {
-                      setSelectedCourseStudents([]);
+                    if (selectedStudentIds.length === filteredEnrolledStudents.length) {
+                      setSelectedStudentIds([]);
                     } else {
-                      setSelectedCourseStudents(filteredCourseStudents.map((s) => s.id));
+                      setSelectedStudentIds(filteredEnrolledStudents.map((s) => s.id));
                     }
                   }}
                   className="px-4 py-3 text-sm font-medium text-[#304DB5] hover:bg-blue-50 rounded-xl transition-colors whitespace-nowrap"
                 >
-                  {selectedCourseStudents.length === filteredCourseStudents.length
+                  {selectedStudentIds.length === filteredEnrolledStudents.length
                     ? 'Deselect All'
                     : 'Select All'}
                 </button>
@@ -574,12 +670,12 @@ const SubCoachAssignmentModal: React.FC<SubCoachAssignmentModalProps> = ({
               {/* Selected Count */}
               <div className="mb-4 p-3 bg-blue-50 rounded-xl flex items-center justify-between">
                 <span className="text-sm text-slate-600">
-                  <span className="font-semibold text-[#304DB5]">{selectedCourseStudents.length}</span> of{' '}
-                  {courseStudents.length} students selected
+                  <span className="font-semibold text-[#304DB5]">{selectedStudentIds.length}</span> of{' '}
+                  {enrolledStudents.length} students selected
                 </span>
-                {selectedCourseStudents.length > 0 && (
+                {selectedStudentIds.length > 0 && (
                   <button
-                    onClick={() => setSelectedCourseStudents([])}
+                    onClick={() => setSelectedStudentIds([])}
                     className="text-sm text-red-600 hover:text-red-700 font-medium"
                   >
                     Clear Selection
@@ -589,37 +685,40 @@ const SubCoachAssignmentModal: React.FC<SubCoachAssignmentModalProps> = ({
 
               {/* Students List */}
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                {filteredCourseStudents.length > 0 ? (
-                  filteredCourseStudents.map((student) => (
+                {loadingEnrolled ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-[#304DB5]" />
+                    <span className="ml-2 text-slate-500">Loading enrolled students...</span>
+                  </div>
+                ) : filteredEnrolledStudents.length > 0 ? (
+                  filteredEnrolledStudents.map((student) => (
                     <button
                       key={student.id}
                       onClick={() => {
-                        if (selectedCourseStudents.includes(student.id)) {
-                          setSelectedCourseStudents(selectedCourseStudents.filter((id) => id !== student.id));
+                        if (selectedStudentIds.includes(student.id)) {
+                          setSelectedStudentIds(selectedStudentIds.filter((id) => id !== student.id));
                         } else {
-                          setSelectedCourseStudents([...selectedCourseStudents, student.id]);
+                          setSelectedStudentIds([...selectedStudentIds, student.id]);
                         }
                       }}
-                      className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
-                        selectedCourseStudents.includes(student.id)
+                      className={`w-full p-4 rounded-xl border-2 transition-all text-left ${selectedStudentIds.includes(student.id)
                           ? 'border-[#304DB5] bg-blue-50'
                           : 'border-slate-200 hover:border-slate-300'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-4">
                         <div
-                          className={`w-6 h-6 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                            selectedCourseStudents.includes(student.id)
+                          className={`w-6 h-6 rounded border-2 flex items-center justify-center flex-shrink-0 ${selectedStudentIds.includes(student.id)
                               ? 'bg-[#304DB5] border-[#304DB5]'
                               : 'border-slate-300'
-                          }`}
+                            }`}
                         >
-                          {selectedCourseStudents.includes(student.id) && (
+                          {selectedStudentIds.includes(student.id) && (
                             <Check className="w-4 h-4 text-white" />
                           )}
                         </div>
                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-400 to-slate-500 flex items-center justify-center text-white font-semibold">
-                          {student.name.charAt(0)}
+                          {student.name.charAt(0).toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-slate-900 truncate">{student.name}</p>
@@ -634,7 +733,7 @@ const SubCoachAssignmentModal: React.FC<SubCoachAssignmentModalProps> = ({
                   ))
                 ) : (
                   <div className="text-center py-8">
-                    <p className="text-slate-500">No students found</p>
+                    <p className="text-slate-500">No students enrolled in this course</p>
                   </div>
                 )}
               </div>
