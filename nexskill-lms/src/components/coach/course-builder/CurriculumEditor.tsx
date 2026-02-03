@@ -14,15 +14,11 @@ import {
     Code,
     Heading,
     FileQuestion,
+    Lock,
+    Unlock,
 } from "lucide-react";
-import type { Lesson } from "../../../types/lesson";
+import type { Lesson, Module } from "../../../types/lesson";
 import type { ContentItem } from "../../../types/content-item";
-
-interface Module {
-    id: string;
-    title: string;
-    lessons: ContentItem[]; // Changed to accept both lessons and quizzes
-}
 
 interface CurriculumEditorProps {
     curriculum: Module[];
@@ -33,6 +29,7 @@ interface CurriculumEditorProps {
     onAddLesson?: (moduleId: string, newLesson: Lesson) => Promise<void>;
     onDeleteLesson?: (moduleId: string, lessonId: string) => Promise<void>;
     onDeleteModule?: (moduleId: string) => Promise<void>;
+    onAddModule?: () => Promise<void>;
     onMoveLesson?: (
         moduleId: string,
         lessonId: string,
@@ -49,6 +46,7 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
     onAddLesson,
     onDeleteLesson,
     onDeleteModule,
+    onAddModule,
     onMoveLesson,
 }) => {
     const [expandedModules, setExpandedModules] = useState<Set<string>>(
@@ -68,6 +66,10 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
     };
 
     const handleAddModule = () => {
+        if (onAddModule) {
+            onAddModule();
+            return;
+        }
         const newModule: Module = {
             id: `module-${Date.now()}`,
             title: `Module ${curriculum.length + 1}`,
@@ -135,6 +137,13 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
     const handleModuleTitleChange = (moduleId: string, newTitle: string) => {
         const updatedCurriculum = curriculum.map((module) =>
             module.id === moduleId ? { ...module, title: newTitle } : module
+        );
+        onChange(updatedCurriculum);
+    };
+
+    const handleToggleSequential = (moduleId: string) => {
+        const updatedCurriculum = curriculum.map((module) =>
+            module.id === moduleId ? { ...module, is_sequential: !module.is_sequential } : module
         );
         onChange(updatedCurriculum);
     };
@@ -394,6 +403,24 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                         <Trash2 className="w-4 h-4" />
                                     </button>
                                 </div>
+                            </div>
+
+                            {/* Module Settings Bar */}
+                            <div className="px-5 py-2 bg-gray-50 dark:bg-slate-800/50 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleSequential(module.id);
+                                    }}
+                                    className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors border ${module.is_sequential
+                                        ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800"
+                                        : "bg-white text-gray-500 border-gray-200 dark:bg-slate-700 dark:text-gray-400 dark:border-gray-600 hover:text-gray-700 dark:hover:text-gray-300"
+                                        }`}
+                                    title="Enforce sequential access for students"
+                                >
+                                    {module.is_sequential ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                                    {module.is_sequential ? "Sequential Order On" : "Sequential Order Off"}
+                                </button>
                             </div>
                         </div>
 
