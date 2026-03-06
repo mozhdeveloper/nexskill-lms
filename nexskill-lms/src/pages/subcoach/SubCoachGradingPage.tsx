@@ -90,7 +90,7 @@ const SubCoachGradingPage: React.FC = () => {
     <SubCoachAppLayout>
       {/* Header */}
       <div className="px-8 py-6 border-b border-[#EDF0FB]">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-1xl mx-auto">
           <h1 className="text-3xl font-bold text-text-primary mb-2">Grading Queue</h1>
           <p className="text-sm text-text-secondary">
             Review and grade student submissions
@@ -100,7 +100,7 @@ const SubCoachGradingPage: React.FC = () => {
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto px-8 py-8">
-        <div className="max-w-7xl mx-auto space-y-6">
+        <div className="max-w-1xl mx-auto space-y-6">
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white rounded-2xl p-5 border border-[#EDF0FB]">

@@ -1,157 +1,69 @@
-import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import StudentAppLayout from '../../layouts/StudentAppLayout';
-import CourseFilterBar from '../../components/courses/CourseFilterBar';
-import CourseCategorySidebar from '../../components/courses/CourseCategorySidebar';
-import CourseGridItem from '../../components/courses/CourseGridItem';
+import React, { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import StudentAppLayout from "../../layouts/StudentAppLayout";
+import CourseFilterBar from "../../components/courses/CourseFilterBar";
+import CourseCategorySidebar from "../../components/courses/CourseCategorySidebar";
+import CourseGridItem from "../../components/courses/CourseGridItem";
+import { useCourses } from '../../hooks/useCourses';
+import { useEnrolledCourses } from '../../hooks/useEnrolledCourses';
 
-// Dummy course data
-const allCourses = [
-  {
-    id: '1',
-    title: 'Complete UI/UX Design Bootcamp',
-    category: 'Design',
-    level: 'Beginner' as const,
-    rating: 4.8,
-    studentsCount: 12450,
-    duration: '24h 30m',
-    price: 49,
-    originalPrice: 99,
-    isBestseller: true,
-    isNew: false,
-    thumbnail: 'gradient-blue-purple',
-    shortDescription: 'Master UI/UX design from scratch with hands-on projects and real-world examples.',
-  },
-  {
-    id: '2',
-    title: 'Advanced React & TypeScript',
-    category: 'Development',
-    level: 'Advanced' as const,
-    rating: 4.9,
-    studentsCount: 8920,
-    duration: '18h 15m',
-    price: 79,
-    originalPrice: 129,
-    isBestseller: true,
-    isNew: false,
-    thumbnail: 'gradient-purple-pink',
-    shortDescription: 'Build scalable applications with modern React patterns and TypeScript best practices.',
-  },
-  {
-    id: '3',
-    title: 'Digital Marketing Fundamentals',
-    category: 'Marketing',
-    level: 'Beginner' as const,
-    rating: 4.6,
-    studentsCount: 15230,
-    duration: '12h 45m',
-    price: 39,
-    isBestseller: false,
-    isNew: true,
-    thumbnail: 'gradient-pink-orange',
-    shortDescription: 'Learn SEO, social media marketing, content strategy, and analytics from industry experts.',
-  },
-  {
-    id: '4',
-    title: 'Data Science with Python',
-    category: 'Data & Analytics',
-    level: 'Intermediate' as const,
-    rating: 4.7,
-    studentsCount: 10540,
-    duration: '32h 20m',
-    price: 89,
-    originalPrice: 149,
-    isBestseller: false,
-    isNew: false,
-    thumbnail: 'gradient-green-blue',
-    shortDescription: 'Master data analysis, visualization, and machine learning with Python and popular libraries.',
-  },
-  {
-    id: '5',
-    title: 'Figma Mastery for Designers',
-    category: 'Design',
-    level: 'Intermediate' as const,
-    rating: 4.8,
-    studentsCount: 7890,
-    duration: '15h 30m',
-    price: 59,
-    isBestseller: false,
-    isNew: true,
-    thumbnail: 'gradient-purple-pink',
-    shortDescription: 'Become a Figma expert with advanced techniques for UI design, prototyping, and collaboration.',
-  },
-  {
-    id: '6',
-    title: 'Full-Stack Web Development',
-    category: 'Development',
-    level: 'Intermediate' as const,
-    rating: 4.9,
-    studentsCount: 18750,
-    duration: '45h 00m',
-    price: 99,
-    originalPrice: 179,
-    isBestseller: true,
-    isNew: false,
-    thumbnail: 'gradient-blue-purple',
-    shortDescription: 'Build complete web applications from frontend to backend with modern technologies.',
-  },
-  {
-    id: '7',
-    title: 'Business Strategy & Leadership',
-    category: 'Business',
-    level: 'Advanced' as const,
-    rating: 4.7,
-    studentsCount: 5430,
-    duration: '20h 10m',
-    price: 69,
-    isBestseller: false,
-    isNew: false,
-    thumbnail: 'gradient-orange-red',
-    shortDescription: 'Develop strategic thinking and leadership skills to drive business growth and innovation.',
-  },
-  {
-    id: '8',
-    title: 'SQL & Database Design',
-    category: 'Data & Analytics',
-    level: 'Beginner' as const,
-    rating: 4.6,
-    studentsCount: 9320,
-    duration: '16h 40m',
-    price: 45,
-    isBestseller: false,
-    isNew: true,
-    thumbnail: 'gradient-green-blue',
-    shortDescription: 'Learn SQL queries, database design, and data modeling for effective data management.',
-  },
-  {
-    id: '9',
-    title: 'Growth Marketing & Analytics',
-    category: 'Marketing',
-    level: 'Intermediate' as const,
-    rating: 4.8,
-    studentsCount: 6210,
-    duration: '14h 25m',
-    price: 55,
-    originalPrice: 89,
-    isBestseller: false,
-    isNew: false,
-    thumbnail: 'gradient-pink-orange',
-    shortDescription: 'Master growth hacking strategies, A/B testing, and data-driven marketing techniques.',
-  },
+// Categories for the filter sidebar
+const categories = [
+  "All",
+  "Design",
+  "Development",
+  "Marketing",
+  "Data & Analytics",
+  "Business",
+  "Personal Development",
 ];
 
-const categories = ['All', 'Design', 'Development', 'Marketing', 'Data & Analytics', 'Business'];
+// Helper to format duration from hours (number) to string
+const formatDuration = (hours: number) => {
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+};
 
 const CourseCatalog: React.FC = () => {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [selectedLevel, setSelectedLevel] = useState('All');
-  const [sortOption, setSortOption] = useState('Most popular');
+  // Fetch ALL courses
+  const { courses: dbCourses, loading: loadingAll, error: errorAll } = useCourses();
+  // Fetch ENROLLED courses
+  const { courses: enrolledCourses, loading: loadingEnrolled, error: errorEnrolled } = useEnrolledCourses();
+
+  const [activeTab, setActiveTab] = useState<'browse' | 'enrolled'>('enrolled');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedLevel, setSelectedLevel] = useState("All");
+  const [sortOption, setSortOption] = useState("Most popular");
+
+  // Determine which source data to use
+  const sourceCourses = activeTab === 'browse' ? dbCourses : enrolledCourses;
+  const isLoading = activeTab === 'browse' ? loadingAll : loadingEnrolled;
+
+  // Map DB courses to UI format
+  const mappedCourses = useMemo(() => {
+    return sourceCourses.map(course => ({
+      id: course.id,
+      title: course.title,
+      category: (course as any).category?.name || 'Uncategorized', // Handle joined data
+      level: course.level || 'Beginner',
+      rating: 0,
+      studentsCount: 0,
+      duration: formatDuration(course.duration_hours || 0),
+      price: course.price || 0,
+      originalPrice: undefined,
+      isBestseller: false,
+      isNew: new Date(course.created_at).getTime() > Date.now() - 7 * 24 * 60 * 60 * 1000,
+      thumbnail: 'gradient-blue-purple', // Could vary based on ID
+      shortDescription: course.short_description || '',
+    }));
+  }, [sourceCourses]);
 
   // Filter and sort courses
   const filteredCourses = useMemo(() => {
-    let filtered = [...allCourses];
+    let filtered = [...mappedCourses];
 
     // Filter by search query
     if (searchQuery) {
@@ -159,38 +71,40 @@ const CourseCatalog: React.FC = () => {
       filtered = filtered.filter(
         (course) =>
           course.title.toLowerCase().includes(query) ||
-          course.shortDescription.toLowerCase().includes(query)
+          course.shortDescription.toLowerCase().includes(query),
       );
     }
 
     // Filter by category
-    if (selectedCategory !== 'All') {
-      filtered = filtered.filter((course) => course.category === selectedCategory);
+    if (selectedCategory !== "All") {
+      filtered = filtered.filter(
+        (course) => course.category === selectedCategory,
+      );
     }
 
     // Filter by level
-    if (selectedLevel !== 'All') {
+    if (selectedLevel !== "All") {
       filtered = filtered.filter((course) => course.level === selectedLevel);
     }
 
     // Sort courses
     switch (sortOption) {
-      case 'Most popular':
+      case "Most popular":
         filtered.sort((a, b) => b.studentsCount - a.studentsCount);
         break;
-      case 'Highest rated':
+      case "Highest rated":
         filtered.sort((a, b) => b.rating - a.rating);
         break;
-      case 'Newest':
+      case "Newest":
         filtered.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
         break;
-      case 'Price: low to high':
+      case "Price: low to high":
         filtered.sort((a, b) => a.price - b.price);
         break;
     }
 
     return filtered;
-  }, [searchQuery, selectedCategory, selectedLevel, sortOption]);
+  }, [searchQuery, selectedCategory, selectedLevel, sortOption, mappedCourses]);
 
   const handleCourseClick = (courseId: string) => {
     navigate(`/student/courses/${courseId}`);
@@ -200,10 +114,40 @@ const CourseCatalog: React.FC = () => {
     <StudentAppLayout>
       {/* Header */}
       <div className="px-8 py-6 border-b border-[#EDF0FB] dark:border-gray-700">
-        <h1 className="text-2xl font-bold text-text-primary dark:text-dark-text-primary mb-1">Course Catalog</h1>
-        <p className="text-sm text-text-secondary dark:text-dark-text-secondary">
-          Discover courses tailored to your learning goals
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-text-primary dark:text-dark-text-primary mb-1">
+              {activeTab === 'enrolled' ? 'My Courses' : 'Course Catalog'}
+            </h1>
+            <p className="text-sm text-text-secondary dark:text-dark-text-secondary">
+              {activeTab === 'enrolled'
+                ? 'Continue learning and track your progress'
+                : 'Discover courses tailored to your learning goals'}
+            </p>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+            <button
+              onClick={() => setActiveTab('enrolled')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'enrolled'
+                  ? 'bg-white dark:bg-gray-700 text-brand-primary shadow-sm'
+                  : 'text-text-secondary hover:text-text-primary'
+                }`}
+            >
+              My Enrollments
+            </button>
+            <button
+              onClick={() => setActiveTab('browse')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'browse'
+                  ? 'bg-white dark:bg-gray-700 text-brand-primary shadow-sm'
+                  : 'text-text-secondary hover:text-text-primary'
+                }`}
+            >
+              Browse All
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Main Content */}
@@ -231,14 +175,23 @@ const CourseCatalog: React.FC = () => {
             />
 
             {/* Results Count */}
-            <div className="mb-4">
+            <div className="mb-4 flex items-center justify-between">
               <p className="text-sm text-text-secondary dark:text-dark-text-secondary">
-                {filteredCourses.length} {filteredCourses.length === 1 ? 'course' : 'courses'} found
+                {filteredCourses.length}{" "}
+                {filteredCourses.length === 1 ? "course" : "courses"} found
               </p>
+              {isLoading && <p className="text-sm text-brand-primary">Loading courses...</p>}
             </div>
 
             {/* Course Grid */}
-            {filteredCourses.length > 0 ? (
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="w-16 h-16 border-4 border-brand-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                  <p className="text-text-secondary">Loading courses...</p>
+                </div>
+              </div>
+            ) : filteredCourses.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredCourses.map((course) => (
                   <CourseGridItem
@@ -250,13 +203,25 @@ const CourseCatalog: React.FC = () => {
               </div>
             ) : (
               <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-card dark:bg-dark-background-card p-12 text-center transition-colors">
-                <div className="text-6xl mb-4">🔍</div>
+                <div className="text-6xl mb-4">
+                  {activeTab === 'enrolled' ? '📚' : '🔍'}
+                </div>
                 <h3 className="text-xl font-semibold text-text-primary dark:text-dark-text-primary mb-2">
-                  No courses found
+                  {activeTab === 'enrolled' ? 'No Enrolled Courses' : 'No courses found'}
                 </h3>
                 <p className="text-text-secondary dark:text-dark-text-secondary">
-                  Try adjusting your filters or search query
+                  {activeTab === 'enrolled'
+                    ? 'You haven\'t enrolled in any courses yet. Switch to "Browse All" to find one!'
+                    : 'Try adjusting your filters or search query'}
                 </p>
+                {activeTab === 'enrolled' && (
+                  <button
+                    onClick={() => setActiveTab('browse')}
+                    className="mt-4 px-6 py-2 bg-brand-primary text-white rounded-full hover:shadow-lg transition-all"
+                  >
+                    Browse Courses
+                  </button>
+                )}
               </div>
             )}
           </div>

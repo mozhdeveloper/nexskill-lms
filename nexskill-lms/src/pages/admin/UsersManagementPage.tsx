@@ -37,7 +37,45 @@ interface FilterState {
 }
 
 const UsersManagementPage: React.FC = () => {
-  // Dummy Organizations
+  // Supabase Integration
+  const [users, setUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  React.useEffect(() => {
+    const fetchUsers = async () => {
+      setIsLoading(true);
+      const { supabase } = await import('../../lib/supabaseClient');
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching users:', error);
+      } else if (data) {
+        const mappedUsers: User[] = data.map((profile: any) => ({
+          id: profile.id,
+          firstName: profile.first_name || '',
+          lastName: profile.last_name || '',
+          email: profile.email || 'N/A',
+          status: 'active', // Default to active as profile exists
+          roles: [profile.role || 'student'],
+          createdAt: profile.updated_at, // Fallback to updated_at since created_at is missing
+
+          lastActiveAt: profile.updated_at || new Date().toISOString(), // Using updated_at as proxy
+          organizationId: undefined
+        }));
+        setUsers(mappedUsers);
+      }
+      setIsLoading(false);
+    };
+
+    // Only fetch if we are on the users tab
+    fetchUsers();
+  }, []);
+
+  // Dummy Organizations (Mock for now)
   const [organizations] = useState<Organization[]>([
     {
       id: 'org-1',
@@ -70,140 +108,6 @@ const UsersManagementPage: React.FC = () => {
       usersCount: 15,
       plan: 'Starter',
       contact: 'team@startupacademy.io',
-    },
-  ]);
-
-  // Dummy Users
-  const [users, setUsers] = useState<User[]>([
-    {
-      id: 'user-1',
-      firstName: 'John',
-      lastName: 'Doe',
-      email: 'john.doe@example.com',
-      status: 'active',
-      roles: ['student'],
-      createdAt: '2024-01-15T10:30:00Z',
-      lastActiveAt: '2025-12-04T08:15:00Z',
-    },
-    {
-      id: 'user-2',
-      firstName: 'Sarah',
-      lastName: 'Johnson',
-      email: 'sarah.j@techcorp.com',
-      status: 'active',
-      roles: ['coach', 'student'],
-      organizationId: 'org-1',
-      organizationName: 'TechCorp Inc.',
-      createdAt: '2024-02-20T14:00:00Z',
-      lastActiveAt: '2025-12-04T06:45:00Z',
-    },
-    {
-      id: 'user-3',
-      firstName: 'Michael',
-      lastName: 'Chen',
-      email: 'mchen@example.com',
-      status: 'banned',
-      roles: ['student'],
-      createdAt: '2024-03-10T09:00:00Z',
-      lastActiveAt: '2025-11-20T12:00:00Z',
-    },
-    {
-      id: 'user-4',
-      firstName: 'Emily',
-      lastName: 'Rodriguez',
-      email: 'emily.r@edusolutions.com',
-      status: 'active',
-      roles: ['org_admin', 'coach'],
-      organizationId: 'org-2',
-      organizationName: 'EduSolutions',
-      createdAt: '2024-04-05T11:30:00Z',
-      lastActiveAt: '2025-12-03T16:20:00Z',
-    },
-    {
-      id: 'user-5',
-      firstName: 'David',
-      lastName: 'Kim',
-      email: 'david.kim@admin.nexskill.com',
-      status: 'active',
-      roles: ['admin'],
-      createdAt: '2023-12-01T08:00:00Z',
-      lastActiveAt: '2025-12-04T09:00:00Z',
-    },
-    {
-      id: 'user-6',
-      firstName: 'Lisa',
-      lastName: 'Anderson',
-      email: 'lisa.a@globaltraining.com',
-      status: 'active',
-      roles: ['coach'],
-      organizationId: 'org-3',
-      organizationName: 'Global Training Ltd.',
-      createdAt: '2024-05-12T13:45:00Z',
-      lastActiveAt: '2025-12-04T07:30:00Z',
-    },
-    {
-      id: 'user-7',
-      firstName: 'James',
-      lastName: 'Wilson',
-      email: 'jwilson@example.com',
-      status: 'pending',
-      roles: ['student'],
-      createdAt: '2025-12-03T15:00:00Z',
-      lastActiveAt: '2025-12-03T15:00:00Z',
-    },
-    {
-      id: 'user-8',
-      firstName: 'Maria',
-      lastName: 'Garcia',
-      email: 'maria.g@startupacademy.io',
-      status: 'active',
-      roles: ['org_admin'],
-      organizationId: 'org-4',
-      organizationName: 'Startup Academy',
-      createdAt: '2024-06-18T10:00:00Z',
-      lastActiveAt: '2025-12-02T14:00:00Z',
-    },
-    {
-      id: 'user-9',
-      firstName: 'Robert',
-      lastName: 'Taylor',
-      email: 'rtaylor@example.com',
-      status: 'active',
-      roles: ['coach', 'student'],
-      createdAt: '2024-07-22T16:30:00Z',
-      lastActiveAt: '2025-12-04T05:15:00Z',
-    },
-    {
-      id: 'user-10',
-      firstName: 'Jennifer',
-      lastName: 'Martinez',
-      email: 'jmartinez@example.com',
-      status: 'banned',
-      roles: ['student'],
-      createdAt: '2024-08-14T12:00:00Z',
-      lastActiveAt: '2025-11-15T10:30:00Z',
-    },
-    {
-      id: 'user-11',
-      firstName: 'William',
-      lastName: 'Brown',
-      email: 'wbrown@techcorp.com',
-      status: 'active',
-      roles: ['student'],
-      organizationId: 'org-1',
-      organizationName: 'TechCorp Inc.',
-      createdAt: '2024-09-05T09:15:00Z',
-      lastActiveAt: '2025-12-04T08:00:00Z',
-    },
-    {
-      id: 'user-12',
-      firstName: 'Patricia',
-      lastName: 'Lee',
-      email: 'patricia.lee@example.com',
-      status: 'active',
-      roles: ['coach'],
-      createdAt: '2024-10-10T14:20:00Z',
-      lastActiveAt: '2025-12-03T18:45:00Z',
     },
   ]);
 
@@ -290,10 +194,10 @@ const UsersManagementPage: React.FC = () => {
         users.map((u) =>
           u.id === userData.id
             ? {
-                ...u,
-                ...userData,
-                organizationName: organizations.find((o) => o.id === userData.organizationId)?.name,
-              }
+              ...u,
+              ...userData,
+              organizationName: organizations.find((o) => o.id === userData.organizationId)?.name,
+            }
             : u
         )
       );
@@ -333,7 +237,7 @@ const UsersManagementPage: React.FC = () => {
 
   return (
     <AdminAppLayout>
-      <div className="space-y-6">
+      <div className="m-5 space-y-6">
         {/* Page Header */}
         <div className="flex items-start justify-between">
           <div>
@@ -365,11 +269,10 @@ const UsersManagementPage: React.FC = () => {
           <nav className="flex gap-8">
             <button
               onClick={() => setActiveTab('users')}
-              className={`pb-4 text-sm font-medium transition-colors relative ${
-                activeTab === 'users'
-                  ? 'text-[#304DB5]'
-                  : 'text-[#5F6473] hover:text-[#111827]'
-              }`}
+              className={`pb-4 text-sm font-medium transition-colors relative ${activeTab === 'users'
+                ? 'text-[#304DB5]'
+                : 'text-[#5F6473] hover:text-[#111827]'
+                }`}
             >
               All Users
               {activeTab === 'users' && (
@@ -378,11 +281,10 @@ const UsersManagementPage: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab('pending-coaches')}
-              className={`pb-4 text-sm font-medium transition-colors relative flex items-center gap-2 ${
-                activeTab === 'pending-coaches'
-                  ? 'text-[#304DB5]'
-                  : 'text-[#5F6473] hover:text-[#111827]'
-              }`}
+              className={`pb-4 text-sm font-medium transition-colors relative flex items-center gap-2 ${activeTab === 'pending-coaches'
+                ? 'text-[#304DB5]'
+                : 'text-[#5F6473] hover:text-[#111827]'
+                }`}
             >
               Pending Coaches
               <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-yellow-100 text-yellow-700">

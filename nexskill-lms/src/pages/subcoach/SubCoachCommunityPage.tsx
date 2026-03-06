@@ -102,7 +102,7 @@ const SubCoachCommunityPage: React.FC = () => {
     <SubCoachAppLayout>
       {/* Header */}
       <div className="px-8 py-6 border-b border-[#EDF0FB]">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-1xl mx-auto">
           <h1 className="text-3xl font-bold text-text-primary mb-2">Community Moderation</h1>
           <p className="text-sm text-text-secondary">
             Monitor and moderate community discussions
@@ -112,7 +112,7 @@ const SubCoachCommunityPage: React.FC = () => {
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto px-8 py-8">
-        <div className="max-w-7xl mx-auto space-y-6">
+        <div className="max-w-1xl mx-auto space-y-6">
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-white rounded-2xl p-5 border border-[#EDF0FB]">
@@ -137,21 +137,19 @@ const SubCoachCommunityPage: React.FC = () => {
               <div className="flex gap-4">
                 <button
                   onClick={() => setActiveTab('recent')}
-                  className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-                    activeTab === 'recent'
-                      ? 'bg-gradient-to-r from-teal-50 to-cyan-50 text-teal-700 border-b-2 border-teal-500'
-                      : 'text-text-secondary hover:text-text-primary'
-                  }`}
+                  className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${activeTab === 'recent'
+                    ? 'bg-gradient-to-r from-teal-50 to-cyan-50 text-teal-700 border-b-2 border-teal-500'
+                    : 'text-text-secondary hover:text-text-primary'
+                    }`}
                 >
                   Recent Posts
                 </button>
                 <button
                   onClick={() => setActiveTab('reported')}
-                  className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-                    activeTab === 'reported'
-                      ? 'bg-gradient-to-r from-teal-50 to-cyan-50 text-teal-700 border-b-2 border-teal-500'
-                      : 'text-text-secondary hover:text-text-primary'
-                  }`}
+                  className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${activeTab === 'reported'
+                    ? 'bg-gradient-to-r from-teal-50 to-cyan-50 text-teal-700 border-b-2 border-teal-500'
+                    : 'text-text-secondary hover:text-text-primary'
+                    }`}
                 >
                   Reported Content
                   {reportedContent.length > 0 && (
@@ -181,7 +179,7 @@ const SubCoachCommunityPage: React.FC = () => {
                       </div>
                       <p className="text-sm text-text-primary mb-3">{post.content}</p>
                       <div className="flex items-center gap-4">
-                        <button 
+                        <button
                           onClick={() => {
                             window.alert(`💬 View Replies
 
@@ -205,7 +203,7 @@ Replies: ${post.replies}
                         >
                           💬 {post.replies} replies
                         </button>
-                        <button 
+                        <button
                           onClick={() => {
                             window.alert(`👍 Post Liked
 
@@ -229,7 +227,7 @@ Current likes: ${post.likes + 1}
                         >
                           ❤️ {post.likes} likes
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleReplyToPost(post.id)}
                           className="text-xs text-teal-600 hover:text-teal-700 font-medium ml-auto"
                         >
@@ -260,11 +258,10 @@ Current likes: ${post.likes + 1}
                             <div className="text-xs text-text-secondary">{item.courseName}</div>
                           </div>
                           <span
-                            className={`px-2 py-1 text-xs font-medium rounded-lg ${
-                              item.status === 'Pending'
-                                ? 'bg-amber-100 text-amber-700'
-                                : 'bg-blue-100 text-blue-700'
-                            }`}
+                            className={`px-2 py-1 text-xs font-medium rounded-lg ${item.status === 'Pending'
+                              ? 'bg-amber-100 text-amber-700'
+                              : 'bg-blue-100 text-blue-700'
+                              }`}
                           >
                             {item.status}
                           </span>
@@ -275,7 +272,7 @@ Current likes: ${post.likes + 1}
                           <span className="font-medium">{item.reportReason}</span> • {item.timestamp}
                         </div>
                         <div className="flex items-center gap-3">
-                          <button 
+                          <button
                             onClick={() => {
                               setSelectedPost(item.id);
                               setShowReportedModal(true);

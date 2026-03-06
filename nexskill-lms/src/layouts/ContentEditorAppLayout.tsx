@@ -33,7 +33,7 @@ const ContentEditorAppLayout: React.FC<ContentEditorAppLayoutProps> = ({ childre
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FFF9F0] via-[#FFF5E8] to-[#FFE8D0] p-8">
-      <div className="max-w-[1440px] mx-auto bg-white rounded-[32px] shadow-card overflow-hidden flex" style={{ minHeight: 'calc(100vh - 64px)' }}>
+      <div className="mx-auto bg-white rounded-[32px] shadow-card overflow-hidden flex" style={{ minHeight: 'calc(100vh - 64px)' }}>
         {/* Left Sidebar */}
         <aside className="w-[240px] flex-shrink-0 flex flex-col p-6 border-r border-[#EDF0FB]">
           {/* Logo */}
@@ -53,11 +53,10 @@ const ContentEditorAppLayout: React.FC<ContentEditorAppLayoutProps> = ({ childre
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                  isActive(item.path)
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive(item.path)
                     ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md'
                     : 'text-text-secondary hover:bg-[#FFF9F0] hover:text-text-primary'
-                }`}
+                  }`}
               >
                 <span className="text-sm font-medium">{item.label}</span>
               </Link>

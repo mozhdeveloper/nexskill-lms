@@ -36,7 +36,7 @@ const EmailVerification: React.FC = () => {
     const code = verificationCode.join('');
     if (code.length === 6) {
       // Dummy verification - navigate to onboarding
-      navigate('/onboarding-preferences');
+      navigate('/student/onboarding-preferences');
     }
   };
 

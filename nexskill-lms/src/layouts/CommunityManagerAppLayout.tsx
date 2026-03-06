@@ -19,21 +19,21 @@ const CommunityManagerAppLayout: React.FC<CommunityManagerAppLayoutProps> = ({ c
   };
 
   const navItems = [
-    { path: '/community/dashboard', label: 'Dashboard'},
-    { path: '/community/discussions', label: 'Discussions'},
-    { path: '/community/moderation', label: 'Moderation'},
-    { path: '/community/reported-content', label: 'Reported Content'},
-    { path: '/community/members', label: 'Members'},
-    { path: '/community/engagement', label: 'Engagement'},
-    { path: '/community/guidelines', label: 'Guidelines'},
-    { path: '/community/settings', label: 'Settings'},
+    { path: '/community/dashboard', label: 'Dashboard' },
+    { path: '/community/discussions', label: 'Discussions' },
+    { path: '/community/moderation', label: 'Moderation' },
+    { path: '/community/reported-content', label: 'Reported Content' },
+    { path: '/community/members', label: 'Members' },
+    { path: '/community/engagement', label: 'Engagement' },
+    { path: '/community/guidelines', label: 'Guidelines' },
+    { path: '/community/settings', label: 'Settings' },
   ];
 
   const isActive = (path: string) => location.pathname === path;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F0FFF4] via-[#E8FFF0] to-[#D0FFE8] p-8">
-      <div className="max-w-[1440px] mx-auto bg-white rounded-[32px] shadow-card overflow-hidden flex" style={{ minHeight: 'calc(100vh - 64px)' }}>
+      <div className="mx-auto bg-white rounded-[32px] shadow-card overflow-hidden flex" style={{ minHeight: 'calc(100vh - 64px)' }}>
         {/* Left Sidebar */}
         <aside className="w-[240px] flex-shrink-0 flex flex-col p-6 border-r border-[#EDF0FB]">
           {/* Logo */}
@@ -53,11 +53,10 @@ const CommunityManagerAppLayout: React.FC<CommunityManagerAppLayoutProps> = ({ c
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                  isActive(item.path)
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive(item.path)
                     ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-md'
                     : 'text-text-secondary hover:bg-[#F0FFF4] hover:text-text-primary'
-                }`}
+                  }`}
               >
                 <span className="text-sm font-medium">{item.label}</span>
               </Link>

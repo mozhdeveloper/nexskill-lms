@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useUser } from '../context/UserContext';
 import GlobalTopBarControls from '../components/system/GlobalTopBarControls';
 import BrandLogo from '../components/brand/BrandLogo';
 import { LogOut } from 'lucide-react';
@@ -12,11 +13,11 @@ interface SubCoachAppLayoutProps {
 const SubCoachAppLayout: React.FC<SubCoachAppLayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { signOut } = useAuth();
+  const { profile: currentUser } = useUser();
 
-  const handleLogout = () => {
-    localStorage.removeItem('authToken');
-    sessionStorage.clear();
+  const handleLogout = async () => {
+    await signOut();
     navigate('/login');
   };
 
@@ -35,7 +36,7 @@ const SubCoachAppLayout: React.FC<SubCoachAppLayoutProps> = ({ children }) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#E7F0FF] via-[#F9F0FF] to-[#E3F4FF] p-8 transition-colors">
-      <div className="max-w-[1440px] mx-auto bg-white rounded-[32px] shadow-card overflow-hidden flex transition-colors" style={{ minHeight: 'calc(100vh - 64px)' }}>
+      <div className="mx-auto bg-white rounded-[32px] shadow-card overflow-hidden flex transition-colors" style={{ minHeight: 'calc(100vh - 64px)' }}>
         {/* Left Sidebar */}
         <aside className="w-[240px] flex-shrink-0 flex flex-col p-6 border-r border-[#EDF0FB]">
           {/* Logo */}
@@ -55,11 +56,10 @@ const SubCoachAppLayout: React.FC<SubCoachAppLayoutProps> = ({ children }) => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                  isActive(item.path)
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive(item.path)
                     ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-medium shadow-md'
                     : 'text-text-secondary hover:bg-teal-50 hover:text-teal-700'
-                }`}
+                  }`}
               >
                 <span className="text-sm">{item.label}</span>
               </Link>
@@ -96,7 +96,7 @@ const SubCoachAppLayout: React.FC<SubCoachAppLayoutProps> = ({ children }) => {
           <div className="flex items-center justify-end px-8 pt-6 pb-4 border-b border-[#EDF0FB]">
             <GlobalTopBarControls />
           </div>
-          
+
           <div className="flex-1 overflow-auto">
             {children}
           </div>

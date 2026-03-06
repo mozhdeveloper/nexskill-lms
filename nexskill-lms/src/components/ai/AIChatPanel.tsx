@@ -43,22 +43,22 @@ const AIChatPanel: React.FC = () => {
     const lowerMessage = userMessage.toLowerCase();
 
     if (lowerMessage.includes('quiz')) {
-      return"You've scored an average of 82% on quizzes. Keep up the great work! Need help preparing for your next quiz?";
+      return "You've scored an average of 82% on quizzes. Keep up the great work! Need help preparing for your next quiz?";
     }
     if (lowerMessage.includes('stuck') || lowerMessage.includes('help')) {
-      return"I'm here to help! Can you tell me which lesson or concept you're struggling with? I can explain it in simpler terms.";
+      return "I'm here to help! Can you tell me which lesson or concept you're struggling with? I can explain it in simpler terms.";
     }
     if (lowerMessage.includes('schedule') || lowerMessage.includes('time')) {
-      return"Based on your pattern, you're most active on Wednesdays. I recommend scheduling 30-minute blocks at 7 PM for best retention.";
+      return "Based on your pattern, you're most active on Wednesdays. I recommend scheduling 30-minute blocks at 7 PM for best retention.";
     }
     if (lowerMessage.includes('recommend') || lowerMessage.includes('next course')) {
-      return"Based on your progress in UI Design, I recommend exploring 'Advanced Figma Techniques' or 'Design Systems Fundamentals' next. Both align with your learning goals!";
+      return "Based on your progress in UI Design, I recommend exploring 'Advanced Figma Techniques' or 'Design Systems Fundamentals' next. Both align with your learning goals!";
     }
     if (lowerMessage.includes('motivation') || lowerMessage.includes('tired')) {
-      return"Remember why you started! You've already completed 35% of your learning path. Small daily progress adds up to big achievements. You've got this! 💪";
+      return "Remember why you started! You've already completed 35% of your learning path. Small daily progress adds up to big achievements. You've got this! 💪";
     }
 
-    return"Great question! I can help you with course recommendations, study schedules, quiz preparation, or explain difficult concepts. What would you like to focus on?";
+    return "Great question! I can help you with course recommendations, study schedules, quiz preparation, or explain difficult concepts. What would you like to focus on?";
   };
 
   const handleSend = () => {
@@ -115,7 +115,7 @@ const AIChatPanel: React.FC = () => {
       </div>
 
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto mb-4 space-y-4">
+      <div className="flex-1 overflow-y-auto mb-4 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
         {messages.map((message) => (
           <div
             key={message.id}
@@ -126,18 +126,16 @@ const AIChatPanel: React.FC = () => {
                 {message.sender === 'user' ? 'You' : 'AI Coach'}
               </div>
               <div
-                className={`rounded-2xl px-4 py-3 ${
-                  message.sender === 'user'
+                className={`rounded-2xl px-4 py-3 ${message.sender === 'user'
                     ? 'bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white rounded-br-sm'
                     : 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white rounded-bl-sm'
-                }`}
+                  }`}
               >
                 <p className="text-sm leading-relaxed">{message.text}</p>
               </div>
               <div
-                className={`text-xs text-slate-500 dark:text-slate-400 mt-1 px-1 ${
-                  message.sender === 'user' ? 'text-right' : 'text-left'
-                }`}
+                className={`text-xs text-slate-500 dark:text-slate-400 mt-1 px-1 ${message.sender === 'user' ? 'text-right' : 'text-left'
+                  }`}
               >
                 {message.timestamp}
               </div>
@@ -160,11 +158,10 @@ const AIChatPanel: React.FC = () => {
         <button
           onClick={handleSend}
           disabled={!currentInput.trim()}
-          className={`px-6 py-3 rounded-full font-semibold transition-all ${
-            currentInput.trim()
+          className={`px-6 py-3 rounded-full font-semibold transition-all ${currentInput.trim()
               ? 'bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white hover:shadow-lg'
               : 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed'
-          }`}
+            }`}
         >
           Send
         </button>

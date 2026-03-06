@@ -1,63 +1,65 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
-import { useAuth } from '../../context/AuthContext';
-// test changes
+import { useUser } from '../../context/UserContext';
+import EnrolledCoursesOverview from '../../components/student/EnrolledCoursesOverview';
+import ProgressCard from '../../components/student/ProgressCard';
+
 // Dummy data
 const courses = [
-  { 
-    id: 1, 
-    title: 'UI Design Fundamentals', 
-    level: 'Beginner', 
-    progress: 67, 
-    completed: 8, 
+  {
+    id: 1,
+    title: 'UI Design Fundamentals',
+    level: 'Beginner',
+    progress: 67,
+    completed: 8,
     total: 12,
     gradient: 'from-blue-100 to-purple-100'
   },
-  { 
-    id: 2, 
-    title: 'Advanced React Patterns', 
-    level: 'Intermediate', 
-    progress: 45, 
-    completed: 9, 
+  {
+    id: 2,
+    title: 'Advanced React Patterns',
+    level: 'Intermediate',
+    progress: 45,
+    completed: 9,
     total: 20,
     gradient: 'from-purple-100 to-pink-100'
   },
-  { 
-    id: 3, 
-    title: 'Figma Mastery', 
-    level: 'Beginner', 
-    progress: 30, 
-    completed: 6, 
+  {
+    id: 3,
+    title: 'Figma Mastery',
+    level: 'Beginner',
+    progress: 30,
+    completed: 6,
     total: 20,
     gradient: 'from-pink-100 to-orange-100'
   }
 ];
 
 const liveClasses = [
-  { 
-    id: 1, 
-    date: 'Today, 2:00 PM', 
-    title: 'Introduction to Design Systems', 
-    instructor: 'Sarah Johnson' 
+  {
+    id: 1,
+    date: 'Today, 2:00 PM',
+    title: 'Introduction to Design Systems',
+    instructor: 'Sarah Johnson'
   },
-  { 
-    id: 2, 
-    date: 'Tomorrow, 10:00 AM', 
-    title: 'React Performance Optimization', 
-    instructor: 'Mike Chen' 
+  {
+    id: 2,
+    date: 'Tomorrow, 10:00 AM',
+    title: 'React Performance Optimization',
+    instructor: 'Mike Chen'
   },
-  { 
-    id: 3, 
-    date: 'Dec 6, 3:00 PM', 
-    title: 'Typography Best Practices', 
-    instructor: 'Emma Wilson' 
+  {
+    id: 3,
+    date: 'Dec 6, 3:00 PM',
+    title: 'Typography Best Practices',
+    instructor: 'Emma Wilson'
   }
 ];
 
 const StudentDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { profile: currentUser } = useUser();
   const [showAICoach, setShowAICoach] = useState(true);
   const [timeFilter] = useState('This week');
 
@@ -72,24 +74,24 @@ const StudentDashboard: React.FC = () => {
   return (
     <StudentAppLayout>
       {/* Header */}
-      <div className="px-8 py-6 border-b border-[#EDF0FB] dark:border-gray-700">
+      <div className="px-8 py-6 border-b border-gray-100 dark:border-gray-800">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-text-primary dark:text-dark-text-primary mb-1">
+            <h1 className="text-2xl font-bold text-text-primary mb-1">
               {getGreeting()}, {currentUser?.firstName || 'Student'} 👋
             </h1>
-            <p className="text-sm text-text-secondary dark:text-dark-text-secondary">
+            <p className="text-sm text-text-secondary">
               Keep learning, you're doing great!
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <div className="px-4 py-2 bg-[#F5F7FF] dark:bg-gray-800 rounded-full">
-              <span className="text-xs font-medium text-text-primary dark:text-dark-text-primary">
+            <div className="px-4 py-2 bg-brand-primary/5 dark:bg-gray-800/50 rounded-full">
+              <span className="text-xs font-medium text-text-primary">
                 🔥 Streak: <span className="text-brand-primary">5 days</span>
               </span>
             </div>
-            <div className="px-4 py-2 bg-[#F5F7FF] dark:bg-gray-800 rounded-full">
-              <span className="text-xs font-medium text-text-primary dark:text-dark-text-primary">
+            <div className="px-4 py-2 bg-brand-primary/5 dark:bg-gray-800/50 rounded-full">
+              <span className="text-xs font-medium text-text-primary">
                 📊 Level: <span className="text-brand-primary">Intermediate</span>
               </span>
             </div>
@@ -103,72 +105,20 @@ const StudentDashboard: React.FC = () => {
           {/* Top Row: Progress Summary + AI Coach + Certificates */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Progress Summary Card */}
-            <div className="lg:col-span-1 bg-white dark:bg-dark-background-card rounded-3xl shadow-card dark:bg-dark-background-card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-text-secondary dark:text-dark-text-secondary">Progress</h3>
-                <button 
-                  onClick={() => alert('📅 Time Filter Options\n\nView your activity for:\n\u2022 Last 7 days\n\u2022 Last 30 days\n\u2022 Last 90 days\n\u2022 All time')}
-                  className="px-3 py-1 bg-[#F5F7FF] dark:bg-gray-800 rounded-full text-xs font-medium text-text-secondary flex items-center gap-1"
-                >
-                  {timeFilter}
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Circular Progress */}
-              <div className="relative w-32 h-32 mx-auto mb-6">
-                <svg className="transform -rotate-90 w-32 h-32">
-                  <circle
-                    cx="64"
-                    cy="64"
-                    r="56"
-                    stroke="#EDF0FB"
-                    strokeWidth="12"
-                    fill="none"
-                  />
-                  <circle
-                    cx="64"
-                    cy="64"
-                    r="56"
-                    stroke="url(#gradient)"
-                    strokeWidth="12"
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeDasharray={`${45 * 3.52} ${100 * 3.52}`}
-                  />
-                  <defs>
-                    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#304DB5" />
-                      <stop offset="100%" stopColor="#5E7BFF" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center">
-                    <p className="text-3xl font-bold text-text-primary dark:text-dark-text-primary">45%</p>
-                    <p className="text-xs text-text-muted dark:text-dark-text-muted">Complete</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Stats */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-text-secondary dark:text-dark-text-secondary">Hours learned</span>
-                  <span className="text-sm font-semibold text-text-primary dark:text-dark-text-primary">6.5h</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-text-secondary dark:text-dark-text-secondary">Lessons completed</span>
-                  <span className="text-sm font-semibold text-text-primary dark:text-dark-text-primary">12 / 20</span>
-                </div>
-              </div>
+            <div className="lg:col-span-1">
+              <ProgressCard
+                progressPercentage={45}
+                hoursLearned={6.5}
+                lessonsCompleted={12}
+                totalLessons={20}
+                timeFilter={timeFilter}
+                onFilterChange={() => alert('Filter clicked')}
+              />
             </div>
 
             {/* AI Coach Message Card */}
             {showAICoach && (
-              <div className="lg:col-span-2 bg-gradient-to-br from-[#E8EEFF] to-[#F5E8FF] rounded-3xl shadow-card dark:bg-dark-background-card p-6 relative">
+              <div className="lg:col-span-2 bg-gradient-to-br from-brand-primary/5 to-purple-500/5 rounded-3xl shadow-sm border border-brand-primary/10 p-6 relative">
                 <button
                   onClick={() => setShowAICoach(false)}
                   className="absolute top-4 right-4 w-6 h-6 rounded-full bg-white/50 hover:bg-white/80 flex items-center justify-center transition-colors"
@@ -179,20 +129,20 @@ const StudentDashboard: React.FC = () => {
                 </button>
 
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-brand-primary to-brand-primary-light flex items-center justify-center text-2xl flex-shrink-0">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-brand-neon to-brand-electric flex items-center justify-center text-2xl flex-shrink-0 text-white shadow-lg shadow-brand-primary/20">
                     🤖
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary mb-2">
+                    <h3 className="text-lg font-semibold text-text-primary mb-2">
                       Today's AI coach insight
                     </h3>
-                    <p className="text-sm text-text-secondary dark:text-dark-text-secondary mb-4">
-                      You're 3 lessons away from completing <span className="font-medium text-text-primary dark:text-dark-text-primary">'UI Design Basics'</span>. 
+                    <p className="text-sm text-text-secondary mb-4">
+                      You're 3 lessons away from completing <span className="font-medium text-text-primary">'UI Design Basics'</span>.
                       Keep up the momentum! Based on your learning pace, you can finish this course by this weekend.
                     </p>
-                    <button 
+                    <button
                       onClick={() => navigate('/student/courses/1/lessons/9')}
-                      className="px-5 py-2 bg-gradient-to-r from-brand-primary to-brand-primary-light text-white text-sm font-medium rounded-full shadow-button-primary hover:shadow-lg hover:scale-[1.02] transition-all"
+                      className="px-5 py-2 bg-gradient-to-r from-brand-neon to-brand-electric text-white text-sm font-medium rounded-full shadow-lg shadow-brand-primary/30 hover:shadow-xl hover:scale-[1.02] transition-all"
                     >
                       Start next lesson
                     </button>
@@ -203,10 +153,10 @@ const StudentDashboard: React.FC = () => {
 
             {/* Certificates KPI Card */}
             {!showAICoach && (
-              <div className="lg:col-span-1 bg-white dark:bg-dark-background-card rounded-2xl shadow-card dark:bg-dark-background-card p-6">
-                <p className="text-sm text-text-secondary dark:text-dark-text-secondary mb-2">Certificates earned</p>
-                <p className="text-4xl font-bold text-text-primary dark:text-dark-text-primary mb-3">4</p>
-                <Link to="/student/certificates" className="text-sm text-brand-primary font-medium hover:text-brand-primary-light transition-colors">
+              <div className="lg:col-span-1 glass-card rounded-2xl p-6">
+                <p className="text-sm text-text-secondary mb-2">Certificates earned</p>
+                <p className="text-4xl font-bold text-text-primary mb-3">4</p>
+                <Link to="/student/certificates" className="text-sm text-brand-primary font-medium hover:text-brand-electric transition-colors">
                   View certificates →
                 </Link>
               </div>
@@ -227,7 +177,18 @@ const StudentDashboard: React.FC = () => {
           {/* Recommended Courses Section */}
           <div>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-text-primary dark:text-dark-text-primary">Recommended courses for you</h2>
+              <h2 className="text-xl font-bold text-text-primary dark:text-dark-text-primary">Your courses</h2>
+              <Link to="/student/courses" className="text-sm font-medium text-brand-primary hover:text-brand-primary-light transition-colors">
+                View all →
+              </Link>
+            </div>
+            <EnrolledCoursesOverview maxCourses={5} />
+          </div>
+
+          {/* Recommended Courses Section */}
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-text-primary dark:text-dark-text-primary">Recommended for you</h2>
               <Link to="/student/courses" className="text-sm font-medium text-brand-primary hover:text-brand-primary-light transition-colors">
                 View all →
               </Link>
@@ -262,7 +223,7 @@ const StudentDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  <button 
+                  <button
                     onClick={() => navigate(`/student/courses/${course.id}`)}
                     className="w-full py-2 px-4 bg-white hover:bg-gray-50 text-brand-primary text-sm font-medium rounded-full transition-colors"
                   >
@@ -284,9 +245,8 @@ const StudentDashboard: React.FC = () => {
                 {liveClasses.map((liveClass, index) => (
                   <div
                     key={liveClass.id}
-                    className={`flex items-center justify-between py-4 ${
-                      index !== liveClasses.length - 1 ? 'border-b border-[#EDF0FB] dark:border-gray-700' : ''
-                    }`}
+                    className={`flex items-center justify-between py-4 ${index !== liveClasses.length - 1 ? 'border-b border-[#EDF0FB] dark:border-gray-700' : ''
+                      }`}
                   >
                     <div className="flex-1">
                       <p className="text-xs text-text-muted mb-1">{liveClass.date}</p>
@@ -297,7 +257,7 @@ const StudentDashboard: React.FC = () => {
                         with {liveClass.instructor}
                       </p>
                     </div>
-                    <button 
+                    <button
                       onClick={() => navigate(`/student/live-class/${liveClass.id}`)}
                       className="px-5 py-2 bg-gradient-to-r from-brand-primary to-brand-primary-light text-white text-sm font-medium rounded-full hover:shadow-lg hover:scale-[1.02] transition-all"
                     >

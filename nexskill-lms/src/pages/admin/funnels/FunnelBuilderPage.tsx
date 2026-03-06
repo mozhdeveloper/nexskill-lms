@@ -128,14 +128,14 @@ const FunnelBuilderPage: React.FC = () => {
   const handleRemoveStep = (stepId: string) => {
     // Remove step
     setSteps(steps.filter((s) => s.id !== stepId));
-    
+
     // Remove connections involving this step
     setConnections(
       connections.filter(
         (c) => c.fromStepId !== stepId && c.toStepId !== stepId
       )
     );
-    
+
     // Clear selection if deleted step was selected
     if (selectedStepId === stepId) {
       setSelectedStepId(null);
@@ -168,7 +168,7 @@ const FunnelBuilderPage: React.FC = () => {
 
   return (
     <AdminAppLayout>
-      <div className="max-w-7xl mx-auto px-8 py-6 space-y-6">
+      <div className="m-5 px-8 py-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           {/* Left: Funnel Name & Status */}

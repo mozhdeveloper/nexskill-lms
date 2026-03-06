@@ -44,69 +44,74 @@ const AIRevisionTasks: React.FC = () => {
   const completedCount = tasks.filter((t) => t.completed).length;
 
   return (
-    <div className="bg-white rounded-2xl shadow-md p-5">
+    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-5 transition-colors max-h-[300px] flex flex-col">
       {/* Header */}
-      <div className="mb-4">
-        <h3 className="text-lg font-bold text-slate-900 mb-1">Revision tasks</h3>
-        <p className="text-sm text-slate-600">Smart to-do list for your next study block</p>
-      </div>
-
-      {/* Progress indicator */}
-      {completedCount > 0 && (
-        <div className="mb-4 p-3 bg-green-50 rounded-xl border border-green-200">
-          <div className="flex items-center gap-2">
-            <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                clipRule="evenodd"
-              />
-            </svg>
-            <span className="text-sm font-medium text-green-700">
-              {completedCount} of {tasks.length} tasks completed
-            </span>
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">Revision tasks</h3>
+          <p className="text-sm text-slate-600 dark:text-slate-400">Smart to-do list for your next study block</p>
+        </div>
+        {/* Circular Progress */}
+        <div className="relative w-12 h-12 flex-shrink-0">
+          <svg className="w-full h-full transform -rotate-90">
+            <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="4" fill="none" className="text-slate-100 dark:text-slate-700" />
+            <circle
+              cx="24"
+              cy="24"
+              r="20"
+              stroke="currentColor"
+              strokeWidth="4"
+              fill="none"
+              strokeDasharray={125.6}
+              strokeDashoffset={125.6 - (125.6 * completedCount) / tasks.length}
+              className="text-[#304DB5] transition-all duration-1000 ease-out"
+              strokeLinecap="round"
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-[#304DB5]">
+            {Math.round((completedCount / tasks.length) * 100)}%
           </div>
         </div>
-      )}
+      </div>
 
       {/* Tasks list */}
-      <div className="space-y-2 mb-4">
+      <div className="space-y-3 mb-4 flex-1 overflow-y-auto">
         {tasks.map((task) => (
           <div
             key={task.id}
-            className={`flex items-start gap-3 p-3 rounded-xl border-2 transition-all ${
-              task.completed
-                ? 'bg-slate-50 border-slate-200'
-                : 'bg-white border-slate-200 hover:border-[#304DB5] hover:bg-blue-50'
-            }`}
+            className={`group flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer ${task.completed
+              ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50'
+              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-[#304DB5] hover:shadow-md'
+              }`}
+            onClick={() => handleToggleTask(task.id)}
           >
-            <input
-              type="checkbox"
-              checked={task.completed}
-              onChange={() => handleToggleTask(task.id)}
-              className="mt-0.5 w-5 h-5 text-[#304DB5] rounded focus:ring-[#304DB5] cursor-pointer"
-            />
+            <div className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${task.completed ? 'bg-[#304DB5] border-[#304DB5]' : 'border-slate-300 dark:border-slate-500 group-hover:border-[#304DB5]'
+              }`}>
+              {task.completed && (
+                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </div>
+
             <div className="flex-1 min-w-0">
               <p
-                className={`text-sm font-medium mb-1 ${
-                  task.completed ? 'text-slate-400 line-through' : 'text-slate-900'
-                }`}
+                className={`text-sm font-medium mb-1 transition-colors ${task.completed ? 'text-slate-400 line-through' : 'text-slate-900 dark:text-white'
+                  }`}
               >
                 {task.title}
               </p>
-              <div className="flex items-center gap-3 text-xs text-slate-500">
-                <span className="flex items-center gap-1">
+              <div className="flex items-center gap-3 text-xs">
+                <span className={`flex items-center gap-1 ${task.completed ? 'text-slate-400' : 'text-slate-500 dark:text-slate-400'}`}>
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   {task.duration}
                 </span>
-                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">
+                <span className={`px-2 py-0.5 rounded-full font-medium ${task.completed
+                  ? 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+                  : 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                  }`}>
                   {task.course}
                 </span>
               </div>
@@ -118,9 +123,9 @@ const AIRevisionTasks: React.FC = () => {
       {/* Footer */}
       <button
         onClick={handleRegenerate}
-        className="w-full py-2.5 rounded-full font-medium text-[#304DB5] border-2 border-[#304DB5] hover:bg-blue-50 transition-all flex items-center justify-center gap-2"
+        className="w-full py-2.5 rounded-xl font-medium text-[#304DB5] border border-[#304DB5] hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all flex items-center justify-center gap-2 group"
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"

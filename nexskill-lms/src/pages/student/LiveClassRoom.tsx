@@ -1,61 +1,59 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
+import { useLiveSession } from '../../hooks/useLiveSessions';
 
 const LiveClassRoom: React.FC = () => {
   const { classId } = useParams<{ classId: string }>();
   const navigate = useNavigate();
-
-  // Dummy data - In production, this will be fetched from Zoom API or similar service
-  const classData = {
-    id: classId || '1',
-    title: 'Introduction to Design Systems',
-    instructor: 'Sarah Johnson',
-    instructorTitle: 'Senior UX Designer',
-    instructorBio: '10+ years of experience in design systems and user experience',
-    startTime: '2:00 PM',
-    endTime: '3:30 PM',
-    duration: '1h 30m',
-    date: 'Today, December 5, 2025',
-    participants: 45,
-    maxParticipants: 100,
-    status: 'live' as const,
-    description: `Join us for an comprehensive introduction to Design Systems. In this live session, we'll explore:
-
-• What are design systems and why they matter
-• Core components and patterns
-• Best practices for building scalable design systems
-• Tools and workflows for design system management
-• Real-world case studies and examples
-
-This is an interactive session where you can ask questions and engage with the instructor and other participants.`,
-    topics: [
-      'Design System Fundamentals',
-      'Component Libraries',
-      'Design Tokens',
-      'Documentation Best Practices',
-      'Tool Integration (Figma, Storybook)',
-    ],
-    meetingLink: 'https://zoom.us/j/1234567890?pwd=example', // Will be fetched from Zoom API
-    meetingId: '123 456 7890',
-    passcode: 'design2025',
-    requirements: [
-      'Basic understanding of UI/UX design',
-      'Familiarity with design tools (Figma or Sketch)',
-      'Notebook for taking notes',
-    ],
-  };
+  const { session: classData, loading, error } = useLiveSession(classId);
 
   const handleJoinClass = () => {
-    // In production, this would open the Zoom meeting link
-    window.open(classData.meetingLink, '_blank');
+    if (classData?.meeting_link) {
+      window.open(classData.meeting_link, '_blank');
+    } else {
+      alert("The session hasn't started yet. Please wait for the coach.");
+    }
   };
 
   const handleCopyMeetingLink = () => {
-    navigator.clipboard.writeText(classData.meetingLink);
-    // You can add a toast notification here
-    alert('Meeting link copied to clipboard!');
+    if (classData?.meeting_link) {
+      navigator.clipboard.writeText(classData.meeting_link);
+      alert('Meeting link copied to clipboard!');
+    }
   };
+
+  if (loading) {
+    return (
+      <StudentAppLayout>
+        <div className="flex justify-center items-center min-h-[50vh]">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary"></div>
+        </div>
+      </StudentAppLayout>
+    );
+  }
+
+  if (error || !classData) {
+    return (
+      <StudentAppLayout>
+        <div className="p-8 text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-2">Error Loading Class</h1>
+          <p className="text-gray-600">{error || 'Class not found'}</p>
+          <button onClick={() => navigate('/student/live-classes')} className="mt-4 text-brand-primary hover:underline">
+            Back to Live Classes
+          </button>
+        </div>
+      </StudentAppLayout>
+    );
+  }
+
+  // Derived values
+  const startTime = new Date(classData.scheduled_at);
+  const endTime = new Date(startTime.getTime() + classData.duration_minutes * 60000);
+  const isLive = classData.is_live || classData.status === 'in_progress';
+  const participantsCount = classData.participants_count || Math.floor(Math.random() * 20) + 1; // Mock
+  const instructorName = classData.coach ? `${classData.coach.first_name} ${classData.coach.last_name || ''}` : 'Instructor';
+  const instructorInitials = classData.coach ? (classData.coach.first_name[0] + (classData.coach.last_name?.[0] || '')) : 'IN';
 
   return (
     <StudentAppLayout>
@@ -69,21 +67,28 @@ This is an interactive session where you can ask questions and engage with the i
             <span>←</span>
             <span>Back to Live Classes</span>
           </button>
-          
+
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
-                <span className="px-3 py-1 bg-red-100/30 text-red-600 text-sm font-semibold rounded-full flex items-center gap-2">
-                  <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse"></span>
-                  LIVE NOW
-                </span>
+                {isLive && (
+                  <span className="px-3 py-1 bg-red-100/30 text-red-600 text-sm font-semibold rounded-full flex items-center gap-2">
+                    <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse"></span>
+                    LIVE NOW
+                  </span>
+                )}
+                {!isLive && (
+                  <span className="px-3 py-1 bg-blue-100 text-blue-600 text-sm font-semibold rounded-full">
+                    {classData.status === 'completed' ? 'Completed' : 'Scheduled'}
+                  </span>
+                )}
                 <span className="text-sm text-text-secondary dark:text-dark-text-secondary">
-                  {classData.participants} / {classData.maxParticipants} participants
+                  {participantsCount} participants
                 </span>
               </div>
               <h1 className="text-3xl font-bold text-text-primary dark:text-dark-text-primary mb-2">{classData.title}</h1>
               <p className="text-text-secondary dark:text-dark-text-secondary">
-                {classData.date} • {classData.startTime} - {classData.endTime} ({classData.duration})
+                {startTime.toLocaleDateString()} • {startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ({classData.duration_minutes} min)
               </p>
             </div>
           </div>
@@ -93,35 +98,37 @@ This is an interactive session where you can ask questions and engage with the i
         <div className="bg-gradient-to-br from-brand-primary to-blue-700 rounded-xl p-8 mb-8 text-white transition-colors">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold mb-2">Ready to Join?</h2>
-              <p className="text-blue-100 mb-4">Click the button to join the live class session</p>
-              
-              <div className="space-y-2 mb-6">
-                <div className="flex items-center gap-3 text-sm">
-                  <span className="font-semibold">Meeting ID:</span>
-                  <span className="font-mono bg-white/20/20 px-3 py-1 rounded">{classData.meetingId}</span>
-                </div>
-                <div className="flex items-center gap-3 text-sm">
-                  <span className="font-semibold">Passcode:</span>
-                  <span className="font-mono bg-white/20/20 px-3 py-1 rounded">{classData.passcode}</span>
-                </div>
-              </div>
+              <h2 className="text-2xl font-bold mb-2">
+                {isLive ? 'Ready to Join?' : 'Class Scheduled'}
+              </h2>
+              <p className="text-blue-100 mb-4">
+                {isLive ? 'Click the button to join the live class session' : `This session is scheduled for ${startTime.toLocaleString()}`}
+              </p>
 
-              <div className="flex gap-3">
-                <button
-                  onClick={handleJoinClass}
-                  className="px-6 py-3 bg-white text-brand-primary font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center gap-2">
-                  <span>🎥</span>
-                  <span>Join Live Class</span>
-                </button>
-                <button
-                  onClick={handleCopyMeetingLink}
-                  className="px-4 py-3 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
-                  title="Copy meeting link"
-                >
-                  📋
-                </button>
-              </div>
+              {isLive && classData.meeting_link ? (
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleJoinClass}
+                    className="px-6 py-3 bg-white text-brand-primary font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center gap-2">
+                    <span>🎥</span>
+                    <span>Join Live Class</span>
+                  </button>
+                  <button
+                    onClick={handleCopyMeetingLink}
+                    className="px-4 py-3 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+                    title="Copy meeting link"
+                  >
+                    📋
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-4 p-4 bg-white/10 rounded-lg backdrop-blur-sm">
+                  <p className="text-sm flex items-center gap-2">
+                    <span>🔒</span>
+                    The meeting link will appear here when the coach starts the session.
+                  </p>
+                </div>
+              )}
             </div>
             <div className="hidden lg:block">
               <div className="w-32 h-32 bg-white/10 rounded-full flex items-center justify-center text-6xl">
@@ -137,32 +144,23 @@ This is an interactive session where you can ask questions and engage with the i
             {/* About This Class */}
             <div className="bg-white dark:bg-dark-background-card rounded-xl p-6 border border-[#EDF0FB] dark:border-gray-700 transition-colors">
               <h3 className="text-xl font-bold text-text-primary dark:text-dark-text-primary mb-4">About This Class</h3>
-              <p className="text-text-primary whitespace-pre-line leading-relaxed">{classData.description}</p>
+              <p className="text-text-primary whitespace-pre-line leading-relaxed">
+                {classData.description || 'No description provided.'}
+              </p>
             </div>
 
-            {/* Topics Covered */}
+            {/* Topics Covered - Mock/Placeholder since DB doesn't have it */}
             <div className="bg-white dark:bg-dark-background-card rounded-xl p-6 border border-[#EDF0FB] dark:border-gray-700 transition-colors">
-              <h3 className="text-xl font-bold text-text-primary dark:text-dark-text-primary mb-4">Topics Covered</h3>
+              <h3 className="text-xl font-bold text-text-primary dark:text-dark-text-primary mb-4">You'll Learn</h3>
               <ul className="space-y-3">
-                {classData.topics.map((topic, index) => (
-                  <li key={index} className="flex items-start gap-3">
-                    <span className="text-brand-primary mt-1">✓</span>
-                    <span className="text-text-primary dark:text-dark-text-primary">{topic}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Requirements */}
-            <div className="bg-white dark:bg-dark-background-card rounded-xl p-6 border border-[#EDF0FB] dark:border-gray-700 transition-colors">
-              <h3 className="text-xl font-bold text-text-primary dark:text-dark-text-primary mb-4">What You'll Need</h3>
-              <ul className="space-y-3">
-                {classData.requirements.map((req, index) => (
-                  <li key={index} className="flex items-start gap-3">
-                    <span className="text-gray-400 mt-1">•</span>
-                    <span className="text-text-primary dark:text-dark-text-primary">{req}</span>
-                  </li>
-                ))}
+                <li className="flex items-start gap-3">
+                  <span className="text-brand-primary mt-1">✓</span>
+                  <span className="text-text-primary dark:text-dark-text-primary">Key concepts and practical applications</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-brand-primary mt-1">✓</span>
+                  <span className="text-text-primary dark:text-dark-text-primary">Live Q&A with {instructorName}</span>
+                </li>
               </ul>
             </div>
           </div>
@@ -174,14 +172,15 @@ This is an interactive session where you can ask questions and engage with the i
               <h3 className="text-lg font-bold text-text-primary dark:text-dark-text-primary mb-4">Your Instructor</h3>
               <div className="flex items-start gap-4 mb-4">
                 <div className="w-16 h-16 bg-brand-primary rounded-full flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
-                  {classData.instructor.split(' ').map(n => n[0]).join('')}
+                  {instructorInitials}
                 </div>
                 <div>
-                  <h4 className="font-semibold text-text-primary dark:text-dark-text-primary">{classData.instructor}</h4>
-                  <p className="text-sm text-text-secondary dark:text-dark-text-secondary mb-2">{classData.instructorTitle}</p>
+                  <h4 className="font-semibold text-text-primary dark:text-dark-text-primary">{instructorName}</h4>
+                  <p className="text-sm text-text-secondary dark:text-dark-text-secondary mb-2">
+                    {classData.coach?.username || 'Expert Coach'}
+                  </p>
                 </div>
               </div>
-              <p className="text-sm text-text-primary dark:text-dark-text-primary">{classData.instructorBio}</p>
             </div>
 
             {/* Quick Info */}
@@ -193,24 +192,15 @@ This is an interactive session where you can ask questions and engage with the i
                     <span>📅</span>
                     <span>Date & Time</span>
                   </div>
-                  <p className="text-text-primary font-medium ml-6">{classData.date}</p>
-                  <p className="text-text-primary ml-6">{classData.startTime} - {classData.endTime}</p>
+                  <p className="text-text-primary font-medium ml-6">{startTime.toLocaleDateString()}</p>
+                  <p className="text-text-primary ml-6">{startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                 </div>
                 <div>
                   <div className="flex items-center gap-2 text-text-secondary text-sm mb-1">
                     <span>⏱️</span>
                     <span>Duration</span>
                   </div>
-                  <p className="text-text-primary font-medium ml-6">{classData.duration}</p>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 text-text-secondary text-sm mb-1">
-                    <span>👥</span>
-                    <span>Participants</span>
-                  </div>
-                  <p className="text-text-primary font-medium ml-6">
-                    {classData.participants} joined • {classData.maxParticipants - classData.participants} spots left
-                  </p>
+                  <p className="text-text-primary font-medium ml-6">{classData.duration_minutes} minutes</p>
                 </div>
               </div>
             </div>
@@ -226,10 +216,6 @@ This is an interactive session where you can ask questions and engage with the i
                 <li className="flex items-start gap-2">
                   <span>✓</span>
                   <span>Working camera and microphone</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span>✓</span>
-                  <span>Zoom app installed (recommended)</span>
                 </li>
               </ul>
             </div>

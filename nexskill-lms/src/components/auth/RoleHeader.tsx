@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useUser } from '../../context/UserContext';
 import type { UserRole } from '../../types/roles';
 import { labelByRole, roleIcons, roleColors, allRoles } from '../../types/roles';
 
@@ -9,7 +10,8 @@ import { labelByRole, roleIcons, roleColors, allRoles } from '../../types/roles'
  * Responsive design with mobile/desktop variants
  */
 const RoleHeader: React.FC = () => {
-  const { currentUser, logout, switchRole, getDefaultRoute } = useAuth();
+  const { signOut } = useAuth();
+  const { profile: currentUser, loading, getDefaultRoute, switchRole } = useUser();
   const navigate = useNavigate();
   const [showRoleSwitcher, setShowRoleSwitcher] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -31,7 +33,7 @@ const RoleHeader: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  if (!currentUser) return null;
+  if (loading || !currentUser) return null;
 
   const roleColor = roleColors[currentUser.role];
   const isDevelopment = import.meta.env.DEV;
@@ -43,8 +45,8 @@ const RoleHeader: React.FC = () => {
     navigate(getDefaultRoute());
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await signOut();
     navigate('/login');
   };
 
@@ -117,14 +119,14 @@ const RoleHeader: React.FC = () => {
           {/* Avatar */}
           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#304DB5] to-[#5E7BFF] flex items-center justify-center">
             <span className="text-white text-sm font-semibold">
-              {currentUser.name.charAt(0).toUpperCase()}
+              {currentUser.firstName.charAt(0).toUpperCase()}
             </span>
           </div>
 
           {/* User Name (Desktop) */}
           <div className="hidden lg:block text-left">
             <p className="text-sm font-medium text-[#111827] leading-tight">
-              {currentUser.name}
+              {currentUser.firstName} {currentUser.lastName}
             </p>
             <p className={`text-xs ${roleColor.text} leading-tight md:hidden lg:block`}>
               {labelByRole[currentUser.role]}
@@ -148,7 +150,7 @@ const RoleHeader: React.FC = () => {
           <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-lg border border-[#EDF0FB] py-2 z-50">
             {/* User Info */}
             <div className="px-4 py-3 border-b border-[#EDF0FB]">
-              <p className="text-sm font-medium text-[#111827]">{currentUser.name}</p>
+              <p className="text-sm font-medium text-[#111827]">{currentUser.firstName} {currentUser.lastName}</p>
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-xs">{roleIcons[currentUser.role]}</span>
                 <span className={`text-xs font-medium ${roleColor.text}`}>

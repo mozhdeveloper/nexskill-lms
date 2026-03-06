@@ -3,18 +3,17 @@
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+const supabaseKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY) as string | undefined;
 
 /**
  * Boolean flag indicating whether Supabase is properly configured.
- * Returns true only if both VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
- * are defined and non-empty strings.
+ * Returns true only if both VITE_SUPABASE_URL and a valid key are defined.
  */
 export const isSupabaseConfigured =
   typeof supabaseUrl === 'string' &&
   supabaseUrl.length > 0 &&
-  typeof supabaseAnonKey === 'string' &&
-  supabaseAnonKey.length > 0;
+  typeof supabaseKey === 'string' &&
+  supabaseKey.length > 0;
 
 if (!isSupabaseConfigured) {
   console.warn(
@@ -32,5 +31,5 @@ if (!isSupabaseConfigured) {
  */
 export const supabase = createClient(
   supabaseUrl ?? 'https://placeholder.supabase.co',
-  supabaseAnonKey ?? 'placeholder_anon_key'
+  supabaseKey ?? 'placeholder_anon_key'
 );

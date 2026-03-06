@@ -3,7 +3,7 @@ import React from 'react';
 interface Profile {
   name: string;
   headline: string;
-  level: string;
+  level: string | null;
   memberSince: string;
   streakDays: number;
   avatarUrl?: string;
@@ -27,9 +27,11 @@ const ProfileHeaderCard: React.FC<ProfileHeaderCardProps> = ({ profile, onEditPr
             <h1 className="text-3xl font-bold text-slate-900 mb-2">{profile.name}</h1>
             <p className="text-lg text-slate-600 mb-4">{profile.headline}</p>
             <div className="flex items-center gap-3">
-              <span className="px-4 py-1.5 bg-blue-100 text-[#304DB5] text-sm font-semibold rounded-full">
-                {profile.level}
-              </span>
+              {profile.level && (
+                <span className="px-4 py-1.5 bg-blue-100 text-[#304DB5] text-sm font-semibold rounded-full">
+                  {profile.level}
+                </span>
+              )}
               <span className="text-sm text-slate-600">Member since {profile.memberSince}</span>
             </div>
           </div>

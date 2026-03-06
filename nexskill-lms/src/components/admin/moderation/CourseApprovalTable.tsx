@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 interface Course {
   id: string;
@@ -6,7 +7,7 @@ interface Course {
   instructorName: string;
   instructorEmail: string;
   category: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'changes_requested';
   submittedAt: string;
   qualityScore: number;
   qualityFlags: string[];
@@ -18,6 +19,7 @@ interface CourseApprovalTableProps {
   onSelect: (courseId: string) => void;
   onApprove: (courseId: string) => void;
   onReject: (courseId: string, reason: string) => void;
+  onRequestChanges: (courseId: string, reason: string) => void;
 }
 
 const CourseApprovalTable: React.FC<CourseApprovalTableProps> = ({
@@ -25,8 +27,11 @@ const CourseApprovalTable: React.FC<CourseApprovalTableProps> = ({
   onSelect,
   onApprove,
   onReject,
+  onRequestChanges,
 }) => {
+  const navigate = useNavigate();
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [modalAction, setModalAction] = useState<'reject' | 'request_changes'>('request_changes');
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
 
@@ -78,6 +83,13 @@ const CourseApprovalTable: React.FC<CourseApprovalTableProps> = ({
           text: 'text-[#DC2626]',
           border: 'border-[#FCA5A5]',
         };
+      case 'changes_requested':
+        return {
+          label: 'Changes Req.',
+          bg: 'bg-amber-100',
+          text: 'text-amber-700',
+          border: 'border-amber-200',
+        };
     }
   };
 
@@ -86,15 +98,20 @@ const CourseApprovalTable: React.FC<CourseApprovalTableProps> = ({
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const handleRejectClick = (courseId: string) => {
+  const handleActionClick = (courseId: string, action: 'reject' | 'request_changes') => {
     setSelectedCourseId(courseId);
+    setModalAction(action);
     setRejectionReason('');
     setRejectModalOpen(true);
   };
 
-  const handleRejectSubmit = () => {
+  const handleActionSubmit = () => {
     if (selectedCourseId && rejectionReason.trim()) {
-      onReject(selectedCourseId, rejectionReason);
+      if (modalAction === 'reject') {
+        onReject(selectedCourseId, rejectionReason);
+      } else if (onRequestChanges) {
+        onRequestChanges(selectedCourseId, rejectionReason);
+      }
       setRejectModalOpen(false);
       setSelectedCourseId(null);
       setRejectionReason('');
@@ -223,7 +240,16 @@ const CourseApprovalTable: React.FC<CourseApprovalTableProps> = ({
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleRejectClick(course.id);
+                                handleActionClick(course.id, 'request_changes');
+                              }}
+                              className="px-3 py-1 text-xs font-semibold text-amber-600 hover:bg-amber-50 rounded-full transition-colors"
+                            >
+                              Request Changes
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleActionClick(course.id, 'reject');
                               }}
                               className="px-3 py-1 text-xs font-semibold text-[#DC2626] hover:bg-[#FEE2E2] rounded-full transition-colors"
                             >
@@ -231,6 +257,15 @@ const CourseApprovalTable: React.FC<CourseApprovalTableProps> = ({
                             </button>
                           </>
                         )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/admin/courses/review/${course.id}`);
+                          }}
+                          className="px-3 py-1 text-xs font-semibold text-white bg-[#304DB5] hover:bg-[#263c91] rounded-full transition-colors"
+                        >
+                          Review
+                        </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -301,7 +336,16 @@ const CourseApprovalTable: React.FC<CourseApprovalTableProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleRejectClick(course.id);
+                          handleActionClick(course.id, 'request_changes');
+                        }}
+                        className="flex-1 px-3 py-2 text-sm font-semibold text-amber-600 bg-amber-50 rounded-full"
+                      >
+                        Req. Changes
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleActionClick(course.id, 'reject');
                         }}
                         className="flex-1 px-3 py-2 text-sm font-semibold text-[#DC2626] bg-[#FEE2E2] rounded-full"
                       >
@@ -312,9 +356,18 @@ const CourseApprovalTable: React.FC<CourseApprovalTableProps> = ({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
+                      navigate(`/admin/courses/review/${course.id}`);
+                    }}
+                    className="flex-1 px-3 py-2 text-sm font-semibold text-white bg-[#304DB5] rounded-full"
+                  >
+                    Review
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
                       onSelect(course.id);
                     }}
-                    className="px-3 py-2 text-sm font-semibold text-[#304DB5] bg-[#F5F7FF] rounded-full"
+                    className="flex-1 px-3 py-2 text-sm font-semibold text-[#304DB5] bg-[#F5F7FF] rounded-full"
                   >
                     Details
                   </button>
@@ -334,14 +387,18 @@ const CourseApprovalTable: React.FC<CourseApprovalTableProps> = ({
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
-              <h3 className="text-xl font-bold text-[#111827] mb-4">Reject Course</h3>
+              <h3 className="text-xl font-bold text-[#111827] mb-4">
+                {modalAction === 'reject' ? 'Reject Course' : 'Request Changes'}
+              </h3>
               <p className="text-sm text-[#5F6473] mb-4">
-                Please provide a reason for rejecting this course. This will be visible to the instructor.
+                {modalAction === 'reject'
+                  ? 'Please provide a reason for rejecting this course. This will be visible to the instructor.'
+                  : 'Please provide feedback on what needs to be changed.'}
               </p>
               <textarea
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
-                placeholder="Enter rejection reason..."
+                placeholder={modalAction === 'reject' ? "Enter rejection reason..." : "Enter feedback..."}
                 className="w-full px-4 py-3 rounded-xl border border-[#E5E7EB] focus:ring-2 focus:ring-[#304DB5] focus:border-transparent outline-none resize-none"
                 rows={4}
               />
@@ -353,15 +410,16 @@ const CourseApprovalTable: React.FC<CourseApprovalTableProps> = ({
                   Cancel
                 </button>
                 <button
-                  onClick={handleRejectSubmit}
+                  onClick={handleActionSubmit}
                   disabled={!rejectionReason.trim()}
-                  className={`flex-1 px-4 py-2 font-semibold rounded-full transition-colors ${
-                    rejectionReason.trim()
+                  className={`flex-1 px-4 py-2 font-semibold rounded-full transition-colors ${rejectionReason.trim()
+                    ? modalAction === 'reject'
                       ? 'bg-[#DC2626] text-white hover:bg-[#B91C1C]'
-                      : 'bg-[#E5E7EB] text-[#9CA3B5] cursor-not-allowed'
-                  }`}
+                      : 'bg-amber-500 text-white hover:bg-amber-600'
+                    : 'bg-[#E5E7EB] text-[#9CA3B5] cursor-not-allowed'
+                    }`}
                 >
-                  Reject Course
+                  {modalAction === 'reject' ? 'Reject Course' : 'Request Changes'}
                 </button>
               </div>
             </div>

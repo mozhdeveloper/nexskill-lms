@@ -135,7 +135,7 @@ const CoachProfilePage: React.FC = () => {
 
   return (
     <CoachAppLayout>
-      <div className="max-w-7xl mx-auto p-8">
+      <div className="max-w-1xl mx-auto p-8">
         {/* Page Header */}
         <div className="mb-8">
           <div className="flex justify-between items-center mb-2">
@@ -147,11 +147,10 @@ const CoachProfilePage: React.FC = () => {
               <button
                 onClick={handleSaveAll}
                 disabled={!hasUnsavedChanges}
-                className={`px-6 py-3 font-semibold rounded-full transition-all ${
-                  hasUnsavedChanges
+                className={`px-6 py-3 font-semibold rounded-full transition-all ${hasUnsavedChanges
                     ? 'bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white hover:shadow-lg'
                     : 'bg-[#E5E7EB] text-[#9CA3B5] cursor-not-allowed'
-                }`}
+                  }`}
               >
                 Save Changes
               </button>

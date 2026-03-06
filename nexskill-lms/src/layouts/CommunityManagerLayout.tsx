@@ -11,20 +11,20 @@ const CommunityManagerLayout: React.FC<CommunityManagerLayoutProps> = ({ childre
   const location = useLocation();
 
   const navItems = [
-    { path: '/community/dashboard', label: 'Dashboard'},
-    { path: '/community/overview', label: 'Overview'},
-    { path: '/community/groups', label: 'Groups'},
-    { path: '/community/approvals', label: 'Approvals'},
-    { path: '/community/announcements', label: 'Announcements'},
-    { path: '/community/engagement', label: 'Engagement'},
-    { path: '/community/profile', label: 'Profile'},
+    { path: '/community/dashboard', label: 'Dashboard' },
+    { path: '/community/overview', label: 'Overview' },
+    { path: '/community/groups', label: 'Groups' },
+    { path: '/community/approvals', label: 'Approvals' },
+    { path: '/community/announcements', label: 'Announcements' },
+    { path: '/community/engagement', label: 'Engagement' },
+    { path: '/community/profile', label: 'Profile' },
   ];
 
   const isActive = (path: string) => location.pathname === path;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F0FFF9] via-[#E8FFF5] to-[#D0FFED] p-8">
-      <div className="max-w-[1440px] mx-auto bg-white rounded-[32px] shadow-card overflow-hidden flex" style={{ minHeight: 'calc(100vh - 64px)' }}>
+      <div className="mx-auto bg-white rounded-[32px] shadow-card overflow-hidden flex" style={{ minHeight: 'calc(100vh - 64px)' }}>
         {/* Left Sidebar */}
         <aside className="w-[240px] flex-shrink-0 flex flex-col p-6 border-r border-[#EDF0FB]">
           {/* Logo */}
@@ -44,13 +44,12 @@ const CommunityManagerLayout: React.FC<CommunityManagerLayoutProps> = ({ childre
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                  isActive(item.path)
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive(item.path)
                     ? 'bg-gradient-to-r from-green-500 to-teal-500 text-white font-medium shadow-md'
                     : 'text-text-secondary hover:bg-[#F0FFF9] hover:text-text-primary'
-                }`}
+                  }`}
               >
-                
+
                 <span className="text-sm">{item.label}</span>
               </Link>
             ))}

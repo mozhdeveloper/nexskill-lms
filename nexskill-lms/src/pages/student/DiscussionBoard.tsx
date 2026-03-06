@@ -120,7 +120,7 @@ const DiscussionBoard: React.FC = () => {
   return (
     <StudentAppLayout>
       <div className="min-h-screen bg-gradient-to-br from-[#E7F0FF] via-[#F9F0FF] to-[#E3F4FF] dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 py-8 px-6 transition-colors">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-1xl mx-auto">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Community discussions</h1>
@@ -133,11 +133,10 @@ const DiscussionBoard: React.FC = () => {
               <button
                 key={filter.id}
                 onClick={() => setActiveFilter(filter.id)}
-                className={`px-5 py-2 rounded-full font-medium text-sm transition-all ${
-                  activeFilter === filter.id
-                    ? 'bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white shadow-md'
-                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600'
-                }`}
+                className={`px-5 py-2 rounded-full font-medium text-sm transition-all ${activeFilter === filter.id
+                  ? 'bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white shadow-md'
+                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600'
+                  }`}
               >
                 {filter.label}
               </button>

@@ -27,7 +27,7 @@ interface Filters {
 const FunnelDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  
+
   const [filters, setFilters] = useState<Filters>({
     search: '',
     status: 'all',
@@ -110,7 +110,7 @@ const FunnelDashboardPage: React.FC = () => {
       owner: 'Current Admin',
       lastUpdatedAt: new Date().toISOString(),
     };
-    
+
     setFunnels([newFunnel, ...funnels]);
     setCreateModalOpen(false);
     navigate(`/admin/funnels/${newFunnel.id}`);
@@ -178,7 +178,7 @@ const FunnelDashboardPage: React.FC = () => {
 
   return (
     <AdminAppLayout>
-      <div className="max-w-7xl mx-auto px-8 py-8 space-y-8">
+      <div className="m-5 px-8 py-8 space-y-8">
         {/* Page Header */}
         <div className="mb-6">
           <h1 className="text-4xl font-bold text-[#111827] mb-2">Funnels</h1>

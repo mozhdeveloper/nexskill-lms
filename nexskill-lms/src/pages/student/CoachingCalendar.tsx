@@ -85,7 +85,7 @@ const CoachingCalendar: React.FC = () => {
   return (
     <StudentAppLayout>
       <div className="min-h-screen bg-gradient-to-br from-[#E7F0FF] via-[#F9F0FF] to-[#E3F4FF] pb-16">
-        <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="max-w-1xl px-6 py-8">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-4xl font-bold text-slate-900 mb-3">1:1 Coaching</h1>

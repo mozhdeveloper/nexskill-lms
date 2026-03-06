@@ -51,11 +51,11 @@ const AIPersonalizedStudyPlan: React.FC = () => {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-md p-6">
+    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-6 transition-colors">
       {/* Header */}
       <div className="mb-4">
-        <h3 className="text-lg font-bold text-slate-900 mb-1">Personalized study plan</h3>
-        <p className="text-sm text-slate-600">Based on your goals and recent activity</p>
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">Personalized study plan</h3>
+        <p className="text-sm text-slate-600 dark:text-slate-400">Based on your goals and recent activity</p>
       </div>
 
       {/* Plan overview */}
@@ -69,51 +69,76 @@ const AIPersonalizedStudyPlan: React.FC = () => {
         </div>
       </div>
 
-      {/* Daily plan sections */}
-      <div className="space-y-4 mb-4">
-        {studyPlan.map((dayPlan) => {
+      {/* Daily plan sections with Timeline */}
+      <div className="relative space-y-8 pl-4 mb-6">
+        {/* Timeline Line */}
+        <div className="absolute left-6 top-4 bottom-4 w-0.5 bg-slate-200 dark:bg-slate-700" />
+
+        {studyPlan.map((dayPlan, index) => {
           const isCompleted = completedDays.has(dayPlan.dayId);
+          const isToday = dayPlan.day === 'Today';
+
           return (
-            <div
-              key={dayPlan.dayId}
-              className={`p-4 rounded-xl border-2 transition-all ${
-                isCompleted
-                  ? 'bg-green-50 border-green-200'
-                  : 'bg-white border-slate-200'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <h4 className={`font-semibold ${isCompleted ? 'text-green-700' : 'text-slate-900'}`}>
-                    {dayPlan.day}
-                  </h4>
-                  {isCompleted && (
-                    <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  )}
-                </div>
-                {dayPlan.dayId === 'day1' && !isCompleted && (
-                  <button
-                    onClick={() => handleMarkDayDone(dayPlan.dayId)}
-                    className="text-xs font-medium text-[#304DB5] hover:text-[#5E7BFF] transition-colors"
-                  >
-                    Mark as done
-                  </button>
+            <div key={dayPlan.dayId} className="relative pl-8">
+              {/* Timeline Node */}
+              <div
+                className={`absolute left-0.5 top-5 w-11 h-11 -ml-[22px] rounded-full border-4 border-white dark:border-slate-800 flex items-center justify-center transition-colors ${isCompleted
+                  ? 'bg-green-500 text-white'
+                  : isToday
+                    ? 'bg-[#304DB5] text-white'
+                    : 'bg-slate-200 dark:bg-slate-700 text-slate-500'
+                  }`}
+              >
+                {isCompleted ? (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <span className="text-sm font-bold">{index + 1}</span>
                 )}
               </div>
-              <ul className="space-y-2">
-                {dayPlan.tasks.map((task, index) => (
-                  <li key={index} className="flex items-start gap-2 text-sm">
-                    <span className={`mt-1 ${isCompleted ? 'text-green-600' : 'text-[#304DB5]'}`}>•</span>
-                    <span className={isCompleted ? 'text-green-700' : 'text-slate-700'}>{task}</span>
-                  </li>
-                ))}
-              </ul>
+
+              {/* Card */}
+              <div
+                className={`rounded-2xl transition-all ${isToday
+                  ? 'bg-white dark:bg-slate-800 ring-2 ring-[#304DB5]/20 shadow-lg'
+                  : 'bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700'
+                  }`}
+              >
+                {/* Card Header */}
+                <div className={`px-5 py-4 border-b ${isToday ? 'border-slate-100 dark:border-slate-700' : 'border-transparent'}`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className={`font-bold text-lg ${isToday ? 'text-[#304DB5] dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                        {dayPlan.day}
+                      </h4>
+                      {isToday && <span className="text-xs font-medium text-slate-500">Focus for today</span>}
+                    </div>
+                    {dayPlan.dayId === 'day1' && !isCompleted && (
+                      <button
+                        onClick={() => handleMarkDayDone(dayPlan.dayId)}
+                        className="text-sm font-medium text-[#304DB5] hover:text-[#5E7BFF] transition-colors bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-lg"
+                      >
+                        Mark complete
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Card Body */}
+                <div className="p-5">
+                  <ul className="space-y-3">
+                    {dayPlan.tasks.map((task, idx) => (
+                      <li key={idx} className="flex items-start gap-3 text-sm group">
+                        <div className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors ${isCompleted ? 'bg-green-500' : 'bg-[#304DB5]'}`} />
+                        <span className={`transition-colors ${isCompleted ? 'text-slate-500 line-through' : 'text-slate-700 dark:text-slate-300 group-hover:text-[#304DB5]'}`}>
+                          {task}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
             </div>
           );
         })}

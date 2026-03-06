@@ -5,18 +5,143 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* ============================================
+       BRAND COLORS - Consistent Across All Modes
+       ============================================ */
+    --color-brand-neon: #22c55e;
+    --color-brand-electric: #3b82f6;
+    --color-brand-primary: #304DB5;
+
+    /* ============================================
+       LIGHT MODE - Default
+       ============================================ */
+    /* Backgrounds */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8fafc;
+    --bg-glass: rgba(255, 255, 255, 0.7);
+    --bg-glass-hover: rgba(255, 255, 255, 0.9);
+    --color-bg-app: #ffffff;
+    --color-bg-shell: #f8fafc;
+    --color-bg-card: #ffffff;
+
+    /* Text */
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-on-brand: #ffffff;
+    --text-on-neon: #000000;
+    --color-text-primary: #0f172a;
+    --color-text-secondary: #64748b;
+    --color-text-muted: #94a3b8;
+
+    /* Borders */
+    --border-base: #e2e8f0;
+    --border-glow: rgba(34, 197, 94, 0.5);
+
+    /* Gradients */
+    --gradient-master: linear-gradient(135deg, #22c55e 0%, #3b82f6 100%);
+  }
+
+  .dark {
+    /* ============================================
+       DARK MODE - Premium Neon & Glass Theme
+       ============================================ */
+    /* Backgrounds */
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-glass: rgba(30, 41, 59, 0.7);
+    --bg-glass-hover: rgba(30, 41, 59, 0.9);
+    --color-bg-app: #0f172a;
+    --color-bg-shell: #1e293b;
+    --color-bg-card: #1e293b;
+
+    /* Text */
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-on-brand: #ffffff;
+    --text-on-neon: #000000;
+    --color-text-primary: #f8fafc;
+    --color-text-secondary: #94a3b8;
+    --color-text-muted: #64748b;
+
+    /* Borders */
+    --border-base: rgba(255, 255, 255, 0.1);
+    --border-glow: rgba(34, 197, 94, 0.5);
+  }
+
   * {
     @apply box-border;
   }
-  
+
   body {
-    @apply m-0 font-sans text-text-primary dark:text-dark-text-primary antialiased;
-    @apply bg-white dark:bg-dark-background-shell;
+    @apply m-0 font-sans antialiased;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
     transition: background-color 0.3s ease, color 0.3s ease;
   }
 
-  /* Dark mode transitions for common elements */
   html.dark {
     color-scheme: dark;
+  }
+}
+
+@layer utilities {
+
+  /* ============================================
+     GLASS CARD - Theme-Aware
+     ============================================ */
+  .glass-card {
+    background: var(--bg-glass);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border-base);
+    transition: all 0.3s ease;
+  }
+
+  .glass-card:hover {
+    background: var(--bg-glass-hover);
+    box-shadow: 0 0 20px var(--border-glow);
+    border-color: var(--color-brand-neon);
+  }
+
+  /* ============================================
+     TEXT GRADIENT - Master the Future
+     ============================================ */
+  .text-gradient {
+    background: var(--gradient-master);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ============================================
+     NEON GLOW EFFECTS
+     ============================================ */
+  .glow-neon {
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
+  }
+
+  .glow-electric {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+  }
+
+  /* ============================================
+     GRADIENT ANIMATION
+     ============================================ */
+  @keyframes gradient-x {
+
+    0%,
+    100% {
+      background-position: 0% 50%;
+    }
+
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+
+  .animate-gradient-x {
+    background-size: 200% 200%;
+    animation: gradient-x 4s ease infinite;
   }
 }

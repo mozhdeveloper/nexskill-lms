@@ -1,34 +1,43 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { ReactNode } from 'react';
-import type { UserRole } from '../types/roles';
-import { defaultLandingRouteByRole } from '../types/roles';
-
-/**
- * User object structure
- */
-export interface User {
-  id: string;
-  name: string;
-  firstName: string;
-  role: UserRole;
-}
+import React, { createContext, useContext, useState, useEffect } from "react";
+import type { ReactNode } from "react";
+// import type { UserRole } from "../types/roles";
+// import { defaultLandingRouteByRole } from "../types/roles";
+import { supabase } from "../lib/supabaseClient";
+import type { AuthError, User } from "@supabase/supabase-js";
 
 /**
  * Auth context value shape
  */
 interface AuthContextValue {
-  currentUser: User | null;
-  isAuthenticated: boolean;
-  loginMock: (name: string, role: UserRole) => void;
-  logout: () => void;
-  switchRole: (role: UserRole) => void;
-  getDefaultRoute: () => string;
+    // state
+    user: User | null;
+    loading: boolean;
+    // methods
+    signUp: (
+        email: string,
+        password: string,
+        firstName?: string,
+        lastName?: string,
+        username?: string,
+        role?: string,
+        middleName?: string,
+        nameExtension?: string
+    ) => Promise<{ data: { user: User | null } | null; error: AuthError | null }>;
+    signIn: (
+        email: string,
+        password: string
+    ) => Promise<{ data: { user: User | null; session: unknown | null }; error: AuthError | null }>;
+    signOut: () => Promise<{ error: AuthError | null }>;
+
+    // loginMock: (name: string, role: UserRole) => void;
+    // logout: () => void;
+    // switchRole: (role: UserRole) => void;
 }
 
 /**
  * Local storage key for persisting auth state
  */
-const AUTH_STORAGE_KEY = 'nexskill_mock_auth';
+// const AUTH_STORAGE_KEY = "nexskill_mock_auth";
 
 /**
  * Create the auth context
@@ -39,7 +48,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
  * Auth Provider Props
  */
 interface AuthProviderProps {
-  children: ReactNode;
+    children: ReactNode;
 }
 
 /**
@@ -47,99 +56,140 @@ interface AuthProviderProps {
  * Persists user session to localStorage for cross-tab/reload consistency
  */
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
 
-  // Load persisted auth state on mount
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(AUTH_STORAGE_KEY);
-      if (stored) {
-        const user = JSON.parse(stored) as User;
-        setCurrentUser(user);
-      }
-    } catch (error) {
-      console.error('Failed to load auth state from localStorage:', error);
-      localStorage.removeItem(AUTH_STORAGE_KEY);
-    }
-  }, []);
+    // Load persisted auth state on mount
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setUser(session?.user ?? null);
+            setLoading(false);
+        });
 
-  /**
-   * Mock login - accepts name and role, generates fake user ID
-   * Extracts first name from full display name for personalized greetings
-   */
-  const loginMock = (name: string, role: UserRole) => {
-    const trimmedName = name.trim() || 'Anonymous User';
-    // Extract first name (first word before any space)
-    const firstName = trimmedName.split(' ')[0];
-    
-    const user: User = {
-      id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      name: trimmedName,
-      firstName,
-      role,
+        const {
+            data: { subscription },
+        } = supabase.auth.onAuthStateChange(async (_event, session) => {
+            setUser(session?.user ?? null);
+            setLoading(false);
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
+
+    /**
+     * Mock login - accepts name and role, generates fake user ID
+     * Extracts first name from full display name for personalized greetings
+     * */
+    //   const loginMock = (name: string, role: UserRole) => {
+    //     const trimmedName = name.trim() || 'Anonymous User';
+    //     // Extract first name (first word before any space)
+    //     const firstName = trimmedName.split(' ')[0];
+
+    //     const user: User = {
+    //       id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    //       name: trimmedName,
+    //       firstName,
+    //       role,
+    //     };
+
+    //     setCurrentUser(user);
+
+    //     // Persist to localStorage
+    //     try {
+    //       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+    //     } catch (error) {
+    //       console.error('Failed to persist auth state to localStorage:', error);
+
+    const signIn = async (email: string, password: string) => {
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
+        return { data, error };
     };
 
-    setCurrentUser(user);
-    
-    // Persist to localStorage
-    try {
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
-    } catch (error) {
-      console.error('Failed to persist auth state to localStorage:', error);
-    }
-  };
+    const signUp = async (
+        email: string,
+        password: string,
+        firstName?: string,
+        lastName?: string,
+        username?: string,
+        role?: string,
+        middleName?: string,
+        nameExtension?: string
+    ) => {
+        const metadata = {
+            username: username,
+            first_name: firstName ?? null,
+            last_name: lastName ?? null,
+            middle_name: middleName ?? null,
+            name_extension: nameExtension ?? null,
+            role: role ?? null,
+        };
 
-  /**
-   * Logout - clears user state and localStorage
-   */
-  const logout = () => {
-    setCurrentUser(null);
-    try {
-      localStorage.removeItem(AUTH_STORAGE_KEY);
-    } catch (error) {
-      console.error('Failed to clear auth state from localStorage:', error);
-    }
-  };
+        const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: metadata,
+            },
+        });
 
-  /**
-   * Switch role (dev/testing utility) - keeps same user but changes role
-   */
-  const switchRole = (role: UserRole) => {
-    if (!currentUser) return;
-
-    const updatedUser: User = {
-      ...currentUser,
-      role,
+        return { data, error };
     };
 
-    setCurrentUser(updatedUser);
-    
-    // Persist to localStorage
-    try {
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updatedUser));
-    } catch (error) {
-      console.error('Failed to persist auth state to localStorage:', error);
-    }
-  };
+    /**
+     * Logout - clears user state and localStorage
+     */
+    const signOut = async () => {
+        const { error } = await supabase.auth.signOut();
+        return { error };
+    };
 
-  /**
-   * Get default landing route for current user's role
-   */
-  const getDefaultRoute = (): string => {
-    if (!currentUser) return '/login';
-    return defaultLandingRouteByRole[currentUser.role];
-  };
+    /**
+     * Switch role (dev/testing utility) - keeps same user but changes role
+     */
+    // const switchRole = (role: UserRole) => {
+    //     if (!currentUser) return;
 
-  const value: AuthContextValue = {
-    currentUser,
-    isAuthenticated: !!currentUser,
-    loginMock,
-    logout,
-    switchRole,
-    getDefaultRoute,
-  };
+    //     const updatedUser: User = {
+    //         ...currentUser,
+    //         role,
+    //     };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+    //     setCurrentUser(updatedUser);
+
+    //     // Persist to localStorage
+    //     try {
+    //         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updatedUser));
+    //     } catch (error) {
+    //         console.error(
+    //             "Failed to persist auth state to localStorage:",
+    //             error
+    //         );
+    //     }
+    // };
+
+    /**
+     * Get default landing route for current user's role
+     */
+    // TODO: Move to UserContext
+    // const getDefaultRoute = (): string => {
+    //     if (!currentUser) return "/login";
+    //     return defaultLandingRouteByRole[currentUser.role];
+    // };
+
+    const value: AuthContextValue = {
+        user,
+        loading,
+        signUp,
+        signIn,
+        signOut,
+    };
+
+    return (
+        <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+    );
 };
 
 /**
@@ -147,9 +197,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
  * @throws Error if used outside AuthProvider
  */
 export const useAuth = (): AuthContextValue => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+    const context = useContext(AuthContext);
+    if (context === undefined) {
+        throw new Error("useAuth must be used within an AuthProvider");
+    }
+    return context;
 };

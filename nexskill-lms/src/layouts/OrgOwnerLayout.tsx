@@ -22,7 +22,7 @@ const OrgOwnerLayout: React.FC<OrgOwnerLayoutProps> = ({ children }) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FFF5F0] via-[#FFF0E8] to-[#FFE8D8] p-8">
-      <div className="max-w-[1440px] mx-auto bg-white rounded-[32px] shadow-card overflow-hidden flex" style={{ minHeight: 'calc(100vh - 64px)' }}>
+      <div className="mx-auto bg-white rounded-[32px] shadow-card overflow-hidden flex" style={{ minHeight: 'calc(100vh - 64px)' }}>
         {/* Left Sidebar */}
         <aside className="w-[240px] flex-shrink-0 flex flex-col p-6 border-r border-[#EDF0FB]">
           {/* Logo */}
@@ -48,11 +48,10 @@ const OrgOwnerLayout: React.FC<OrgOwnerLayoutProps> = ({ children }) => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                  isActive(item.path)
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive(item.path)
                     ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white font-medium shadow-md'
                     : 'text-text-secondary hover:bg-[#FFF5F0] hover:text-text-primary'
-                }`}
+                  }`}
               >
                 <span className="text-sm">{item.label}</span>
               </Link>
@@ -94,7 +93,7 @@ const OrgOwnerLayout: React.FC<OrgOwnerLayoutProps> = ({ children }) => {
           <div className="flex items-center justify-end px-8 pt-6 pb-4 border-b border-[#EDF0FB]">
             <GlobalTopBarControls />
           </div>
-          
+
           <div className="flex-1 overflow-auto">
             {children}
           </div>

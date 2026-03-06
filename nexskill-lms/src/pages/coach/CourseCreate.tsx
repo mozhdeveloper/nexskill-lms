@@ -1,32 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CoachAppLayout from '../../layouts/CoachAppLayout';
+import { supabase } from '../../lib/supabaseClient';
+import { useUser } from '../../context/UserContext';
 
 const CourseCreate: React.FC = () => {
   const navigate = useNavigate();
+  const { profile } = useUser();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [categories, setCategories] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     title: '',
-    category: '',
+    category_id: '',
     language: 'English',
-    level: 'beginner',
+    level: 'Beginner',
   });
 
-  const categories = [
-    'Web Development',
-    'Mobile Development',
-    'Data Science',
-    'Design',
-    'Business',
-    'Marketing',
-    'Photography',
-    'Music',
-    'Other',
-  ];
+  const fetchCategories = async () => {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('id, name')
+      .order('name');
+
+    if (error) {
+      console.error('Error fetching categories:', error);
+    } else if (data) {
+      setCategories(data);
+    }
+  };
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
 
   const levels = [
-    { value: 'beginner', label: 'Beginner' },
-    { value: 'intermediate', label: 'Intermediate' },
-    { value: 'advanced', label: 'Advanced' },
+    { value: 'Beginner', label: 'Beginner' },
+    { value: 'Intermediate', label: 'Intermediate' },
+    { value: 'Advanced', label: 'Advanced' },
   ];
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -34,13 +44,44 @@ const CourseCreate: React.FC = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Generate dummy courseId
-    const courseId = `course-${Date.now()}`;
-    window.alert(`✅ Course Created Successfully\n\nCourse: ${formData.title}\nCategory: ${formData.category}\nLevel: ${formData.level}\nLanguage: ${formData.language}\n\n📚 Course Setup:\n• Course ID: ${courseId}\n• Status: Draft\n• Visibility: Private\n\n🎯 Next Steps:\n1. Add course description and objectives\n2. Upload course thumbnail\n3. Create curriculum and lessons\n4. Set pricing and enrollment options\n5. Preview and publish\n\n💡 You can save your progress at any time and return later.`);
-    // Navigate to builder with initial data
-    navigate(`/coach/courses/${courseId}/edit`, { state: { newCourse: true, ...formData } });
+    if (!profile) {
+      window.alert('You must be logged in to create a course.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const { data, error } = await supabase
+        .from('courses')
+        .insert([
+          {
+            title: formData.title,
+            category_id: formData.category_id ? parseInt(formData.category_id) : null,
+            level: formData.level,
+            duration_hours: 0, // Default for now, can be updated later
+            price: 0, // Default for now
+            visibility: 'private', // Default to private (Draft)
+            coach_id: profile.id,
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        window.alert(`✅ Course Created Successfully\n\nCourse: ${data.title}`);
+        navigate(`/coach/courses/${data.id}/edit`, { state: { newCourse: true, ...formData } });
+      }
+    } catch (error: any) {
+      console.error('Error creating course:', error);
+      window.alert(`Failed to create course: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleCancel = () => {
@@ -90,21 +131,21 @@ const CourseCreate: React.FC = () => {
 
                 {/* Category */}
                 <div>
-                  <label htmlFor="category" className="block text-sm font-semibold text-slate-700 dark:text-dark-text-primary mb-2">
+                  <label htmlFor="category_id" className="block text-sm font-semibold text-slate-700 dark:text-dark-text-primary mb-2">
                     Category *
                   </label>
                   <select
-                    id="category"
-                    name="category"
-                    value={formData.category}
+                    id="category_id"
+                    name="category_id"
+                    value={formData.category_id}
                     onChange={handleInputChange}
                     className="w-full px-5 py-3 bg-slate-50 dark:bg-gray-800 rounded-xl border border-slate-200 dark:border-gray-700 focus:border-[#304DB5] focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all"
                     required
                   >
                     <option value="">Select a category</option>
                     {categories.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
                       </option>
                     ))}
                   </select>
@@ -168,9 +209,10 @@ const CourseCreate: React.FC = () => {
                 <div className="flex flex-col sm:flex-row gap-3 pt-4">
                   <button
                     type="submit"
-                    className="flex-1 py-3 px-6 bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white font-semibold rounded-full hover:shadow-lg transition-all"
+                    disabled={isSubmitting}
+                    className="flex-1 py-3 px-6 bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white font-semibold rounded-full hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Create course
+                    {isSubmitting ? 'Creating...' : 'Create course'}
                   </button>
                   <button
                     type="button"

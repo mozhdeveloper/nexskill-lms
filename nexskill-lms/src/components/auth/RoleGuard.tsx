@@ -1,9 +1,9 @@
 import React from 'react';
 import type { ReactNode } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
 import type { UserRole } from '../../types/roles';
 import { labelByRole } from '../../types/roles';
+import { useUser } from '../../context/UserContext';
 
 interface RoleGuardProps {
   children: ReactNode;
@@ -19,11 +19,20 @@ interface RoleGuardProps {
  * </RoleGuard>
  */
 const RoleGuard: React.FC<RoleGuardProps> = ({ children, allowedRoles }) => {
-  const { currentUser, isAuthenticated, getDefaultRoute } = useAuth();
+  const { profile: currentUser, loading, getDefaultRoute } = useUser();
   const navigate = useNavigate();
 
+  // Show loading state while fetching profile
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#E7F0FF] via-[#F9F0FF] to-[#E3F4FF]">
+        <div className="w-12 h-12 border-4 border-[#304DB5] border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   // Not authenticated - redirect to login
-  if (!isAuthenticated || !currentUser) {
+  if (!currentUser) {
     return <Navigate to="/login" replace />;
   }
 

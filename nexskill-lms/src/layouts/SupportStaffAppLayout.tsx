@@ -32,7 +32,7 @@ const SupportStaffAppLayout: React.FC<SupportStaffAppLayoutProps> = ({ children 
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#EFF6FF] via-[#E0F2FE] to-[#DBEAFE] p-8 transition-colors">
-      <div className="max-w-[1440px] mx-auto bg-white rounded-[32px] shadow-card overflow-hidden flex transition-colors" style={{ minHeight: 'calc(100vh - 64px)' }}>
+      <div className="mx-auto bg-white rounded-[32px] shadow-card overflow-hidden flex transition-colors" style={{ minHeight: 'calc(100vh - 64px)' }}>
         {/* Left Sidebar */}
         <aside className="w-[240px] flex-shrink-0 flex flex-col p-6 border-r border-[#EDF0FB]">
           {/* Logo */}
@@ -52,11 +52,10 @@ const SupportStaffAppLayout: React.FC<SupportStaffAppLayoutProps> = ({ children 
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                  isActive(item.path)
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive(item.path)
                     ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md'
                     : 'text-text-secondary hover:bg-[#EFF6FF] hover:text-text-primary'
-                }`}
+                  }`}
               >
                 <span className="text-sm font-medium">{item.label}</span>
               </Link>

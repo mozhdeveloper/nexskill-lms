@@ -1,6 +1,7 @@
 import React, { type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useUser } from '../context/UserContext';
 import GlobalTopBarControls from '../components/system/GlobalTopBarControls';
 import BrandLogo from '../components/brand/BrandLogo';
 import { LogOut } from 'lucide-react';
@@ -12,28 +13,28 @@ interface PlatformOwnerAppLayoutProps {
 const PlatformOwnerAppLayout: React.FC<PlatformOwnerAppLayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { signOut } = useAuth();
+  const { profile: currentUser } = useUser();
 
-  const handleLogout = () => {
-    localStorage.removeItem('authToken');
-    sessionStorage.clear();
+  const handleLogout = async () => {
+    await signOut();
     navigate('/login');
   };
 
   const navItems = [
-    { label: 'Dashboard', path: '/owner/dashboard'},
-    { label: 'Users & Roles', path: '/owner/users'},
-    { label: 'Billing & Payouts', path: '/owner/billing'},
-    { label: 'Security & Compliance', path: '/owner/security'},
-    { label: 'System Settings', path: '/owner/settings'},
-    { label: 'AI Governance', path: '/owner/ai-governance'},
+    { label: 'Dashboard', path: '/owner/dashboard' },
+    { label: 'Users & Roles', path: '/owner/users' },
+    { label: 'Billing & Payouts', path: '/owner/billing' },
+    { label: 'Security & Compliance', path: '/owner/security' },
+    { label: 'System Settings', path: '/owner/settings' },
+    { label: 'AI Governance', path: '/owner/ai-governance' },
   ];
 
   const isActive = (path: string) => location.pathname === path;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#E7F0FF] via-[#F9F0FF] to-[#E3F4FF] p-8 transition-colors">
-      <div className="max-w-[1440px] mx-auto bg-white rounded-[32px] shadow-card overflow-hidden flex transition-colors" style={{ minHeight: 'calc(100vh - 64px)' }}>
+      <div className="mx-auto bg-white rounded-[32px] shadow-card overflow-hidden flex transition-colors" style={{ minHeight: 'calc(100vh - 64px)' }}>
         {/* Left Sidebar */}
         <aside className="w-[240px] flex-shrink-0 flex flex-col p-6 border-r border-[#EDF0FB]">
           {/* Logo */}
@@ -53,11 +54,10 @@ const PlatformOwnerAppLayout: React.FC<PlatformOwnerAppLayoutProps> = ({ childre
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                  isActive(item.path)
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive(item.path)
                     ? 'bg-purple-50/30 text-purple-700 font-medium'
                     : 'text-text-secondary hover:bg-[#F5F7FF] hover:text-brand-primary'
-                }`}
+                  }`}
               >
                 <span className="text-sm">{item.label}</span>
               </Link>
@@ -94,7 +94,7 @@ const PlatformOwnerAppLayout: React.FC<PlatformOwnerAppLayoutProps> = ({ childre
           <div className="flex items-center justify-end px-8 pt-6 pb-4 border-b border-[#EDF0FB]">
             <GlobalTopBarControls />
           </div>
-          
+
           <div className="flex-1 overflow-auto">
             {children}
           </div>

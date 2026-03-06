@@ -219,7 +219,7 @@ const ContactsPage: React.FC = () => {
 
   return (
     <AdminAppLayout>
-      <div className="max-w-7xl mx-auto px-8 py-8 space-y-8">
+      <div className="m-5 px-8 py-8 space-y-8">
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold text-[#111827] mb-2">Contacts</h1>
