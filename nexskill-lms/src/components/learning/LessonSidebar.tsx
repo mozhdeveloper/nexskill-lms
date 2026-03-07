@@ -15,13 +15,14 @@ interface Lesson {
 }
 
 interface LessonSidebarProps {
-  modules: Module[];
+  modules?: Module[];
+  courseId?: string; // accepted for future DB integration
   activeLessonId: string;
   onSelectLesson: (lessonId: string) => void;
 }
 
 const LessonSidebar: React.FC<LessonSidebarProps> = ({
-  modules,
+  modules = [],
   activeLessonId,
   onSelectLesson,
 }) => {

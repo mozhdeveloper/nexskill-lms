@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import GlobalTopBarControls from '../components/system/GlobalTopBarControls';
 import BrandLogo from '../components/brand/BrandLogo';
-import { LogOut } from 'lucide-react';
+import { LogOut, Menu, X } from 'lucide-react';
 
 interface ContentEditorAppLayoutProps {
   children: React.ReactNode;
@@ -11,6 +11,7 @@ interface ContentEditorAppLayoutProps {
 const ContentEditorAppLayout: React.FC<ContentEditorAppLayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = () => {
     localStorage.removeItem('authToken');
@@ -19,87 +20,93 @@ const ContentEditorAppLayout: React.FC<ContentEditorAppLayoutProps> = ({ childre
   };
 
   const navItems = [
-    { path: '/content/dashboard', label: 'Dashboard', icon: '📊' },
-    { path: '/content/courses', label: 'Courses', icon: '📚' },
-    { path: '/content/lessons', label: 'Lessons', icon: '📝' },
-    { path: '/content/media-library', label: 'Media Library', icon: '🎬' },
-    { path: '/content/resources', label: 'Resources', icon: '📁' },
-    { path: '/content/review-queue', label: 'Review Queue', icon: '✓' },
-    { path: '/content/templates', label: 'Templates', icon: '📋' },
-    { path: '/content/settings', label: 'Settings', icon: '⚙️' },
+    { path: '/content/dashboard', label: 'Dashboard' },
+    { path: '/content/courses', label: 'Courses' },
+    { path: '/content/lessons', label: 'Lessons' },
+    { path: '/content/media-library', label: 'Media Library' },
+    { path: '/content/resources', label: 'Resources' },
+    { path: '/content/review-queue', label: 'Review Queue' },
+    { path: '/content/templates', label: 'Templates' },
+    { path: '/content/settings', label: 'Settings' },
   ];
 
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#FFF9F0] via-[#FFF5E8] to-[#FFE8D0] p-8">
-      <div className="mx-auto bg-white rounded-[32px] shadow-card overflow-hidden flex" style={{ minHeight: 'calc(100vh - 64px)' }}>
-        {/* Left Sidebar */}
-        <aside className="w-[240px] flex-shrink-0 flex flex-col p-6 border-r border-[#EDF0FB]">
-          {/* Logo */}
-          <div className="mb-8">
+    <div className="h-screen flex bg-[color:var(--bg-primary)] transition-colors overflow-hidden">
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      <aside
+        className={`fixed lg:static inset-y-0 left-0 z-50 w-[260px] flex-shrink-0 flex flex-col bg-[color:var(--color-bg-sidebar)] border-r border-[color:var(--border-base)] transform transition-transform duration-200 lg:translate-x-0 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="p-6 pb-2">
+          <div className="flex items-center justify-between">
             <Link to="/content/dashboard" className="flex items-center gap-3">
               <BrandLogo size="md" showText={false} />
               <div>
-                <span className="text-xl font-bold text-amber-600 block leading-tight">NexSkill</span>
-                <span className="text-xs text-slate-600">Content Editor</span>
+                <span className="text-xl font-bold text-gradient block leading-tight">NexSkill</span>
+                <span className="text-xs text-[color:var(--text-secondary)]">Content Editor</span>
               </div>
             </Link>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 space-y-2">
-            {navItems.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive(item.path)
-                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md'
-                    : 'text-text-secondary hover:bg-[#FFF9F0] hover:text-text-primary'
-                  }`}
-              >
-                <span className="text-sm font-medium">{item.label}</span>
-              </Link>
-            ))}
-          </nav>
-
-          {/* Quick Actions */}
-          <div className="mt-6 p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-100">
-            <p className="text-xs font-semibold text-amber-800 mb-2">Quick Actions</p>
-            <div className="space-y-2">
-              <button className="w-full px-3 py-2 bg-white text-amber-600 text-xs font-medium rounded-lg hover:bg-amber-50 transition-colors border border-amber-200 text-left">
-                📝 New Lesson
-              </button>
-              <button className="w-full px-3 py-2 bg-white text-amber-600 text-xs font-medium rounded-lg hover:bg-amber-50 transition-colors border border-amber-200 text-left">
-                🎬 Upload Media
-              </button>
-            </div>
-          </div>
-
-          {/* Logout Button */}
-          <div className="pt-6 mt-6 border-t border-[#EDF0FB]">
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition-all"
-            >
-              <LogOut className="w-5 h-5" />
-              <span className="text-sm font-medium">Logout</span>
+            <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1 rounded-lg text-[color:var(--text-secondary)] hover:bg-[color:var(--bg-glass-hover)]">
+              <X className="w-5 h-5" />
             </button>
           </div>
-        </aside>
-
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col">
-          {/* Top Bar */}
-          <header className="px-8 py-4 border-b border-[#EDF0FB] flex items-center justify-end">
-            <GlobalTopBarControls />
-          </header>
-
-          {/* Page Content */}
-          <main className="flex-1 flex flex-col overflow-hidden">
-            {children}
-          </main>
         </div>
+
+        <nav className="flex-1 overflow-y-auto scrollbar-hidden px-4 py-2 space-y-1">
+          {navItems.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              onClick={() => setSidebarOpen(false)}
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all ${isActive(item.path)
+                  ? 'bg-gradient-to-r from-[color:var(--color-brand-neon)] to-[color:var(--color-brand-electric)] text-white font-medium shadow-md'
+                  : 'text-[color:var(--text-secondary)] hover:bg-[color:var(--bg-glass-hover)] hover:text-[color:var(--color-brand-electric)]'
+                }`}
+            >
+              <span className="text-sm font-medium">{item.label}</span>
+            </Link>
+          ))}
+        </nav>
+
+        {/* Quick Actions */}
+        <div className="mx-4 mb-2 p-3 glass-card rounded-xl">
+          <p className="text-xs font-semibold text-[color:var(--text-primary)] mb-2">Quick Actions</p>
+          <div className="space-y-1.5">
+            <button className="w-full px-3 py-2 bg-[color:var(--bg-glass-hover)] text-[color:var(--color-brand-electric)] text-xs font-medium rounded-lg hover:bg-[color:var(--bg-glass)] transition-colors border border-[color:var(--border-base)] text-left">
+              New Lesson
+            </button>
+            <button className="w-full px-3 py-2 bg-[color:var(--bg-glass-hover)] text-[color:var(--color-brand-electric)] text-xs font-medium rounded-lg hover:bg-[color:var(--bg-glass)] transition-colors border border-[color:var(--border-base)] text-left">
+              Upload Media
+            </button>
+          </div>
+        </div>
+
+        <div className="p-4 border-t border-[color:var(--border-base)]">
+          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-red-400 hover:bg-red-500/10 transition-all">
+            <LogOut className="w-4 h-4" />
+            <span className="text-sm font-medium">Logout</span>
+          </button>
+        </div>
+      </aside>
+
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="flex items-center justify-between px-4 sm:px-6 lg:px-8 py-3 border-b border-[color:var(--border-base)] bg-[color:var(--bg-secondary)]">
+          <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 rounded-lg text-[color:var(--text-secondary)] hover:bg-[color:var(--bg-glass-hover)]">
+            <Menu className="w-5 h-5" />
+          </button>
+          <div className="flex-1" />
+          <GlobalTopBarControls />
+        </header>
+
+        <main className="flex-1 flex flex-col overflow-auto scrollbar-hidden">
+          {children}
+        </main>
       </div>
     </div>
   );

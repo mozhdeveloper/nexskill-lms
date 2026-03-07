@@ -11,17 +11,30 @@ export default {
         brand: {
           neon: 'var(--color-brand-neon)',
           electric: 'var(--color-brand-electric)',
-          primary: 'var(--color-brand-primary)', // Keeping existing name but mapping to var
+          primary: 'var(--color-brand-primary)',
+          'primary-soft': 'rgba(48, 77, 181, 0.08)',
         },
         background: {
           app: 'var(--color-bg-app)',
           shell: 'var(--color-bg-shell)',
           card: 'var(--color-bg-card)',
+          sidebar: 'var(--color-bg-sidebar)',
         },
         text: {
           primary: 'var(--color-text-primary)',
           secondary: 'var(--color-text-secondary)',
           muted: 'var(--color-text-muted)',
+        },
+        dark: {
+          background: {
+            shell: 'var(--color-bg-shell)',
+            card: 'var(--color-bg-card)',
+          },
+          text: {
+            primary: 'var(--color-text-primary)',
+            secondary: 'var(--color-text-secondary)',
+            muted: 'var(--color-text-muted)',
+          },
         },
       },
       backgroundImage: {

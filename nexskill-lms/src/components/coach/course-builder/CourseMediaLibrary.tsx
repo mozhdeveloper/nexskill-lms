@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
 import { Upload, FileText, Image, Video, Trash2, ExternalLink, Loader } from 'lucide-react';
 import { supabase } from '../../../lib/supabaseClient';
 import { MediaUploader } from '../../MediaUploader';

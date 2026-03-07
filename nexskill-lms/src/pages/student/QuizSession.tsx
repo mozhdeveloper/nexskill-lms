@@ -1,190 +1,273 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
 import QuestionProgressBar from '../../components/quiz/QuestionProgressBar';
 import QuestionMultipleChoice from '../../components/quiz/QuestionMultipleChoice';
 import QuestionTrueFalse from '../../components/quiz/QuestionTrueFalse';
 import QuestionImageChoice from '../../components/quiz/QuestionImageChoice';
+import { supabase } from '../../lib/supabaseClient';
+import { useAuth } from '../../context/AuthContext';
 
-// Dummy quiz data
-const dummyQuiz = {
-  id: '1',
-  title: 'Module 2 Knowledge Check',
-  courseName: 'Advanced React Patterns',
-  moduleName: 'State Management',
-  totalQuestions: 10,
-  timeMinutes: 15,
-  passingScore: 70,
-  questions: [
-    {
-      id: 'q1',
-      type: 'multiple-choice' as const,
-      questionText: 'What is the primary purpose of React Context API?',
-      options: [
-        { id: 'a', label: 'To manage component lifecycle', helperText: 'Lifecycle is managed by hooks and class methods' },
-        { id: 'b', label: 'To share data across components without prop drilling', helperText: 'Correct - Context provides global state' },
-        { id: 'c', label: 'To optimize rendering performance', helperText: 'That\'s more related to React.memo' },
-        { id: 'd', label: 'To handle routing in applications', helperText: 'That\'s React Router\'s job' },
-      ],
-      correctOptionId: 'b',
-      explanation: 'React Context API is designed to share data that can be considered"global" for a tree of React components, avoiding prop drilling.',
-    },
-    {
-      id: 'q2',
-      type: 'true-false' as const,
-      questionText: 'useReducer is always better than useState for managing state.',
-      correctAnswer: false,
-      explanation: 'useReducer is better for complex state logic, but useState is simpler and more appropriate for basic state management.',
-    },
-    {
-      id: 'q3',
-      type: 'image-choice' as const,
-      questionText: 'Which diagram correctly represents the React component tree structure?',
-      options: [
-        { id: 'img1', imageUrl: 'https://via.placeholder.com/400x300/304DB5/ffffff?text=Tree+A', label: 'Tree A' },
-        { id: 'img2', imageUrl: 'https://via.placeholder.com/400x300/5E7BFF/ffffff?text=Tree+B', label: 'Tree B' },
-        { id: 'img3', imageUrl: 'https://via.placeholder.com/400x300/8B9EFF/ffffff?text=Tree+C', label: 'Tree C' },
-        { id: 'img4', imageUrl: 'https://via.placeholder.com/400x300/A8B8FF/ffffff?text=Tree+D', label: 'Tree D' },
-      ],
-      correctOptionId: 'img2',
-      explanation: 'Tree B shows the correct hierarchical structure with proper parent-child relationships.',
-    },
-    {
-      id: 'q4',
-      type: 'multiple-choice' as const,
-      questionText: 'Which hook should you use to store a value that persists between renders but doesn\'t trigger re-renders when changed?',
-      options: [
-        { id: 'a', label: 'useState' },
-        { id: 'b', label: 'useEffect' },
-        { id: 'c', label: 'useRef' },
-        { id: 'd', label: 'useMemo' },
-      ],
-      correctOptionId: 'c',
-      explanation: 'useRef returns a mutable ref object that persists for the full lifetime of the component without causing re-renders when mutated.',
-    },
-    {
-      id: 'q5',
-      type: 'true-false' as const,
-      questionText: 'Context Providers should be placed as low as possible in the component tree to minimize unnecessary re-renders.',
-      correctAnswer: true,
-      explanation: 'Placing Context Providers closer to the components that need them reduces the scope of re-renders when context values change.',
-    },
-    {
-      id: 'q6',
-      type: 'multiple-choice' as const,
-      questionText: 'What does the"reducer" function in useReducer accept as parameters?',
-      options: [
-        { id: 'a', label: 'Only the new state' },
-        { id: 'b', label: 'Previous state and action' },
-        { id: 'c', label: 'Component props and state' },
-        { id: 'd', label: 'Action type only' },
-      ],
-      correctOptionId: 'b',
-      explanation: 'A reducer function takes two parameters: the current state and an action object, and returns the new state.',
-    },
-    {
-      id: 'q7',
-      type: 'true-false' as const,
-      questionText: 'React automatically batches multiple setState calls in event handlers for better performance.',
-      correctAnswer: true,
-      explanation: 'React batches state updates in event handlers to minimize re-renders. In React 18+, automatic batching extends to promises, timeouts, and native event handlers.',
-    },
-    {
-      id: 'q8',
-      type: 'multiple-choice' as const,
-      questionText: 'Which pattern is recommended for updating state based on the previous state?',
-      options: [
-        { id: 'a', label: 'setState(newValue)' },
-        { id: 'b', label: 'setState(prevState => newValue)' },
-        { id: 'c', label: 'setState(this.state.value + 1)' },
-        { id: 'd', label: 'Direct mutation of state' },
-      ],
-      correctOptionId: 'b',
-      explanation: 'Using the functional form setState(prevState => ...) ensures you\'re working with the most current state, especially important with batched updates.',
-    },
-    {
-      id: 'q9',
-      type: 'image-choice' as const,
-      questionText: 'Which state flow diagram represents the correct Redux-style unidirectional data flow?',
-      options: [
-        { id: 'flow1', imageUrl: 'https://via.placeholder.com/400x300/FF6B6B/ffffff?text=Flow+1', label: 'Flow 1' },
-        { id: 'flow2', imageUrl: 'https://via.placeholder.com/400x300/4ECDC4/ffffff?text=Flow+2', label: 'Flow 2' },
-        { id: 'flow3', imageUrl: 'https://via.placeholder.com/400x300/45B7D1/ffffff?text=Flow+3', label: 'Flow 3' },
-        { id: 'flow4', imageUrl: 'https://via.placeholder.com/400x300/96CEB4/ffffff?text=Flow+4', label: 'Flow 4' },
-      ],
-      correctOptionId: 'flow2',
-      explanation: 'Flow 2 correctly shows: Action → Reducer → Store → View → Action (unidirectional cycle).',
-    },
-    {
-      id: 'q10',
-      type: 'true-false' as const,
-      questionText: 'When using Context, all components consuming the context will re-render whenever any part of the context value changes.',
-      correctAnswer: true,
-      explanation: 'This is a common performance gotcha. To optimize, you can split contexts or use memoization techniques to prevent unnecessary re-renders.',
-    },
-  ],
+interface QuizQuestion {
+  id: string;
+  type: 'multiple-choice' | 'true-false' | 'image-choice';
+  questionText: string;
+  options?: { id: string; label: string; helperText?: string; imageUrl?: string }[];
+  correctOptionId?: string;
+  correctAnswer?: boolean;
+  explanation: string;
+  points: number;
+}
+
+interface QuizMeta {
+  id: string;
+  title: string;
+  passing_score: number;
+  time_limit_minutes: number | null;
+}
+
+const mapQuestionType = (dbType: string): 'multiple-choice' | 'true-false' | 'image-choice' => {
+  switch (dbType) {
+    case 'true_false': return 'true-false';
+    case 'image_choice': return 'image-choice';
+    default: return 'multiple-choice';
+  }
 };
 
 const QuizSession: React.FC = () => {
   const navigate = useNavigate();
   const { courseId, quizId } = useParams();
+  const { user } = useAuth();
+  const [quizMeta, setQuizMeta] = useState<QuizMeta | null>(null);
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string | boolean>>({});
-  const [timeRemaining] = useState(dummyQuiz.timeMinutes * 60); // seconds
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const currentQuestion = dummyQuiz.questions[currentQuestionIndex];
-  const isLastQuestion = currentQuestionIndex === dummyQuiz.questions.length - 1;
+  useEffect(() => {
+    const fetchQuiz = async () => {
+      if (!quizId) return;
+      try {
+        const { data: quiz, error: qErr } = await supabase
+          .from('quizzes')
+          .select('id, title, passing_score, time_limit_minutes')
+          .eq('id', quizId)
+          .single();
+
+        if (qErr) throw qErr;
+
+        const { data: rows, error: rErr } = await supabase
+          .from('quiz_questions')
+          .select('*')
+          .eq('quiz_id', quizId)
+          .order('position', { ascending: true });
+
+        if (rErr) throw rErr;
+
+        setQuizMeta({
+          id: quiz.id,
+          title: quiz.title,
+          passing_score: quiz.passing_score ?? 70,
+          time_limit_minutes: quiz.time_limit_minutes,
+        });
+
+        const mapped: QuizQuestion[] = (rows || []).map((r: Record<string, unknown>) => {
+          // question_content is stored as a JSON array (DB CHECK enforces this).
+          // Each element is a block: { text, options? }. We use the first block.
+          const rawContent = r.question_content;
+          const contentBlock: Record<string, unknown> = Array.isArray(rawContent)
+            ? ((rawContent[0] as Record<string, unknown>) ?? {})
+            : ((rawContent as Record<string, unknown>) ?? {});
+          const answer = r.answer_config as Record<string, unknown> | null;
+          const type = mapQuestionType(r.question_type as string);
+
+          // Options: seed format stores them in content block; coach editor stores in answer_config.options
+          let options = (contentBlock?.options as QuizQuestion['options']) || undefined;
+          if (!options && Array.isArray(answer?.options) && (answer!.options as unknown[]).length > 0) {
+            options = (answer!.options as any[]).map((o: any) => ({
+              id: o.id as string,
+              label: (o.text || o.label || '') as string,
+            }));
+          }
+
+          // correctOptionId: seed stores explicit field; coach editor marks is_correct on each option
+          let correctOptionId = (answer?.correctOptionId as string) || undefined;
+          if (!correctOptionId && Array.isArray(answer?.options)) {
+            const correctOpt = (answer!.options as any[]).find((o: any) => o.is_correct);
+            if (correctOpt) correctOptionId = correctOpt.id as string;
+          }
+
+          // true/false: seed uses camelCase correctAnswer; coach editor uses snake_case correct_answer
+          const correctAnswer =
+            (answer?.correctAnswer as boolean | undefined) ??
+            (answer?.correct_answer as boolean | undefined);
+
+          return {
+            id: r.id as string,
+            type,
+            questionText: (contentBlock?.text as string) || '',
+            options,
+            correctOptionId,
+            correctAnswer,
+            explanation: (answer?.explanation as string) || '',
+            points: (r.points as number) || 1,
+          };
+        });
+
+        setQuestions(mapped);
+        if (quiz.time_limit_minutes) {
+          setTimeRemaining(quiz.time_limit_minutes * 60);
+        }
+      } catch (err) {
+        console.error('Error fetching quiz questions:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchQuiz();
+  }, [quizId]);
+
+  // Countdown timer
+  useEffect(() => {
+    if (timeRemaining === null || timeRemaining <= 0) return;
+    timerRef.current = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev === null || prev <= 1) {
+          if (timerRef.current) clearInterval(timerRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [timeRemaining !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-submit when time runs out
+  useEffect(() => {
+    if (timeRemaining === 0 && !submitting && questions.length > 0) {
+      handleSubmit();
+    }
+  }, [timeRemaining]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const currentQuestion = questions[currentQuestionIndex];
+  const isLastQuestion = currentQuestionIndex === questions.length - 1;
   const isFirstQuestion = currentQuestionIndex === 0;
 
   const handleNext = () => {
-    if (!isLastQuestion) {
-      setCurrentQuestionIndex((prev) => prev + 1);
-    }
+    if (!isLastQuestion) setCurrentQuestionIndex((prev) => prev + 1);
   };
 
   const handlePrevious = () => {
-    if (!isFirstQuestion) {
-      setCurrentQuestionIndex((prev) => prev - 1);
-    }
+    if (!isFirstQuestion) setCurrentQuestionIndex((prev) => prev - 1);
   };
 
   const handleAnswerSelect = (answer: string | boolean) => {
-    setSelectedAnswers({
-      ...selectedAnswers,
-      [currentQuestion.id]: answer,
-    });
+    if (!currentQuestion) return;
+    setSelectedAnswers((prev) => ({ ...prev, [currentQuestion.id]: answer }));
   };
 
-  const handleSubmit = () => {
-    // Calculate score
-    let correctCount = 0;
-    dummyQuiz.questions.forEach((q) => {
-      const userAnswer = selectedAnswers[q.id];
-      let isCorrect = false;
+  const handleSubmit = useCallback(async () => {
+    if (!quizMeta || !user || submitting) return;
+    setSubmitting(true);
 
-      if (q.type === 'true-false') {
-        isCorrect = userAnswer === q.correctAnswer;
-      } else if (q.type === 'multiple-choice' || q.type === 'image-choice') {
-        isCorrect = userAnswer === q.correctOptionId;
-      }
+    try {
+      // Calculate score
+      let correctCount = 0;
+      let totalPoints = 0;
+      let earnedPoints = 0;
 
-      if (isCorrect) correctCount++;
-    });
+      questions.forEach((q) => {
+        const userAnswer = selectedAnswers[q.id];
+        let isCorrect = false;
+        totalPoints += q.points;
 
-    const scorePercent = Math.round((correctCount / dummyQuiz.questions.length) * 100);
+        if (q.type === 'true-false') {
+          isCorrect = userAnswer === q.correctAnswer;
+        } else {
+          isCorrect = userAnswer === q.correctOptionId;
+        }
 
-    // Navigate to result page with state
-    navigate(`/student/courses/${courseId}/quizzes/${quizId}/result`, {
-      state: {
-        score: scorePercent,
-        correctCount,
-        totalQuestions: dummyQuiz.questions.length,
-        passingScore: dummyQuiz.passingScore,
-        questions: dummyQuiz.questions,
-        userAnswers: selectedAnswers,
-      },
-    });
-  };
+        if (isCorrect) {
+          correctCount++;
+          earnedPoints += q.points;
+        }
+      });
+
+      const scorePercent = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
+      const passed = scorePercent >= quizMeta.passing_score;
+
+      // Count prior attempts
+      const { count: priorCount } = await supabase
+        .from('quiz_attempts')
+        .select('id', { count: 'exact', head: true })
+        .eq('quiz_id', quizMeta.id)
+        .eq('user_id', user.id);
+
+      const attemptNumber = (priorCount || 0) + 1;
+
+      // Insert quiz attempt
+      const { data: attempt, error: aErr } = await supabase
+        .from('quiz_attempts')
+        .insert({
+          user_id: user.id,
+          quiz_id: quizMeta.id,
+          attempt_number: attemptNumber,
+          status: 'submitted',
+          score: earnedPoints,
+          max_score: totalPoints,
+          passed,
+          started_at: new Date().toISOString(),
+          submitted_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single();
+
+      if (aErr) throw aErr;
+
+      // Insert quiz responses
+      const responses = questions.map((q) => {
+        const userAnswer = selectedAnswers[q.id];
+        let isCorrect = false;
+        if (q.type === 'true-false') {
+          isCorrect = userAnswer === q.correctAnswer;
+        } else {
+          isCorrect = userAnswer === q.correctOptionId;
+        }
+
+        return {
+          attempt_id: attempt.id,
+          question_id: q.id,
+          response_data: { answer: userAnswer ?? null },
+          points_earned: isCorrect ? q.points : 0,
+          points_possible: q.points,
+          is_correct: isCorrect,
+        };
+      });
+
+      const { error: rErr } = await supabase.from('quiz_responses').insert(responses);
+      if (rErr) console.error('Error saving responses:', rErr);
+
+      // Navigate to result page
+      navigate(`/student/courses/${courseId}/quizzes/${quizId}/result`, {
+        state: {
+          score: scorePercent,
+          correctCount,
+          totalQuestions: questions.length,
+          passingScore: quizMeta.passing_score,
+          questions,
+          userAnswers: selectedAnswers,
+        },
+      });
+    } catch (err) {
+      console.error('Error submitting quiz:', err);
+      setSubmitting(false);
+    }
+  }, [quizMeta, user, submitting, questions, selectedAnswers, courseId, quizId, navigate]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -192,31 +275,61 @@ const QuizSession: React.FC = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  if (loading) {
+    return (
+      <StudentAppLayout>
+        <div className="min-h-screen bg-[color:var(--bg-primary)] flex items-center justify-center">
+          <p className="text-text-secondary">Loading quiz...</p>
+        </div>
+      </StudentAppLayout>
+    );
+  }
+
+  if (!quizMeta || questions.length === 0) {
+    return (
+      <StudentAppLayout>
+        <div className="min-h-screen bg-[color:var(--bg-primary)] flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-text-secondary mb-4">No questions found for this quiz.</p>
+            <button
+              onClick={() => navigate(`/student/courses/${courseId}`)}
+              className="text-brand-primary hover:underline"
+            >
+              Back to course
+            </button>
+          </div>
+        </div>
+      </StudentAppLayout>
+    );
+  }
+
   return (
     <StudentAppLayout>
-      <div className="min-h-screen bg-gradient-to-br from-[#E7F0FF] via-[#F9F0FF] to-[#E3F4FF] py-8 px-6">
+      <div className="min-h-screen bg-[color:var(--bg-primary)] py-8 px-6">
         <div className="max-w-4xl mx-auto">
           {/* Top bar */}
-          <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-md p-6 mb-6">
+          <div className="glass-card rounded-2xl p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
-              <h1 className="text-xl font-bold text-slate-900">{dummyQuiz.title}</h1>
-              <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-full">
-                <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-sm font-medium text-slate-700">
-                  {formatTime(timeRemaining)}
-                </span>
-              </div>
+              <h1 className="text-xl font-bold text-text-primary">{quizMeta.title}</h1>
+              {timeRemaining !== null && (
+                <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${timeRemaining < 60 ? 'bg-red-100 dark:bg-red-900/30' : 'bg-[color:var(--bg-tertiary)]'}`}>
+                  <svg className="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className={`text-sm font-medium ${timeRemaining < 60 ? 'text-red-600 dark:text-red-400' : 'text-text-secondary'}`}>
+                    {formatTime(timeRemaining)}
+                  </span>
+                </div>
+              )}
             </div>
-            <QuestionProgressBar currentIndex={currentQuestionIndex} total={dummyQuiz.questions.length} />
+            <QuestionProgressBar currentIndex={currentQuestionIndex} total={questions.length} />
           </div>
 
           {/* Question card */}
-          <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-md p-8 mb-6">
+          <div className="glass-card rounded-3xl p-8 mb-6">
             {currentQuestion.type === 'multiple-choice' && (
               <QuestionMultipleChoice
-                question={currentQuestion}
+                question={{...currentQuestion, options: currentQuestion.options || []}}
                 selectedOptionId={selectedAnswers[currentQuestion.id] as string}
                 onSelect={handleAnswerSelect}
               />
@@ -230,7 +343,7 @@ const QuizSession: React.FC = () => {
             )}
             {currentQuestion.type === 'image-choice' && (
               <QuestionImageChoice
-                question={currentQuestion}
+                question={{...currentQuestion, options: (currentQuestion.options || []).map(o => ({id: o.id, label: o.label, imageUrl: o.imageUrl || ''}))}}
                 selectedOptionId={selectedAnswers[currentQuestion.id] as string}
                 onSelect={handleAnswerSelect}
               />
@@ -242,14 +355,11 @@ const QuizSession: React.FC = () => {
             <button
               onClick={handlePrevious}
               disabled={isFirstQuestion}
-              className={`
-                px-6 py-3 rounded-full font-semibold transition-all
-                ${
-                  isFirstQuestion
-                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                    : 'bg-white text-slate-700 border-2 border-slate-300 hover:border-slate-400 shadow-sm hover:shadow'
-                }
-              `}
+              className={`px-6 py-3 rounded-full font-semibold transition-all ${
+                isFirstQuestion
+                  ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+                  : 'glass-card text-text-primary border-2 border-[color:var(--border-base)] hover:shadow'
+              }`}
             >
               ← Previous
             </button>
@@ -257,21 +367,22 @@ const QuizSession: React.FC = () => {
             <div className="flex gap-3">
               <button
                 onClick={() => navigate(`/student/courses/${courseId}`)}
-                className="px-6 py-3 rounded-full font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+                className="px-6 py-3 rounded-full font-semibold text-text-secondary hover:text-text-primary transition-colors"
               >
                 Exit quiz
               </button>
               {isLastQuestion ? (
                 <button
                   onClick={handleSubmit}
-                  className="px-8 py-3 rounded-full font-semibold bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white shadow-lg hover:shadow-xl transition-all"
+                  disabled={submitting}
+                  className="px-8 py-3 rounded-full font-semibold bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
                 >
-                  Submit quiz
+                  {submitting ? 'Submitting...' : 'Submit quiz'}
                 </button>
               ) : (
                 <button
                   onClick={handleNext}
-                  className="px-8 py-3 rounded-full font-semibold bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white shadow-lg hover:shadow-xl transition-all"
+                  className="px-8 py-3 rounded-full font-semibold bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all"
                 >
                   Next →
                 </button>

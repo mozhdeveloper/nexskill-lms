@@ -74,7 +74,7 @@ const CourseBuilder: React.FC = () => {
   const [verificationStatus, setVerificationStatus] = useState<string>("draft");
   const [adminFeedback, setAdminFeedback] = useState<string>("");
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [instructorName, setInstructorName] = useState<string>("Instructor");
+  const [, setInstructorName] = useState<string>("Instructor");
 
   // Settings state
   const [settings, setSettings] = useState<CourseSettings>({

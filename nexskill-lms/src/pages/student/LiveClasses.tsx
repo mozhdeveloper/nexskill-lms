@@ -43,9 +43,7 @@ const LiveClasses: React.FC = () => {
     return new Date(dateStr).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   };
 
-  const getMockParticipants = (id: string) => {
-    return (id.charCodeAt(0) * 13) % 45 + 5;
-  };
+  const getParticipantsFallback = () => 0;
 
   return (
     <StudentAppLayout>
@@ -139,7 +137,7 @@ const LiveClasses: React.FC = () => {
                         (new Date(liveClass.scheduled_at).getTime() - Date.now() < 30 * 60 * 1000 &&
                           new Date(liveClass.scheduled_at).getTime() > Date.now());
 
-                      const participants = liveClass.participants_count || getMockParticipants(liveClass.id);
+                      const participants = liveClass.participants_count || getParticipantsFallback();
 
                       return (
                         <div

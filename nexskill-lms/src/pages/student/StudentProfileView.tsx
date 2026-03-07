@@ -24,6 +24,8 @@ const StudentProfileView: React.FC = () => {
   const [goals, setGoals] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [completedCount, setCompletedCount] = useState(0);
+  const [hoursLearned, setHoursLearned] = useState(0);
 
   // Fetch profile data with interests and goals
   useEffect(() => {
@@ -90,6 +92,58 @@ const StudentProfileView: React.FC = () => {
             .filter(Boolean) || [];
           setGoals(goalNames);
         }
+
+        // Fetch real learning stats in parallel
+        const [enrollmentsResult, progressResult] = await Promise.all([
+          supabase.from('enrollments').select('course_id').eq('profile_id', user.id),
+          supabase.from('user_lesson_progress').select('lesson_id, is_completed').eq('user_id', user.id)
+        ]);
+
+        const enrolledCourseIds = (enrollmentsResult.data || []).map((e: any) => e.course_id);
+
+        const completedLessonIds = (progressResult.data || []).filter((p: any) => p.is_completed).map((p: any) => p.lesson_id);
+
+        // Fetch duration info for completed lessons to calculate hours
+        if (completedLessonIds.length > 0) {
+          const { data: durationData } = await supabase
+            .from('module_content_items')
+            .select('content_id, lessons!inner(estimated_duration_minutes)')
+            .eq('content_type', 'lesson')
+            .in('content_id', completedLessonIds);
+          const totalMinutes = (durationData || []).reduce((sum: number, item: any) => {
+            return sum + (item.lessons?.estimated_duration_minutes || 5);
+          }, 0);
+          setHoursLearned(Math.round(totalMinutes / 60));
+        }
+
+        // Estimate completed courses: courses where all enrolled lessons are completed
+        if (enrolledCourseIds.length > 0) {
+          const { data: moduleData } = await supabase
+            .from('modules')
+            .select('id, course_id')
+            .in('course_id', enrolledCourseIds);
+          const moduleIds = (moduleData || []).map((m: any) => m.id);
+          if (moduleIds.length > 0) {
+            const { data: contentData } = await supabase
+              .from('module_content_items')
+              .select('content_id, module_id')
+              .eq('content_type', 'lesson')
+              .in('module_id', moduleIds);
+            const completedSet = new Set(completedLessonIds);
+            const lessonsByCourse: Record<string, { total: number; completed: number }> = {};
+            const moduleIdToCourseId: Record<string, string> = {};
+            (moduleData || []).forEach((m: any) => { moduleIdToCourseId[m.id] = m.course_id; });
+            (contentData || []).forEach((item: any) => {
+              const cid = moduleIdToCourseId[item.module_id];
+              if (!cid) return;
+              if (!lessonsByCourse[cid]) lessonsByCourse[cid] = { total: 0, completed: 0 };
+              lessonsByCourse[cid].total++;
+              if (completedSet.has(item.content_id)) lessonsByCourse[cid].completed++;
+            });
+            const completed = Object.values(lessonsByCourse).filter(c => c.total > 0 && c.completed === c.total).length;
+            setCompletedCount(completed);
+          }
+        }
       } catch (err) {
         console.error('Error fetching profile:', err);
         setError(err instanceof Error ? err.message : 'Failed to load profile');
@@ -140,15 +194,15 @@ const StudentProfileView: React.FC = () => {
   const profileData = {
     name: `${profile.first_name} ${profile.last_name}`,
     headline: profile.headline || 'Student',
-    level: profile.current_skill_level || null,  // <-- Allow null
+    level: profile.current_skill_level || null,
     memberSince: new Date(profile.created_at).getFullYear().toString(),
     streakDays: 12,
     bio: profile.bio || "Tell us about yourself! Click 'Edit Profile' to get started.",
     interests: interests,
     goals: goals,
-    completedCourses: 8, // TODO: Implement course tracking in database
-    certificates: 3, // TODO: Implement certificate tracking in database
-    hoursLearned: 45, // TODO: Implement hours tracking in database
+    completedCourses: completedCount,
+    certificates: completedCount, // Certificates = completed courses until a certificates table exists
+    hoursLearned: hoursLearned,
   };
 
   return (
@@ -181,8 +235,7 @@ const StudentProfileView: React.FC = () => {
 
           {/* Right column - Metrics and Quick Actions */}
           <div className="space-y-6">
-            {/* Learning Stats - Using dummy data for now */}
-            {/* TODO: Implement real stats from database */}
+            {/* Learning Stats — fetched from enrollments + lesson progress */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Learning stats</h2>
               <div className="space-y-4">

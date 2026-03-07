@@ -39,7 +39,7 @@ interface FilterState {
 const UsersManagementPage: React.FC = () => {
   // Supabase Integration
   const [users, setUsers] = useState<User[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [, setIsLoading] = useState(true);
 
   React.useEffect(() => {
     const fetchUsers = async () => {

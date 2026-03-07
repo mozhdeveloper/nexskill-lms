@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
 import MembershipPlanCard from '../../components/membership/MembershipPlanCard';
 import MembershipFeatureCompare from '../../components/membership/MembershipFeatureCompare';
 
-// Dummy membership plans data
-const membershipPlans = [
+// Plan definitions — static config
+const PLANS = [
   {
     id: 'free',
     name: 'Free',
@@ -19,7 +19,6 @@ const membershipPlans = [
       'Limited AI Coach (10 queries/month)',
       'Basic progress tracking',
     ],
-    isCurrent: false,
     isMostPopular: false,
   },
   {
@@ -38,7 +37,6 @@ const membershipPlans = [
       'Live classes access',
       'Download courses offline',
     ],
-    isCurrent: true,
     isMostPopular: true,
     badgeLabel: 'Most Popular',
   },
@@ -58,15 +56,21 @@ const membershipPlans = [
       'Resume reviews & interview prep',
       'Exclusive masterclasses',
     ],
-    isCurrent: false,
     isMostPopular: false,
   },
 ];
 
 const MembershipPlans: React.FC = () => {
   const navigate = useNavigate();
+  // membership_tier column not yet in DB — default to 'free'
+  const [currentTier] = useState<string>('free');
 
-  const currentPlan = membershipPlans.find((plan) => plan.isCurrent);
+  useEffect(() => {
+    // membership_tier column not yet in DB — stays on 'free' default
+  }, []);
+
+  const membershipPlans = PLANS.map(p => ({ ...p, isCurrent: p.id === currentTier }));
+  const currentPlan = membershipPlans.find(p => p.isCurrent);
 
   const handleSelectPlan = (planId: string) => {
     console.log('Selected plan:', planId);

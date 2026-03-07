@@ -16,9 +16,8 @@ interface Coach {
 
 const CoachesManagementPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'pending' | 'suspended'>('all');
-  const [showFilters, setShowFilters] = useState(false);
-  const [selectedCoaches, setSelectedCoaches] = useState<string[]>([]);
+  const [statusFilter] = useState<'all' | 'active' | 'pending' | 'suspended'>('all');
+  const [selectedCoaches] = useState<string[]>([]);
 
   // Supabase Integration
   const [activeCoaches, setActiveCoaches] = useState<Coach[]>([]);

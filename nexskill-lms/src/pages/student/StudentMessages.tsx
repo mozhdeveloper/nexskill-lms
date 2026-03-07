@@ -1,198 +1,144 @@
-import React, { useState } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
-import { Search, Send, Archive, Star, MoreVertical, Paperclip, Plus } from 'lucide-react';
+import { Search, Send, Archive, Star, MoreVertical, Plus } from 'lucide-react';
+import { useConversations, useMessages } from '../../hooks/useChat';
+import { supabase } from '../../lib/supabaseClient';
 
-interface Conversation {
+interface CoachOption {
   id: string;
-  coachName: string;
-  coachAvatar?: string;
-  lastMessage: string;
-  timestamp: string;
-  unread: boolean;
-  starred: boolean;
+  first_name: string;
+  last_name: string;
   course?: string;
 }
 
-interface Message {
-  id: string;
-  content: string;
-  timestamp: string;
-  isFromStudent: boolean;
-  attachments?: Array<{ name: string; size: string; type: string }>;
+function formatRelativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
 }
 
 const StudentMessages: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [messageInput, setMessageInput] = useState('');
   const [filterTab, setFilterTab] = useState<'all' | 'unread' | 'starred'>('all');
   const [showNewConversationModal, setShowNewConversationModal] = useState(false);
+  const [starredIds, setStarredIds] = useState<Set<string>>(new Set());
+  const [archivedIds, setArchivedIds] = useState<Set<string>>(new Set());
+  const [coachOptions, setCoachOptions] = useState<CoachOption[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const [conversations, setConversations] = useState<Conversation[]>([
-    {
-      id: 'conv-1',
-      coachName: 'Sarah Johnson',
-      lastMessage: 'Hi Alex! How are you progressing with the React hooks assignment?',
-      timestamp: '10 min ago',
-      unread: true,
-      starred: false,
-      course: 'React Fundamentals',
-    },
-    {
-      id: 'conv-2',
-      coachName: 'Mike Chen',
-      lastMessage: 'Your JavaScript project looks great! Just a few suggestions...',
-      timestamp: '2 hours ago',
-      unread: true,
-      starred: true,
-      course: 'JavaScript Mastery',
-    },
-    {
-      id: 'conv-3',
-      coachName: 'Emma Wilson',
-      lastMessage: 'Thanks for submitting your design portfolio. I\'ll review it today.',
-      timestamp: '5 hours ago',
-      unread: false,
-      starred: false,
-      course: 'UI/UX Design',
-    },
-    {
-      id: 'conv-4',
-      coachName: 'David Park',
-      lastMessage: 'The next live session is scheduled for tomorrow at 3 PM.',
-      timestamp: 'Yesterday',
-      unread: false,
-      starred: true,
-      course: 'Python for Data Science',
-    },
-  ]);
+  const { conversations, loading: convsLoading } = useConversations();
+  const { messages, loading: msgsLoading, sendMessage } = useMessages({ recipientId: selectedUserId || undefined });
 
-  const [messages, setMessages] = useState<Record<string, Message[]>>({
-    'conv-1': [
-      {
-        id: 'msg-1',
-        content: 'Hi Coach Sarah! I\'m working on the React hooks assignment and have a question about useEffect.',
-        timestamp: '9:30 AM',
-        isFromStudent: true,
-      },
-      {
-        id: 'msg-2',
-        content: 'Hi Alex! Happy to help. What specifically are you struggling with regarding useEffect?',
-        timestamp: '10:15 AM',
-        isFromStudent: false,
-      },
-      {
-        id: 'msg-3',
-        content: 'Hi Alex! How are you progressing with the React hooks assignment?',
-        timestamp: '10:20 AM',
-        isFromStudent: false,
-      },
-    ],
-    'conv-2': [
-      {
-        id: 'msg-4',
-        content: 'Hi Coach Mike! I submitted my JavaScript project. Could you review it?',
-        timestamp: 'Yesterday 3:00 PM',
-        isFromStudent: true,
-      },
-      {
-        id: 'msg-5',
-        content: 'Your JavaScript project looks great! Just a few suggestions...',
-        timestamp: 'Today 8:00 AM',
-        isFromStudent: false,
-      },
-    ],
-  });
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) setCurrentUserId(data.user.id);
+    });
+  }, []);
 
-  const handleSendMessage = () => {
-    if (!messageInput.trim() || !selectedConversation) return;
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
-    const newMessage: Message = {
-      id: `msg-${Date.now()}`,
-      content: messageInput,
-      timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-      isFromStudent: true,
+  useEffect(() => {
+    if (!showNewConversationModal || !currentUserId) return;
+    const fetchCoaches = async () => {
+      const { data: enrollments } = await supabase
+        .from('enrollments')
+        .select('course_id, courses!inner(coach_id, title)')
+        .eq('profile_id', currentUserId);
+
+      const coachCourseMap: Record<string, string> = {};
+      (enrollments || []).forEach((e: any) => {
+        if (e.courses?.coach_id && e.courses?.title) {
+          coachCourseMap[e.courses.coach_id] = e.courses.title;
+        }
+      });
+
+      const coachIds = Object.keys(coachCourseMap);
+      if (coachIds.length === 0) return;
+
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .in('id', coachIds);
+
+      setCoachOptions((profiles || []).map((p: any) => ({
+        id: p.id,
+        first_name: p.first_name || '',
+        last_name: p.last_name || '',
+        course: coachCourseMap[p.id],
+      })));
     };
+    fetchCoaches();
+  }, [showNewConversationModal, currentUserId]);
 
-    setMessages(prev => ({
-      ...prev,
-      [selectedConversation]: [...(prev[selectedConversation] || []), newMessage],
-    }));
-
-    // Update conversation last message
-    setConversations(prev =>
-      prev.map(conv =>
-        conv.id === selectedConversation
-          ? { ...conv, lastMessage: messageInput, timestamp: 'Just now', unread: false }
-          : conv
-      )
-    );
-
-    window.alert(`💬 Message Sent\n\n📨 Delivered to: ${conversations.find(c => c.id === selectedConversation)?.coachName}\n\n✅ Message Details:\n• Sent: ${new Date().toLocaleTimeString()}\n• Status: Delivered\n• Read receipt: Enabled\n\n📱 Coach Notification:\n• Email: Sent\n• In-app: Delivered\n• Push notification: Sent\n\n💡 Coaches typically respond within 2-4 hours during business days.`);
-
-    setMessageInput('');
-  };
-
-  const handleStarConversation = (conversationId: string) => {
-    setConversations(prev =>
-      prev.map(conv =>
-        conv.id === conversationId ? { ...conv, starred: !conv.starred } : conv
-      )
-    );
-    const conv = conversations.find(c => c.id === conversationId);
-    window.alert(`${conv?.starred ? '☆' : '⭐'} Conversation ${conv?.starred ? 'Unstarred' : 'Starred'}\n\nCoach: ${conv?.coachName}\n\n${conv?.starred ? '• Removed from starred messages\n• Still accessible in all messages' : '• Added to starred messages\n• Quick access from starred filter\n• Never auto-archived'}\n\n💡 Star important conversations for easy access.`);
-  };
-
-  const handleArchiveConversation = (conversationId: string) => {
-    const conv = conversations.find(c => c.id === conversationId);
-    window.alert(`📦 Archive Conversation\n\nCoach: ${conv?.coachName}\nCourse: ${conv?.course}\n\n✅ Archiving:\n• Conversation moved to archive\n• Removed from main inbox\n• Can be restored anytime\n• Coach can still message you\n\n📬 New messages will automatically unarchive this conversation.\n\n💡 Archive old conversations to keep your inbox organized.`);
-
-    setConversations(prev => prev.filter(c => c.id !== conversationId));
-    if (selectedConversation === conversationId) {
-      setSelectedConversation(null);
+  const handleSendMessage = async () => {
+    if (!messageInput.trim() || !selectedUserId) return;
+    try {
+      await sendMessage(messageInput.trim(), selectedUserId);
+      setMessageInput('');
+    } catch (err) {
+      console.error('Failed to send message:', err);
     }
   };
 
-  const handleAttachment = () => {
-    window.alert(`📎 Attach Files\n\n📤 Supported Attachments:\n• Documents: PDF, DOC, DOCX, TXT\n• Images: JPG, PNG, GIF, SVG\n• Spreadsheets: XLS, XLSX, CSV\n• Presentations: PPT, PPTX\n• Code files: All common formats\n\n📏 File Limits:\n• Max file size: 25 MB\n• Max files per message: 5\n• Total storage: Unlimited\n\n✅ Files are:\n• Scanned for viruses\n• Encrypted in transit\n• Stored securely\n• Available for 90 days\n\n💡 Use attachments to share resources, feedback, and supplementary materials.`);
+  const handleStarConversation = (userId: string) => {
+    setStarredIds(prev => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId); else next.add(userId);
+      return next;
+    });
   };
 
-  const filteredConversations = conversations.filter(conv => {
-    const matchesSearch = conv.coachName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         conv.lastMessage.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (conv.course && conv.course.toLowerCase().includes(searchQuery.toLowerCase()));
+  const handleArchiveConversation = (userId: string) => {
+    setArchivedIds(prev => new Set([...prev, userId]));
+    if (selectedUserId === userId) setSelectedUserId(null);
+  };
 
-    if (filterTab === 'unread') return matchesSearch && conv.unread;
-    if (filterTab === 'starred') return matchesSearch && conv.starred;
+  const activeConversations = conversations.filter(c => !archivedIds.has(c.other_user_id));
+
+  const filteredConversations = activeConversations.filter(conv => {
+    const name = `${conv.other_user_profile?.first_name ?? ''} ${conv.other_user_profile?.last_name ?? ''}`.toLowerCase();
+    const matchesSearch = name.includes(searchQuery.toLowerCase()) ||
+      (conv.last_message || '').toLowerCase().includes(searchQuery.toLowerCase());
+    if (filterTab === 'unread') return matchesSearch && (conv.unread_count ?? 0) > 0;
+    if (filterTab === 'starred') return matchesSearch && starredIds.has(conv.other_user_id);
     return matchesSearch;
   });
 
-  const selectedConv = conversations.find(c => c.id === selectedConversation);
-  const conversationMessages = selectedConversation ? messages[selectedConversation] || [] : [];
+  const selectedName = (() => {
+    const c = conversations.find(c => c.other_user_id === selectedUserId);
+    return c ? `${c.other_user_profile?.first_name ?? ''} ${c.other_user_profile?.last_name ?? ''}`.trim() : '';
+  })();
 
-  const handleStartNewConversation = () => {
-    setShowNewConversationModal(true);
-  };
+  const unreadCount = activeConversations.filter(c => (c.unread_count ?? 0) > 0).length;
+  const starredCount = activeConversations.filter(c => starredIds.has(c.other_user_id)).length;
 
   return (
     <StudentAppLayout>
       <div className="flex-1 flex overflow-hidden">
-        {/* Conversations List */}
         <div className="w-96 border-r border-slate-200 dark:border-gray-700 flex flex-col bg-white dark:bg-dark-background-card">
-          {/* Header */}
           <div className="p-6 border-b border-slate-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
               <h1 className="text-2xl font-bold text-slate-900 dark:text-dark-text-primary">Messages</h1>
               <button
-                onClick={handleStartNewConversation}
-                className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full transition-colors shadow-lg hover:shadow-xl"
+                onClick={() => setShowNewConversationModal(true)}
+                className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full transition-colors shadow-lg"
                 title="Start new conversation"
               >
                 <Plus className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Search */}
             <div className="relative mb-4">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
               <input
@@ -204,109 +150,86 @@ const StudentMessages: React.FC = () => {
               />
             </div>
 
-            {/* Filter Tabs */}
             <div className="flex gap-2">
-              <button
-                onClick={() => setFilterTab('all')}
-                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  filterTab === 'all'
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                    : 'text-slate-600 dark:text-dark-text-secondary hover:bg-slate-100 dark:hover:bg-gray-800'
-                }`}
-              >
-                All ({conversations.length})
-              </button>
-              <button
-                onClick={() => setFilterTab('unread')}
-                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  filterTab === 'unread'
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                    : 'text-slate-600 dark:text-dark-text-secondary hover:bg-slate-100 dark:hover:bg-gray-800'
-                }`}
-              >
-                Unread ({conversations.filter(c => c.unread).length})
-              </button>
-              <button
-                onClick={() => setFilterTab('starred')}
-                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  filterTab === 'starred'
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                    : 'text-slate-600 dark:text-dark-text-secondary hover:bg-slate-100 dark:hover:bg-gray-800'
-                }`}
-              >
-                <Star className="w-4 h-4 inline mr-1" />
-                {conversations.filter(c => c.starred).length}
-              </button>
+              {(['all', 'unread', 'starred'] as const).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setFilterTab(tab)}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    filterTab === tab
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                      : 'text-slate-600 dark:text-dark-text-secondary hover:bg-slate-100 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  {tab === 'all' && `All (${activeConversations.length})`}
+                  {tab === 'unread' && `Unread (${unreadCount})`}
+                  {tab === 'starred' && <><Star className="w-4 h-4 inline mr-1" />{starredCount}</>}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Conversations */}
           <div className="flex-1 overflow-y-auto">
-            {filteredConversations.map(conv => (
-              <div
-                key={conv.id}
-                onClick={() => setSelectedConversation(conv.id)}
-                className={`p-4 border-b border-slate-200 dark:border-gray-700 cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-gray-800 ${
-                  selectedConversation === conv.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
-                }`}
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold">
-                      {conv.coachName.split(' ').map(n => n[0]).join('')}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className={`font-semibold ${conv.unread ? 'text-slate-900 dark:text-dark-text-primary' : 'text-slate-700 dark:text-dark-text-secondary'}`}>
-                          {conv.coachName}
-                        </h3>
-                        {conv.starred && <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />}
+            {convsLoading ? (
+              <div className="p-6 text-center text-slate-400">Loading...</div>
+            ) : filteredConversations.length === 0 ? (
+              <div className="p-6 text-center text-slate-400">No conversations yet</div>
+            ) : filteredConversations.map(conv => {
+              const name = `${conv.other_user_profile?.first_name ?? ''} ${conv.other_user_profile?.last_name ?? ''}`.trim() || 'Unknown';
+              const initials = name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+              const isUnread = (conv.unread_count ?? 0) > 0;
+              const isStarred = starredIds.has(conv.other_user_id);
+              return (
+                <div
+                  key={conv.other_user_id}
+                  onClick={() => setSelectedUserId(conv.other_user_id)}
+                  className={`p-4 border-b border-slate-200 dark:border-gray-700 cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-gray-800 ${
+                    selectedUserId === conv.other_user_id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-1">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                        {initials}
                       </div>
-                      {conv.course && (
-                        <p className="text-xs text-slate-500 dark:text-dark-text-muted">{conv.course}</p>
-                      )}
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className={`font-semibold text-sm ${isUnread ? 'text-slate-900 dark:text-dark-text-primary' : 'text-slate-700 dark:text-dark-text-secondary'}`}>
+                            {name}
+                          </span>
+                          {isStarred && <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />}
+                          {isUnread && <span className="w-2 h-2 bg-blue-500 rounded-full inline-block" />}
+                        </div>
+                      </div>
                     </div>
+                    <span className="text-xs text-slate-500 dark:text-dark-text-muted whitespace-nowrap ml-2">
+                      {conv.last_message_at ? formatRelativeTime(conv.last_message_at) : ''}
+                    </span>
                   </div>
-                  <span className="text-xs text-slate-500 dark:text-dark-text-muted">{conv.timestamp}</span>
+                  <p className={`text-sm truncate pl-13 ${isUnread ? 'text-slate-900 dark:text-dark-text-primary font-medium' : 'text-slate-600 dark:text-dark-text-secondary'}`}>
+                    {conv.last_message || 'Start a conversation'}
+                  </p>
                 </div>
-                <p className={`text-sm ${conv.unread ? 'text-slate-900 dark:text-dark-text-primary font-medium' : 'text-slate-600 dark:text-dark-text-secondary'} truncate`}>
-                  {conv.lastMessage}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
-        {/* Message Thread */}
         <div className="flex-1 flex flex-col bg-slate-50 dark:bg-dark-background">
-          {selectedConv ? (
+          {selectedUserId ? (
             <>
-              {/* Thread Header */}
               <div className="p-6 bg-white dark:bg-dark-background-card border-b border-slate-200 dark:border-gray-700 flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-lg">
-                    {selectedConv.coachName.split(' ').map((n: string) => n[0]).join('')}
+                    {selectedName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || '?'}
                   </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-dark-text-primary">{selectedConv.coachName}</h2>
-                    {selectedConv.course && (
-                      <p className="text-sm text-slate-600 dark:text-dark-text-secondary">{selectedConv.course}</p>
-                    )}
-                  </div>
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-dark-text-primary">{selectedName || 'Coach'}</h2>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleStarConversation(selectedConv.id)}
-                    className="p-2 hover:bg-slate-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                    title={selectedConv.starred ? 'Unstar' : 'Star'}
-                  >
-                    <Star className={`w-5 h-5 ${selectedConv.starred ? 'text-yellow-500 fill-yellow-500' : 'text-slate-400'}`} />
+                  <button onClick={() => handleStarConversation(selectedUserId)} className="p-2 hover:bg-slate-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                    <Star className={`w-5 h-5 ${starredIds.has(selectedUserId) ? 'text-yellow-500 fill-yellow-500' : 'text-slate-400'}`} />
                   </button>
-                  <button
-                    onClick={() => handleArchiveConversation(selectedConv.id)}
-                    className="p-2 hover:bg-slate-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                    title="Archive"
-                  >
+                  <button onClick={() => handleArchiveConversation(selectedUserId)} className="p-2 hover:bg-slate-100 dark:hover:bg-gray-800 rounded-lg transition-colors" title="Archive">
                     <Archive className="w-5 h-5 text-slate-400" />
                   </button>
                   <button className="p-2 hover:bg-slate-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
@@ -315,51 +238,35 @@ const StudentMessages: React.FC = () => {
                 </div>
               </div>
 
-              {/* Messages */}
               <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                {conversationMessages.map(message => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.isFromStudent ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div className={`max-w-lg ${message.isFromStudent ? 'order-2' : 'order-1'}`}>
-                      <div
-                        className={`rounded-2xl px-4 py-3 ${
-                          message.isFromStudent
+                {msgsLoading ? (
+                  <div className="text-center text-slate-400">Loading messages...</div>
+                ) : messages.length === 0 ? (
+                  <div className="text-center text-slate-400 py-8">No messages yet. Say hello!</div>
+                ) : messages.map(msg => {
+                  const isFromMe = msg.sender_id === currentUserId;
+                  return (
+                    <div key={msg.id} className={`flex ${isFromMe ? 'justify-end' : 'justify-start'}`}>
+                      <div className="max-w-lg">
+                        <div className={`rounded-2xl px-4 py-3 ${
+                          isFromMe
                             ? 'bg-blue-600 text-white'
                             : 'bg-white dark:bg-dark-background-card text-slate-900 dark:text-dark-text-primary border border-slate-200 dark:border-gray-700'
-                        }`}
-                      >
-                        <p className="text-sm leading-relaxed">{message.content}</p>
-                        {message.attachments && (
-                          <div className="mt-2 space-y-1">
-                            {message.attachments.map((att, idx) => (
-                              <div key={idx} className="flex items-center gap-2 text-xs opacity-90">
-                                <Paperclip className="w-3 h-3" />
-                                <span>{att.name}</span>
-                                <span>({att.size})</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        }`}>
+                          <p className="text-sm leading-relaxed">{msg.content}</p>
+                        </div>
+                        <p className={`text-xs text-slate-500 dark:text-dark-text-muted mt-1 ${isFromMe ? 'text-right' : 'text-left'}`}>
+                          {formatRelativeTime(msg.created_at)}
+                        </p>
                       </div>
-                      <p className={`text-xs text-slate-500 dark:text-dark-text-muted mt-1 ${message.isFromStudent ? 'text-right' : 'text-left'}`}>
-                        {message.timestamp}
-                      </p>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
+                <div ref={messagesEndRef} />
               </div>
 
-              {/* Message Input */}
               <div className="p-6 bg-white dark:bg-dark-background-card border-t border-slate-200 dark:border-gray-700">
                 <div className="flex items-end gap-3">
-                  <button
-                    onClick={handleAttachment}
-                    className="p-2 hover:bg-slate-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                  >
-                    <Paperclip className="w-5 h-5 text-slate-400" />
-                  </button>
                   <div className="flex-1">
                     <textarea
                       value={messageInput}
@@ -402,52 +309,30 @@ const StudentMessages: React.FC = () => {
         </div>
       </div>
 
-      {/* New Conversation Modal */}
       {showNewConversationModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-dark-background-card rounded-lg p-6 w-full max-w-md mx-4">
             <h2 className="text-xl font-bold text-slate-900 dark:text-dark-text-primary mb-4">Start New Conversation</h2>
-            <p className="text-slate-600 dark:text-dark-text-secondary mb-4">Select a coach to start messaging:</p>
+            <p className="text-slate-600 dark:text-dark-text-secondary mb-4">Select a coach from your enrolled courses:</p>
 
             <div className="space-y-2 max-h-60 overflow-y-auto">
-              {/* Mock coaches - in real app, this would come from API */}
-              {[
-                { id: 'coach-1', name: 'Coach Sarah', avatar: 'S', course: 'React Development' },
-                { id: 'coach-2', name: 'Coach Mike', avatar: 'M', course: 'JavaScript Fundamentals' },
-                { id: 'coach-3', name: 'Coach Emily', avatar: 'E', course: 'Advanced React' },
-              ].map(coach => (
+              {coachOptions.length === 0 ? (
+                <p className="text-slate-500 dark:text-dark-text-muted text-center py-4">No coaches found. Enroll in a course first.</p>
+              ) : coachOptions.map(coach => (
                 <button
                   key={coach.id}
                   onClick={() => {
-                    // Create new conversation
-                    const newConvId = `conv-${Date.now()}`;
-                    const newConversation: Conversation = {
-                      id: newConvId,
-                      coachName: coach.name,
-                      coachAvatar: coach.avatar,
-                      lastMessage: 'New conversation started',
-                      timestamp: 'Just now',
-                      unread: false,
-                      starred: false,
-                      course: coach.course,
-                    };
-
-                    setConversations(prev => [newConversation, ...prev]);
-                    setSelectedConversation(newConvId);
-                    setMessages(prev => ({
-                      ...prev,
-                      [newConvId]: [],
-                    }));
+                    setSelectedUserId(coach.id);
                     setShowNewConversationModal(false);
                   }}
                   className="w-full p-3 text-left hover:bg-slate-50 dark:hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-3"
                 >
-                  <div className="w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center font-semibold">
-                    {coach.avatar}
+                  <div className="w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">
+                    {(coach.first_name[0] || '') + (coach.last_name[0] || '')}
                   </div>
                   <div>
-                    <p className="font-medium text-slate-900 dark:text-dark-text-primary">{coach.name}</p>
-                    <p className="text-sm text-slate-600 dark:text-dark-text-secondary">{coach.course}</p>
+                    <p className="font-medium text-slate-900 dark:text-dark-text-primary">{coach.first_name} {coach.last_name}</p>
+                    {coach.course && <p className="text-sm text-slate-600 dark:text-dark-text-secondary">{coach.course}</p>}
                   </div>
                 </button>
               ))}

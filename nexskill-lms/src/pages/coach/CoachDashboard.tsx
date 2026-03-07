@@ -1,60 +1,33 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import CoachAppLayout from '../../layouts/CoachAppLayout';
 import { useUser } from '../../context/UserContext';
 import { supabase } from '../../lib/supabaseClient';
 
-// Dummy data
+// Revenue placeholder — no earnings table exists yet
 const revenueData = {
-  currentMonth: 2450,
-  totalAllTime: 18920,
-  monthOverMonth: 18,
+  currentMonth: 0,
+  totalAllTime: 0,
+  monthOverMonth: 0,
   lastSixMonths: [
-    { month: 'Jul', amount: 1800 },
-    { month: 'Aug', amount: 2100 },
-    { month: 'Sep', amount: 1950 },
-    { month: 'Oct', amount: 2200 },
-    { month: 'Nov', amount: 2070 },
-    { month: 'Dec', amount: 2450 },
+    { month: 'Jul', amount: 0 },
+    { month: 'Aug', amount: 0 },
+    { month: 'Sep', amount: 0 },
+    { month: 'Oct', amount: 0 },
+    { month: 'Nov', amount: 0 },
+    { month: 'Dec', amount: 0 },
   ],
 };
 
 
 
 
-const studentMetrics = {
-  averageRating: 4.8,
-};
-
-const courses = [
-  {
-    id: 1,
-    name: 'UI Design Fundamentals',
-    enrolledStudents: 48,
-    rating: 4.9,
-    completionRate: 87,
-  },
-  {
-    id: 2,
-    name: 'JavaScript Mastery',
-    enrolledStudents: 56,
-    rating: 4.7,
-    completionRate: 72,
-  },
-  {
-    id: 3,
-    name: 'Product Management Excellence',
-    enrolledStudents: 34,
-    rating: 4.8,
-    completionRate: 81,
-  },
-  {
-    id: 4,
-    name: 'Data Analytics with Python',
-    enrolledStudents: 42,
-    rating: 4.6,
-    completionRate: 68,
-  },
-];
+interface CoursePerf {
+  id: string;
+  name: string;
+  enrolledStudents: number;
+  rating: number;
+}
 
 const aiShortcuts = [
   { id: 1, label: 'Generate lesson outline', icon: '📝' },
@@ -65,10 +38,13 @@ const aiShortcuts = [
 
 const CoachDashboard: React.FC = () => {
   const { profile: currentUser } = useUser();
+  const navigate = useNavigate();
   const [activeCoursesCount, setActiveCoursesCount] = useState(0);
   const [activeStudentsCount, setActiveStudentsCount] = useState(0);
   const [newEnrolleesCount, setNewEnrolleesCount] = useState(0);
   const [upcomingSessions, setUpcomingSessions] = useState<any[]>([]);
+  const [coursePerfs, setCoursePerfs] = useState<CoursePerf[]>([]);
+  const [avgRating, setAvgRating] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -81,7 +57,7 @@ const CoachDashboard: React.FC = () => {
         // 1. Active Courses
         const { count: courseCount, data: coursesData, error: courseError } = await supabase
           .from('courses')
-          .select('id', { count: 'exact' })
+          .select('id, title', { count: 'exact' })
           .eq('coach_id', currentUser.id)
           .eq('verification_status', 'approved');
 
@@ -90,37 +66,70 @@ const CoachDashboard: React.FC = () => {
 
         const courseIds = coursesData?.map(c => c.id) || [];
 
-
+        // Build course performance data
         if (courseIds.length > 0) {
-          // 2. Active Students & 3. New Enrollees
-          const { data: enrollments, error: enrollError } = await supabase
+          // Enrollment counts per course
+          const { data: allEnrollments } = await supabase
             .from('enrollments')
-            .select('profile_id, enrolled_at')
+            .select('course_id, profile_id, enrolled_at')
             .in('course_id', courseIds);
 
-          if (enrollError) throw enrollError;
-
-          const uniqueStudents = new Set(enrollments?.map(e => e.profile_id));
-          setActiveStudentsCount(uniqueStudents.size);
-
+          const enrollmentsByCourse: Record<string, number> = {};
+          const uniqueStudents = new Set<string>();
           const sevenDaysAgo = new Date();
           sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-          const newEnrollments = enrollments?.filter(e => new Date(e.enrolled_at) > sevenDaysAgo);
-          setNewEnrolleesCount(newEnrollments?.length || 0);
+          let newCount = 0;
+
+          (allEnrollments || []).forEach((e: { course_id: string; profile_id: string; enrolled_at: string }) => {
+            enrollmentsByCourse[e.course_id] = (enrollmentsByCourse[e.course_id] || 0) + 1;
+            uniqueStudents.add(e.profile_id);
+            if (new Date(e.enrolled_at) > sevenDaysAgo) newCount++;
+          });
+
+          setActiveStudentsCount(uniqueStudents.size);
+          setNewEnrolleesCount(newCount);
+
+          // Ratings per course
+          const { data: reviews } = await supabase
+            .from('reviews')
+            .select('course_id, rating')
+            .in('course_id', courseIds);
+
+          const ratingsByCourse: Record<string, number[]> = {};
+          (reviews || []).forEach((r: { course_id: string; rating: number }) => {
+            if (!ratingsByCourse[r.course_id]) ratingsByCourse[r.course_id] = [];
+            ratingsByCourse[r.course_id].push(r.rating);
+          });
+
+          const allRatings = (reviews || []).map((r: { rating: number }) => r.rating);
+          const overallAvg = allRatings.length > 0
+            ? Math.round((allRatings.reduce((s: number, v: number) => s + v, 0) / allRatings.length) * 10) / 10
+            : 0;
+          setAvgRating(overallAvg);
+
+          const perfs: CoursePerf[] = (coursesData || []).map((c: { id: string; title: string }) => {
+            const courseRatings = ratingsByCourse[c.id] || [];
+            const avg = courseRatings.length > 0
+              ? Math.round((courseRatings.reduce((s, v) => s + v, 0) / courseRatings.length) * 10) / 10
+              : 0;
+            return {
+              id: c.id,
+              name: c.title,
+              enrolledStudents: enrollmentsByCourse[c.id] || 0,
+              rating: avg,
+            };
+          });
+          setCoursePerfs(perfs);
         }
 
         // 4. Upcoming Sessions
-        // DEBUG: Relaxed filter to checked past sessions too, and added logs
-        console.log('Fetching sessions for coach:', currentUser.id);
         const { data: sessions, error: sessionError } = await supabase
           .from('live_sessions')
           .select('*')
           .eq('coach_id', currentUser.id)
-          // .gte('scheduled_at', new Date().toISOString()) // Commented out strict future filter for debug
-          .order('scheduled_at', { ascending: true }) // Ascending (oldest first) might bury future ones if there are many old ones, but limit is 5. 
-          .limit(10); // Increased limit
-
-        console.log('Sessions fetch result:', { sessions, sessionError });
+          .gte('scheduled_at', new Date().toISOString())
+          .order('scheduled_at', { ascending: true })
+          .limit(5);
 
         if (sessionError) throw sessionError;
         setUpcomingSessions(sessions || []);
@@ -135,22 +144,16 @@ const CoachDashboard: React.FC = () => {
     fetchDashboardData();
   }, [currentUser]);
 
-  const handleCourseClick = (courseName: string) => {
-    window.alert(`📚 ${courseName}\n\n🎯 Quick Actions:\n• View course analytics\n• Edit course content\n• Manage students (24 enrolled)\n• View student feedback (4.8/5)\n• Update pricing or settings\n\n📊 Recent Activity:\n• 3 new enrollments today\n• 12 lessons completed\n• 5 student questions pending\n\nClick on course card to access full details.`);
+  const handleCourseClick = (courseId: string) => {
+    navigate(`/coach/courses/${courseId}`);
   };
 
-  const handleSessionClick = (sessionId: number) => {
-    window.alert(`📅 Coaching Session Details\n\nSession ID: ${sessionId}\n\n👥 Session Info:\n• Duration: 60 minutes\n• Format: Video call\n• Student: Premium member\n• Topic: Course feedback\n\n🎯 Preparation:\n• Review student progress\n• Prepare discussion points\n• Test video/audio setup\n• Have course materials ready\n\n⏰ Join 5 minutes early for best experience.`);
+  const handleSessionClick = (_sessionId: string) => {
+    navigate(`/coach/sessions`);
   };
 
-  const handleAIShortcut = (label: string) => {
-    const aiFeatures: Record<string, string> = {
-      'Generate lesson outline': '📝 AI Lesson Outline Generator\n\n✨ What it does:\n• Creates structured lesson outlines\n• Suggests learning objectives\n• Recommends activities and assessments\n• Optimizes lesson duration\n\n⚡ Time saved: ~2 hours per lesson\n\n💡 Click to launch AI assistant',
-      'Analyze quiz results': '📊 AI Quiz Analytics\n\n✨ Features:\n• Identifies difficult questions\n• Suggests question improvements\n• Analyzes student performance patterns\n• Recommends personalized feedback\n\n📈 Improves student outcomes by 25%\n\n💡 Click to view analytics',
-      'Draft course announcement': '📢 AI Announcement Writer\n\n✨ Capabilities:\n• Writes engaging announcements\n• Personalizes for your audience\n• Suggests optimal send times\n• A/B testing recommendations\n\n✅ Increases open rates by 40%\n\n💡 Click to start drafting',
-      'Suggest price optimization': '💡 AI Price Optimizer\n\n✨ Analysis includes:\n• Market competitive analysis\n• Student demand prediction\n• Revenue optimization suggestions\n• Discount strategy recommendations\n\n💰 Average revenue increase: 18%\n\n💡 Click to see recommendations'
-    };
-    window.alert(aiFeatures[label] || `🤖 AI Tool: ${label}\n\nThis AI tool helps you work smarter and save time.\n\nClick to explore features.`);
+  const handleAIShortcut = (_label: string) => {
+    // AI shortcuts — future feature
   };
 
   const maxRevenue = Math.max(...revenueData.lastSixMonths.map((m) => m.amount));
@@ -263,7 +266,7 @@ const CoachDashboard: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-sm text-[color:var(--text-secondary)]">Average rating</p>
-                    <p className="text-3xl font-bold text-yellow-500">{studentMetrics.averageRating}</p>
+                    <p className="text-3xl font-bold text-yellow-500">{avgRating || '—'}</p>
                   </div>
                 </div>
               </div>
@@ -274,34 +277,25 @@ const CoachDashboard: React.FC = () => {
           <div className="glass-card rounded-[24px] p-6">
             <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-6">Course performance</h2>
             <div className="space-y-4">
-              {courses.map((course) => (
+              {coursePerfs.length > 0 ? coursePerfs.map((course) => (
                 <div
                   key={course.id}
-                  onClick={() => handleCourseClick(course.name)}
+                  onClick={() => handleCourseClick(course.id)}
                   className="p-4 bg-[color:var(--bg-secondary)] rounded-xl hover:bg-[color:var(--bg-glass-hover)] border border-[color:var(--border-base)] transition-all cursor-pointer group"
                 >
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <h3 className="text-lg font-semibold text-[color:var(--text-primary)] mb-1 group-hover:text-[color:var(--color-brand-electric)] transition-colors">{course.name}</h3>
                       <div className="flex items-center gap-4 text-sm text-[color:var(--text-secondary)]">
                         <span>👥 {course.enrolledStudents} students</span>
-                        <span>⭐ {course.rating}</span>
+                        {course.rating > 0 && <span>⭐ {course.rating}</span>}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm text-[color:var(--text-secondary)] mb-1">Completion rate</p>
-                      <p className="text-xl font-bold text-[color:var(--color-brand-electric)]">{course.completionRate}%</p>
-                    </div>
-                  </div>
-                  {/* Progress Bar */}
-                  <div className="w-full h-2 bg-[color:var(--bg-primary)] rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-[color:var(--color-brand-electric)] to-[color:var(--color-brand-neon)] rounded-full transition-all box-shadow-[0_0_8px_rgba(59,130,246,0.5)]"
-                      style={{ width: `${course.completionRate}%` }}
-                    />
                   </div>
                 </div>
-              ))}
+              )) : (
+                <p className="text-center text-[color:var(--text-secondary)] py-8">No approved courses yet. Create your first course!</p>
+              )}
             </div>
           </div>
 

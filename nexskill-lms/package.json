@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:backend": "npx tsx tests/backend.test.ts",
+    "test:frontend": "npx tsx tests/frontend.test.ts",
+    "test": "npx tsx tests/frontend.test.ts && npx tsx tests/backend.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.90.1",

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, GripVertical, Save, Target } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Target } from 'lucide-react';
 import { supabase } from '../../../lib/supabaseClient';
 
 interface CourseGoal {
@@ -112,7 +112,7 @@ const CourseGoalsPanel: React.FC<CourseGoalsPanelProps> = ({ courseId }) => {
                     <p className="text-center py-4 text-gray-500">Loading goals...</p>
                 ) : (
                     <div className="space-y-3">
-                        {goals.map((goal, index) => (
+                        {goals.map((goal, _index) => (
                             <div key={goal.id} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-700/50 rounded-xl border border-gray-200 dark:border-gray-600 group">
                                 <div className="text-gray-400 cursor-grab">
                                     <GripVertical className="w-5 h-5" />

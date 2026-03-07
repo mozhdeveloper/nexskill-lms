@@ -38,11 +38,11 @@ const RoleHeader: React.FC = () => {
   const roleColor = roleColors[currentUser.role];
   const isDevelopment = import.meta.env.DEV;
 
-  const handleRoleSwitch = (newRole: UserRole) => {
+  const handleRoleSwitch = async (newRole: UserRole) => {
     switchRole(newRole);
     setShowRoleSwitcher(false);
     // Navigate to new role's default dashboard
-    navigate(getDefaultRoute());
+    navigate(await getDefaultRoute());
   };
 
   const handleLogout = async () => {

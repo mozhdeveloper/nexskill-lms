@@ -27,6 +27,106 @@ const StudentLogin: React.FC = () => {
         }));
     };
 
+    const DEMO_EMAIL = 'alex.doe@nexskill.demo';
+    const DEMO_PASSWORD = 'demo1234';
+
+    const handleQuickLogin = async () => {
+        setError(null);
+        setIsSubmitting(true);
+        try {
+            let authUser = null;
+
+            // 1. Attempt sign in
+            const { data: signInData, error: signInError } = await signIn(DEMO_EMAIL, DEMO_PASSWORD);
+
+            if (signInError) {
+                // Account doesn't exist yet — auto-create it
+                if (
+                    signInError.message.toLowerCase().includes('invalid login credentials') ||
+                    signInError.message.toLowerCase().includes('user not found')
+                ) {
+                    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+                        email: DEMO_EMAIL,
+                        password: DEMO_PASSWORD,
+                        options: {
+                            data: { first_name: 'Alex', last_name: 'Doe', username: 'alex_doe', role: 'student' },
+                        },
+                    });
+
+                    if (signUpError) {
+                        setError(`Could not create demo account: ${signUpError.message}`);
+                        setIsSubmitting(false);
+                        return;
+                    }
+
+                    if (!signUpData.session) {
+                        setError(
+                            'Demo account created but email confirmation is required.\n' +
+                            'In the Supabase dashboard → Authentication → Providers → Email, disable "Confirm email".',
+                        );
+                        setIsSubmitting(false);
+                        return;
+                    }
+
+                    authUser = signUpData.user;
+
+                    // Upsert profile after signup
+                    if (authUser) {
+                        await supabase.from('profiles').upsert({
+                            id: authUser.id,
+                            email: DEMO_EMAIL,
+                            first_name: 'Alex',
+                            last_name: 'Doe',
+                            username: 'alex_doe',
+                            role: 'student',
+                        });
+                    }
+                } else {
+                    setError(signInError.message);
+                    setIsSubmitting(false);
+                    return;
+                }
+            } else {
+                authUser = signInData?.user;
+            }
+
+            if (authUser) {
+                // Ensure profile exists with correct role
+                const { data: profileData } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', authUser.id)
+                    .single();
+
+                if (!profileData) {
+                    // Profile missing — create it now
+                    await supabase.from('profiles').upsert({
+                        id: authUser.id,
+                        email: DEMO_EMAIL,
+                        first_name: 'Alex',
+                        last_name: 'Doe',
+                        username: 'alex_doe',
+                        role: 'student',
+                    });
+                }
+
+                const role = mapStringToRole(profileData?.role ?? 'student');
+                if (role !== 'STUDENT') {
+                    await supabase.auth.signOut();
+                    setError('This demo account is not a student. Check the profiles table role.');
+                    setIsSubmitting(false);
+                    return;
+                }
+
+                setTheme('dark');
+                navigate(defaultLandingRouteByRole['STUDENT']);
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Unexpected error');
+            setIsSubmitting(false);
+        }
+    };
+
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
@@ -159,6 +259,23 @@ const StudentLogin: React.FC = () => {
                         {isSubmitting ? 'Signing In...' : 'Sign In as Student'}
                     </button>
                 </form>
+
+                {/* DEV: Quick Login */}
+                <div className="mt-4">
+                    <div className="flex items-center gap-3 mb-3">
+                        <div className="flex-1 border-t border-white/10" />
+                        <span className="text-xs text-yellow-400/70 font-mono">DEV</span>
+                        <div className="flex-1 border-t border-white/10" />
+                    </div>
+                    <button
+                        type="button"
+                        onClick={handleQuickLogin}
+                        disabled={isSubmitting}
+                        className="w-full py-2.5 px-4 rounded-xl border border-yellow-400/30 bg-yellow-400/10 text-yellow-400 text-sm font-semibold hover:bg-yellow-400/20 hover:border-yellow-400/50 transition-all disabled:opacity-50"
+                    >
+                        ⚡ Quick Login — Demo Student
+                    </button>
+                </div>
 
                 <div className="mt-8 pt-6 border-t border-white/10 text-center space-y-3">
                     <p className="text-sm text-gray-400">

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
 import AIChatPanel from '../../components/ai/AIChatPanel';
 import AIProgressRecommendations from '../../components/ai/AIProgressRecommendations';
@@ -6,21 +6,27 @@ import AIExplainSimplyCard from '../../components/ai/AIExplainSimplyCard';
 import AIRevisionTasks from '../../components/ai/AIRevisionTasks';
 import AIMilestoneNotifications from '../../components/ai/AIMilestoneNotifications';
 import AIPersonalizedStudyPlan from '../../components/ai/AIPersonalizedStudyPlan';
-
-// Mock student progress data
-const studentProgress = {
-  activeCourses: 3,
-  completedLessons: 42,
-  totalLessons: 120,
-  weeklyHours: 8.5,
-  streakDays: 5,
-  upcomingDeadlines: 2,
-  averageQuizScore: 82,
-  currentCourse: 'UI Design Basics',
-  completionPercentage: 35,
-};
+import { useEnrolledCourses } from '../../hooks/useEnrolledCourses';
+import { useCourseProgress } from '../../hooks/useCourseProgress';
 
 const AICoachHome: React.FC = () => {
+  const { courses: enrolledCourses } = useEnrolledCourses();
+  const courseIds = useMemo(() => enrolledCourses.map(c => c.id), [enrolledCourses]);
+  const { totalLessons, totalCompleted, totalTimeSeconds, overallPercent } = useCourseProgress(courseIds);
+
+  const currentCourse = enrolledCourses[0]?.title ?? 'your course';
+  const studentProgress = {
+    activeCourses: enrolledCourses.length,
+    completedLessons: totalCompleted,
+    totalLessons: totalLessons,
+    weeklyHours: Math.round((totalTimeSeconds / 3600) * 10) / 10,
+    streakDays: 0,
+    upcomingDeadlines: 0,
+    averageQuizScore: 0,
+    currentCourse,
+    completionPercentage: Math.round(overallPercent),
+  };
+
   return (
     <StudentAppLayout>
       <div className="min-h-screen bg-gradient-to-br from-[#E7F0FF] via-[#F9F0FF] to-[#E3F4FF] dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 py-8 px-6 transition-colors">

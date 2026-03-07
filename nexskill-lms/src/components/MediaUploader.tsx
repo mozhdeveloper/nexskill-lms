@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import {
     Upload,
     X,
@@ -7,7 +7,6 @@ import {
     Image as ImageIcon,
     Video as VideoIcon,
     FileText,
-    File,
 } from "lucide-react";
 import { useCloudinaryUpload } from "../hooks/useCloudinaryUpload";
 import type { MediaMetadata } from "../types/media.types";
@@ -32,7 +31,6 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
 }) => {
     const { uploadMedia, isUploading, uploadProgress, error, clearError } =
         useCloudinaryUpload();
-    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (error) {
@@ -44,7 +42,8 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
     }, [error, clearError]);
 
     const handleUpload = async () => {
-        const metadata = await uploadMedia(resourceType);
+        const cloudinaryType = resourceType === 'document' ? 'auto' : resourceType;
+        const metadata = await uploadMedia(cloudinaryType);
         if (metadata) {
             onUploadComplete(metadata);
         }

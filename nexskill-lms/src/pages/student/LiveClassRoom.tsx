@@ -51,7 +51,7 @@ const LiveClassRoom: React.FC = () => {
   const startTime = new Date(classData.scheduled_at);
   const endTime = new Date(startTime.getTime() + classData.duration_minutes * 60000);
   const isLive = classData.is_live || classData.status === 'in_progress';
-  const participantsCount = classData.participants_count || Math.floor(Math.random() * 20) + 1; // Mock
+  const participantsCount = classData.participants_count || 0;
   const instructorName = classData.coach ? `${classData.coach.first_name} ${classData.coach.last_name || ''}` : 'Instructor';
   const instructorInitials = classData.coach ? (classData.coach.first_name[0] + (classData.coach.last_name?.[0] || '')) : 'IN';
 

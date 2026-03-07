@@ -1,4 +1,4 @@
-import { MediaMetadata } from "./media.types";
+import type { MediaMetadata } from "./media.types";
 
 // ============================================
 // Content Block Types (Shared by Lessons & Quizzes)

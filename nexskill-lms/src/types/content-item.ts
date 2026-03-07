@@ -1,5 +1,5 @@
-import { Lesson } from "./lesson";
-import { Quiz } from "./quiz";
+import type { Lesson } from "./lesson";
+import type { Quiz } from "./quiz";
 
 export type ContentType = "lesson" | "quiz";
 

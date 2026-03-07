@@ -28,11 +28,30 @@ const CourseList: React.FC = () => {
         if (error) throw error;
 
         if (data) {
-          // DEBUG: Log feedback specifically for rejected/changes_requested courses
-          data.forEach((c: any) => {
-            if (c.verification_status === 'changes_requested' || c.verification_status === 'rejected') {
-              console.log(`[DEBUG] Feedback for ${c.title} (${c.id}):`, c.admin_verification_feedback);
-            }
+          // Fetch enrollment counts and ratings in parallel
+          const courseIds = data.map((c: any) => c.id);
+
+          const [{ data: enrollmentRows }, { data: reviewRows }] = await Promise.all([
+            supabase
+              .from('enrollments')
+              .select('course_id')
+              .in('course_id', courseIds),
+            supabase
+              .from('reviews')
+              .select('course_id, rating')
+              .in('course_id', courseIds),
+          ]);
+
+          const enrollCountByCourse: Record<string, number> = {};
+          (enrollmentRows || []).forEach((e: any) => {
+            enrollCountByCourse[e.course_id] = (enrollCountByCourse[e.course_id] || 0) + 1;
+          });
+
+          const ratingByCourse: Record<string, { total: number; count: number }> = {};
+          (reviewRows || []).forEach((r: any) => {
+            if (!ratingByCourse[r.course_id]) ratingByCourse[r.course_id] = { total: 0, count: 0 };
+            ratingByCourse[r.course_id].total += r.rating;
+            ratingByCourse[r.course_id].count++;
           });
 
           const mappedCourses = data.map((course: any) => {
@@ -67,10 +86,12 @@ const CourseList: React.FC = () => {
               id: course.id,
               title: course.title,
               status: status,
-              enrolledStudents: 0, // Placeholder
+              enrolledStudents: enrollCountByCourse[course.id] || 0,
               moduleCount,
               lessonCount,
-              rating: 0, // Placeholder
+              rating: ratingByCourse[course.id]
+                ? Math.round((ratingByCourse[course.id].total / ratingByCourse[course.id].count) * 10) / 10
+                : 0,
               lastUpdated: new Date(course.updated_at).toLocaleDateString(),
               adminFeedback: latestFeedback
             };

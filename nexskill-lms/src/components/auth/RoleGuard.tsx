@@ -76,7 +76,7 @@ const RoleGuard: React.FC<RoleGuardProps> = ({ children, allowedRoles }) => {
           {/* Action Buttons */}
           <div className="space-y-3">
             <button
-              onClick={() => navigate(getDefaultRoute())}
+              onClick={async () => navigate(await getDefaultRoute())}
               className="w-full py-3 px-6 bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white font-medium rounded-full shadow-[0_12px_24px_rgba(35,76,200,0.35)] hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all"
             >
               Go to My Dashboard

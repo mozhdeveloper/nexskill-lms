@@ -3,25 +3,26 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
 import LessonSidebar from '../../components/learning/LessonSidebar';
-import VideoPlayer from '../../components/learning/VideoPlayer';
-import PdfReader from '../../components/learning/PdfReader';
 import ContentBlockRenderer from '../../components/learning/ContentBlockRenderer';
 import DownloadCenter from '../../components/learning/DownloadCenter';
 import LessonNotesPanel from '../../components/learning/LessonNotesPanel';
-import TranscriptPanel from '../../components/learning/TranscriptPanel';
 import AISummaryDrawer from '../../components/learning/AISummaryDrawer';
 import AskAIWidget from '../../components/learning/AskAIWidget';
 import MarkLessonCompleteModal from '../../components/learning/MarkLessonCompleteModal';
 import type { Lesson } from '../../types/lesson';
+
+type LessonWithModule = Lesson & { moduleTitle?: string };
 
 const CoursePlayer: React.FC = () => {
   const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>();
   const navigate = useNavigate();
   const [showAIDrawer, setShowAIDrawer] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [showGraduation, setShowGraduation] = useState(false);
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
+  const [totalLessonsInCourse, setTotalLessonsInCourse] = useState(0);
   const [courseTitle, setCourseTitle] = useState('');
-  const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
+  const [currentLesson, setCurrentLesson] = useState<LessonWithModule | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,7 +47,7 @@ const CoursePlayer: React.FC = () => {
         // Fetch lesson data including content_blocks
         const { data: lessonData, error: lessonError } = await supabase
           .from('lessons')
-          .select('id, title, description, content_blocks, estimated_duration_minutes, is_published, created_at, updated_at, type')
+          .select('id, title, description, content_blocks, estimated_duration_minutes, is_published, created_at, updated_at')
           .eq('id', lessonId)
           .single();
 
@@ -67,23 +68,35 @@ const CoursePlayer: React.FC = () => {
 
         const lessonWithModule = {
           ...lessonData,
-          moduleTitle: moduleData.modules?.title || ''
+          moduleTitle: (moduleData.modules as unknown as { title: string } | null)?.title || ''
         };
 
         setCurrentLesson(lessonWithModule);
 
-        // Fetch completed lessons for this course
-        const { data: enrollmentData, error: enrollmentError } = await supabase
-          .from('enrollments')
-          .select('completed_lessons')
-          .eq('course_id', courseId)
-          .single(); // Assuming single enrollment record per student per course
+        // Fetch completed lessons using user_lesson_progress
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          // Get all lesson ids for this course via modules → module_content_items
+          const { data: modItems } = await supabase
+            .from('modules')
+            .select('module_content_items(content_id)')
+            .eq('course_id', courseId);
 
-        if (enrollmentError) {
-          // If no enrollment found, initialize with empty array
-          setCompletedLessons([]);
-        } else {
-          setCompletedLessons(enrollmentData.completed_lessons || []);
+          const lessonIds: string[] = (modItems || []).flatMap(
+            (m: any) => (m.module_content_items || []).map((ci: any) => ci.content_id)
+          );
+
+          if (lessonIds.length > 0) {
+            setTotalLessonsInCourse(lessonIds.length);
+            const { data: progressRows } = await supabase
+              .from('user_lesson_progress')
+              .select('lesson_id')
+              .eq('user_id', user.id)
+              .eq('is_completed', true)
+              .in('lesson_id', lessonIds);
+
+            setCompletedLessons((progressRows || []).map((r: any) => r.lesson_id));
+          }
         }
       } catch (err) {
         console.error('Error fetching lesson data:', err);
@@ -97,7 +110,9 @@ const CoursePlayer: React.FC = () => {
   }, [courseId, lessonId]);
 
   // Calculate progress based on completed lessons
-  const progress = currentLesson ? Math.round((completedLessons.length / 1) * 100) : 0; // Simplified for now
+  const progress = totalLessonsInCourse > 0
+    ? Math.min(100, Math.round((completedLessons.length / totalLessonsInCourse) * 100))
+    : 0;
 
   const handleSelectLesson = (newLessonId: string) => {
     navigate(`/student/courses/${courseId}/lessons/${newLessonId}`);
@@ -107,29 +122,36 @@ const CoursePlayer: React.FC = () => {
     if (!lessonId || !courseId) return;
 
     try {
-      // Add lesson to completed lessons
-      const updatedCompletedLessons = [...completedLessons, lessonId];
-      setCompletedLessons(updatedCompletedLessons);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
 
-      // Update in Supabase
+      // Upsert into user_lesson_progress
       const { error } = await supabase
-        .from('enrollments')
+        .from('user_lesson_progress')
         .upsert({
-          course_id: courseId,
-          completed_lessons: updatedCompletedLessons,
-          enrollment_date: new Date().toISOString(),
-          status: 'active'
-        }, { onConflict: ['course_id'] }); // Assuming one enrollment per course
+          user_id: user.id,
+          lesson_id: lessonId,
+          is_completed: true,
+          completed_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,lesson_id' });
 
       if (error) throw error;
 
+      // Optimistically update local state
+      setCompletedLessons(prev => prev.includes(lessonId) ? prev : [...prev, lessonId]);
       setShowCompleteModal(false);
-      alert('✓ Lesson marked as complete!');
     } catch (err) {
       console.error('Error marking lesson as complete:', err);
-      alert('Failed to mark lesson as complete');
+      alert('Failed to mark lesson as complete. Please try again.');
     }
   };
+
+  // Show graduation banner when all lessons are complete
+  useEffect(() => {
+    if (totalLessonsInCourse > 0 && completedLessons.length >= totalLessonsInCourse) {
+      setShowGraduation(true);
+    }
+  }, [completedLessons, totalLessonsInCourse]);
 
   if (loading) {
     return (
@@ -194,7 +216,7 @@ const CoursePlayer: React.FC = () => {
             <h1 className="text-xl font-bold text-text-primary dark:text-dark-text-primary mb-1">{courseTitle}</h1>
             <h2 className="text-lg text-text-secondary dark:text-dark-text-secondary mb-2">{currentLesson.title}</h2>
             <div className="flex items-center gap-4 text-sm text-text-muted dark:text-dark-text-muted">
-              <span>{currentLesson.moduleTitle}</span>
+              <span>{currentLesson.moduleTitle ?? ''}</span>
               <span>•</span>
               <span>Lesson {lessonId}</span>
               <span>•</span>
@@ -230,29 +252,15 @@ const CoursePlayer: React.FC = () => {
 
           {/* Center: Main Content */}
           <div className="flex-1 min-w-0">
-            {currentLesson.type === 'video' ? (
-              <VideoPlayer lesson={currentLesson} />
-            ) : currentLesson.type === 'text' || currentLesson.type === 'article' ? (
-              <div className="bg-white dark:bg-dark-background-card rounded-2xl p-6 shadow-md border border-gray-100 dark:border-gray-700">
-                <ContentBlockRenderer contentBlocks={currentLesson.content_blocks || []} />
-              </div>
-            ) : (
-              <PdfReader
-                pdf={{
-                  title: currentLesson.title,
-                  fileName: `${currentLesson.title.toLowerCase().replace(/\s+/g, '-')}.pdf`,
-                  totalPages: 12,
-                }}
-              />
-            )}
+            {/* Render content blocks (lessons store all content as content_blocks jsonb) */}
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl p-6 shadow-md border border-gray-100 dark:border-gray-700">
+              <ContentBlockRenderer contentBlocks={currentLesson.content_blocks || []} />
+            </div>
           </div>
 
           {/* Right: Secondary Panels */}
           <aside className="w-80 flex-shrink-0 space-y-4">
-            <DownloadCenter resources={[]} />
-            <LessonNotesPanel activeLessonId={lessonId || ''} />
-            {currentLesson.type === 'video' && <TranscriptPanel transcript={[]} />}
-            <AskAIWidget activeLessonId={lessonId || ''} />
+            <DownloadCenter resources={[]} />\n            <LessonNotesPanel activeLessonId={lessonId || ''} />\n            <AskAIWidget activeLessonId={lessonId || ''} />
 
             {/* AI Summary Button */}
             <button
@@ -279,6 +287,35 @@ const CoursePlayer: React.FC = () => {
         onConfirm={handleMarkComplete}
         onCancel={() => setShowCompleteModal(false)}
       />
+
+      {/* Graduation Banner */}
+      {showGraduation && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm w-full">
+          <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-2xl shadow-2xl p-5 flex items-start gap-4">
+            <span className="text-3xl flex-shrink-0">🎓</span>
+            <div className="flex-1 min-w-0">
+              <div className="font-bold text-lg mb-1">Course Complete!</div>
+              <div className="text-sm text-green-100 mb-3">
+                You've completed all lessons in <span className="font-semibold">{courseTitle}</span>. Your certificate is ready!
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => navigate(`/student/certificates/${courseId}`)}
+                  className="px-4 py-1.5 bg-white text-green-700 font-semibold rounded-full text-sm hover:bg-green-50 transition-colors"
+                >
+                  Get Certificate
+                </button>
+                <button
+                  onClick={() => setShowGraduation(false)}
+                  className="px-4 py-1.5 bg-green-700/40 text-white font-medium rounded-full text-sm hover:bg-green-700/60 transition-colors"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </StudentAppLayout>
   );
 };

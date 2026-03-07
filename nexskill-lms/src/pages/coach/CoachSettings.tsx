@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import CoachAppLayout from '../../layouts/CoachAppLayout';
 import ProfileInterestsGoals from '../../components/profile/ProfileInterestsGoals';
@@ -41,10 +42,18 @@ const CoachSettings: React.FC = () => {
   });
 
   const [accountSettings, setAccountSettings] = useState({
-    email: 'coach.johnson@example.com',
+    email: '',
     timezone: 'Pacific Time (PST)',
     lastPasswordUpdate: 'Nov 15, 2025',
   });
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user?.email) {
+        setAccountSettings(prev => ({ ...prev, email: data.user!.email! }));
+      }
+    });
+  }, []);
 
   const [privacySettings, setPrivacySettings] = useState({
     profileVisibility: 'public',

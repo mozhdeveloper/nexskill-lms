@@ -96,16 +96,96 @@ const CoachStudentsPage: React.FC = () => {
         }
 
 
-        // 4. Map & Aggregate Data
+        // 4. Fetch real progress, time spent, and quiz scores
+        // Get modules for the coach's courses
+        const { data: modules } = await supabase
+          .from('modules')
+          .select('id, course_id')
+          .in('course_id', courseIds);
+
+        const moduleIds = (modules || []).map(m => m.id);
+
+        // Get lesson content items from those modules
+        let lessonIds: string[] = [];
+        if (moduleIds.length > 0) {
+          const { data: contentItems } = await supabase
+            .from('module_content_items')
+            .select('content_id, module_id')
+            .in('module_id', moduleIds)
+            .eq('content_type', 'lesson');
+          lessonIds = (contentItems || []).map(ci => ci.content_id);
+        }
+
+        // Get user_lesson_progress for these students and lessons
+        let progressRows: { user_id: string; is_completed: boolean; time_spent_seconds: number }[] = [];
+        if (lessonIds.length > 0 && studentIds.length > 0) {
+          const { data } = await supabase
+            .from('user_lesson_progress')
+            .select('user_id, is_completed, time_spent_seconds')
+            .in('user_id', studentIds)
+            .in('lesson_id', lessonIds);
+          progressRows = data || [];
+        }
+
+        // Get quiz attempts for these students
+        let attemptRows: { user_id: string; score: number; max_score: number }[] = [];
+        if (studentIds.length > 0) {
+          // Get quiz ids linked to coach's courses
+          let quizIds: string[] = [];
+          if (moduleIds.length > 0) {
+            const { data: quizItems } = await supabase
+              .from('module_content_items')
+              .select('content_id')
+              .in('module_id', moduleIds)
+              .eq('content_type', 'quiz');
+            quizIds = (quizItems || []).map(qi => qi.content_id);
+          }
+          if (quizIds.length > 0) {
+            const { data } = await supabase
+              .from('quiz_attempts')
+              .select('user_id, score, max_score')
+              .in('user_id', studentIds)
+              .in('quiz_id', quizIds)
+              .in('status', ['submitted', 'graded']);
+            attemptRows = data || [];
+          }
+        }
+
+        // Pre-aggregate per student
+        const totalLessonsCount = lessonIds.length;
+        const progressByStudent: Record<string, { completed: number; timeSeconds: number }> = {};
+        for (const row of progressRows) {
+          if (!progressByStudent[row.user_id]) {
+            progressByStudent[row.user_id] = { completed: 0, timeSeconds: 0 };
+          }
+          if (row.is_completed) progressByStudent[row.user_id].completed++;
+          progressByStudent[row.user_id].timeSeconds += (row.time_spent_seconds || 0);
+        }
+
+        const scoresByStudent: Record<string, { totalPct: number; count: number }> = {};
+        for (const row of attemptRows) {
+          if (!scoresByStudent[row.user_id]) {
+            scoresByStudent[row.user_id] = { totalPct: 0, count: 0 };
+          }
+          if (row.max_score > 0) {
+            scoresByStudent[row.user_id].totalPct += (row.score / row.max_score) * 100;
+            scoresByStudent[row.user_id].count++;
+          }
+        }
+
+        // 5. Map & Aggregate Data
         const mappedStudents: Student[] = studentProfiles?.map((profile: any) => {
           const studentEnrollments = enrollments.filter(e => e.profile_id === profile.id);
 
-          // Note: enrollments table doesn't have progress column
-          // TODO: Calculate real progress from user_module_progress table
-          let avgProgress: number = 0; // Placeholder until we query user_module_progress
+          // Real progress from user_lesson_progress
+          const sp = progressByStudent[profile.id];
+          const avgProgress = totalLessonsCount > 0 && sp
+            ? Math.round((sp.completed / totalLessonsCount) * 100)
+            : 0;
 
-          // Mock Avg Score (Placeholder logic until quiz_attempts populated)
-          const mockAvgScore = Math.min(100, Math.round(avgProgress * (0.8 + Math.random() * 0.4)));
+          // Real avg score from quiz_attempts
+          const sq = scoresByStudent[profile.id];
+          const avgScoreVal = sq && sq.count > 0 ? Math.round(sq.totalPct / sq.count) : 0;
 
           // Get earliest enrollment date for this student (as their "joined" date for this coach)
           const earliestEnrollment = studentEnrollments.reduce((earliest, e) => {
@@ -137,12 +217,12 @@ const CoachStudentsPage: React.FC = () => {
             email: profile.email,
             enrolledCourses: studentEnrollments.length,
             totalProgress: avgProgress,
-            averageScore: mockAvgScore,
+            averageScore: avgScoreVal,
             lastActive,
             joinedDate: earliestEnrollment ? earliestEnrollment.toLocaleDateString() : 'N/A',
             status: computedStatus,
-            totalTimeSpent: `${Math.floor(avgProgress * 0.5 + Math.random() * 10)}h`, // Mock
-            certificatesEarned: 0, // TODO: Calculate from actual completion data
+            totalTimeSpent: sp ? `${Math.round(sp.timeSeconds / 3600)}h` : '0h',
+            certificatesEarned: 0,
           };
         }) || [];
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useUiPreferences } from '../../context/UiPreferencesContext';
+import { supabase } from '../../lib/supabaseClient';
 // import { useUser } from '../../context/UserContext';
 
 
@@ -18,6 +19,110 @@ const AdminLogin: React.FC = () => {
   const { signIn } = useAuth();
   // const { getDefaultRoute } = useUser();
   const [error, setError] = useState<string | null>(null);
+
+  const DEMO_EMAIL = 'morgan.doe@nexskill.demo';
+  const DEMO_PASSWORD = 'demo1234';
+
+  const handleQuickLogin = async () => {
+    setError(null);
+    setIsLoading(true);
+    try {
+      let authUser = null;
+
+      // 1. Attempt sign in
+      const { data: signInData, error: signInError } = await signIn(DEMO_EMAIL, DEMO_PASSWORD);
+
+      if (signInError) {
+        // Account doesn't exist yet — auto-create it
+        if (
+          signInError.message.toLowerCase().includes('invalid login credentials') ||
+          signInError.message.toLowerCase().includes('user not found')
+        ) {
+          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+            email: DEMO_EMAIL,
+            password: DEMO_PASSWORD,
+            options: {
+              data: { first_name: 'Morgan', last_name: 'Doe', username: 'morgan_doe', role: 'admin' },
+            },
+          });
+
+          if (signUpError) {
+            setError(`Could not create demo account: ${signUpError.message}`);
+            setIsLoading(false);
+            return;
+          }
+
+          if (!signUpData.session) {
+            setError(
+              'Demo account created but email confirmation is required.\n' +
+              'In the Supabase dashboard → Authentication → Providers → Email, disable "Confirm email".',
+            );
+            setIsLoading(false);
+            return;
+          }
+
+          authUser = signUpData.user;
+
+          // Upsert admin profile after signup
+          if (authUser) {
+            await supabase.from('profiles').upsert({
+              id: authUser.id,
+              email: DEMO_EMAIL,
+              first_name: 'Morgan',
+              last_name: 'Doe',
+              username: 'morgan_doe',
+              role: 'admin',
+            });
+          }
+        } else {
+          setError(signInError.message);
+          setIsLoading(false);
+          return;
+        }
+      } else {
+        authUser = signInData?.user;
+      }
+
+      if (!authUser) {
+        setError('Authentication failed. Please try again.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Verify role in profiles table
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', authUser.id)
+        .single();
+
+      if (!profile) {
+        // Profile missing — create it
+        await supabase.from('profiles').upsert({
+          id: authUser.id,
+          email: DEMO_EMAIL,
+          first_name: 'Morgan',
+          last_name: 'Doe',
+          username: 'morgan_doe',
+          role: 'admin',
+        });
+      }
+
+      const userRole = profile?.role?.toLowerCase();
+      if (!userRole || !['admin', 'platform_owner'].includes(userRole)) {
+        await supabase.auth.signOut();
+        setError('Demo account does not have admin privileges. Check the profiles table role.');
+        setIsLoading(false);
+        return;
+      }
+
+      setTheme('dark');
+      setTimeout(() => navigate('/admin/dashboard'), 100);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unexpected error');
+      setIsLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,10 +152,6 @@ const AdminLogin: React.FC = () => {
       }
 
       // 2. Check if user has 'admin' or 'platform_owner' role
-      // We need to import supabase from lib/supabaseClient to make this query
-      // Note: This assumes a 'profiles' table exists with a 'role' column
-      const { supabase } = await import('../../lib/supabaseClient');
-
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role')
@@ -59,12 +160,8 @@ const AdminLogin: React.FC = () => {
 
       if (profileError) {
         console.error("Error fetching profile:", profileError);
-        // Fallback: accept if no profile found? Or reject? 
-        // Safer to reject for an admin portal if database query fails.
-        // However, if we are in development and using mock data, this might block us.
-        // For now, let's log it but proceed to rejection if we can't verify.
         setError("Failed to verify admin privileges.");
-        await useAuth().signOut; // ensure we sign out if check fails
+        await supabase.auth.signOut();
         setIsLoading(false);
         return;
       }
@@ -205,6 +302,23 @@ const AdminLogin: React.FC = () => {
               {isLoading ? 'Authenticating...' : 'Sign In to Admin Console'}
             </button>
           </form>
+
+          {/* DEV: Quick Login */}
+          <div className="mt-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex-1 border-t border-white/10" />
+              <span className="text-xs text-yellow-400/70 font-mono">DEV</span>
+              <div className="flex-1 border-t border-white/10" />
+            </div>
+            <button
+              type="button"
+              onClick={handleQuickLogin}
+              disabled={isLoading}
+              className="w-full py-2.5 px-4 rounded-xl border border-yellow-400/30 bg-yellow-400/10 text-yellow-400 text-sm font-semibold hover:bg-yellow-400/20 hover:border-yellow-400/50 transition-all disabled:opacity-50"
+            >
+              ⚡ Quick Login — Demo Admin
+            </button>
+          </div>
 
           {/* Divider */}
           <div className="my-6 flex items-center gap-4">

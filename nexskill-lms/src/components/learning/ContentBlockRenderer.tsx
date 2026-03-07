@@ -20,7 +20,7 @@ const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({ contentBloc
       case 'heading':
         // Extract heading level from attributes or default to h2
         const headingLevel = block.attributes?.level || 2;
-        const HeadingTag = `h${headingLevel}` as keyof JSX.IntrinsicElements;
+        const HeadingTag = `h${headingLevel}` as React.ElementType;
         
         return (
           <HeadingTag 

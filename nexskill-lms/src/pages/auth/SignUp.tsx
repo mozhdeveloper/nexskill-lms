@@ -4,8 +4,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useUser } from '../../context/UserContext';
 import BrandLockup from '../../components/brand/BrandLockup';
 
-type AccountType = 'STUDENT' | 'COACH';
-
 const SignUp: React.FC = () => {
   const navigate = useNavigate();
   const { signUp } = useAuth();
@@ -100,7 +98,7 @@ const SignUp: React.FC = () => {
           formData.firstName,
           formData.lastName,
           formData.username,
-          accountType,
+          'STUDENT',
           formData.middleName, // Passed as arg 7
           formData.nameExtension // Passed as arg 8
         );

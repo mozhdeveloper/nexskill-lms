@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import StudentAppLayout from "../../layouts/StudentAppLayout";
 import CourseFilterBar from "../../components/courses/CourseFilterBar";
@@ -28,9 +28,9 @@ const formatDuration = (hours: number) => {
 const CourseCatalog: React.FC = () => {
   const navigate = useNavigate();
   // Fetch ALL courses
-  const { courses: dbCourses, loading: loadingAll, error: errorAll } = useCourses();
+  const { courses: dbCourses, loading: loadingAll } = useCourses();
   // Fetch ENROLLED courses
-  const { courses: enrolledCourses, loading: loadingEnrolled, error: errorEnrolled } = useEnrolledCourses();
+  const { courses: enrolledCourses, loading: loadingEnrolled } = useEnrolledCourses();
 
   const [activeTab, setActiveTab] = useState<'browse' | 'enrolled'>('enrolled');
   const [searchQuery, setSearchQuery] = useState("");

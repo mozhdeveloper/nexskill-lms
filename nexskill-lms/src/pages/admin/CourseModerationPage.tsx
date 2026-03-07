@@ -48,10 +48,10 @@ const CourseModerationPage: React.FC = () => {
   // Dummy data for courses
   // Supabase for Active Courses
   const [activeCourses, setActiveCourses] = useState<Course[]>([]);
-  const [loadingActive, setLoadingActive] = useState(true);
+  const [, setLoadingActive] = useState(true);
 
   // Mock for Pending/Rejected
-  const [mockCourses, setMockCourses] = useState<Course[]>([
+  const [mockCourses] = useState<Course[]>([
     {
       id: 'c1',
       title: 'Complete Python Programming Bootcamp 2024',

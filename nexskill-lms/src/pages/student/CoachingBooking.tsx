@@ -1,100 +1,63 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
 import TimeSlotPicker from '../../components/coaching/TimeSlotPicker';
 import BookingConfirmationCard from '../../components/coaching/BookingConfirmationCard';
 import BookingPaymentForm from '../../components/coaching/BookingPaymentForm';
+import { supabase } from '../../lib/supabaseClient';
 
-// Dummy coach data
-const coachesData: Record<string, any> = {
-  '1': { name: 'Dr. Emily Chen', title: 'Career Strategy Coach' },
-  '2': { name: 'Michael Rodriguez', title: 'Tech Skills Mentor' },
-  '3': { name: 'Sarah Thompson', title: 'Data Science Advisor' },
-};
-
-// Dummy available days
-const availableDays = [
-  {
-    date: '2025-12-08',
-    label: 'Mon, Dec 8',
-    weekday: 'MON',
-    dayNumber: 8,
-    slots: [
-      { time: '9:00 AM', available: true },
-      { time: '10:00 AM', available: true, fewLeft: true },
-      { time: '11:00 AM', available: false },
-      { time: '1:00 PM', available: true },
-      { time: '2:00 PM', available: true },
-      { time: '3:00 PM', available: false },
-    ],
-  },
-  {
-    date: '2025-12-09',
-    label: 'Tue, Dec 9',
-    weekday: 'TUE',
-    dayNumber: 9,
-    slots: [
-      { time: '9:00 AM', available: true },
-      { time: '10:00 AM', available: true },
-      { time: '11:00 AM', available: true },
-      { time: '1:00 PM', available: false },
-      { time: '2:00 PM', available: true, fewLeft: true },
-      { time: '3:00 PM', available: true },
-    ],
-  },
-  {
-    date: '2025-12-10',
-    label: 'Wed, Dec 10',
-    weekday: 'WED',
-    dayNumber: 10,
-    slots: [
-      { time: '9:00 AM', available: false },
-      { time: '10:00 AM', available: true },
-      { time: '11:00 AM', available: true },
-      { time: '1:00 PM', available: true },
-      { time: '2:00 PM', available: true },
-      { time: '3:00 PM', available: true },
-    ],
-  },
-  {
-    date: '2025-12-11',
-    label: 'Thu, Dec 11',
-    weekday: 'THU',
-    dayNumber: 11,
-    slots: [
-      { time: '9:00 AM', available: true },
-      { time: '10:00 AM', available: true },
-      { time: '11:00 AM', available: true, fewLeft: true },
-      { time: '1:00 PM', available: true },
-      { time: '2:00 PM', available: false },
-      { time: '3:00 PM', available: true },
-    ],
-  },
-  {
-    date: '2025-12-12',
-    label: 'Fri, Dec 12',
-    weekday: 'FRI',
-    dayNumber: 12,
-    slots: [
-      { time: '9:00 AM', available: true },
-      { time: '10:00 AM', available: false },
-      { time: '11:00 AM', available: true },
-      { time: '1:00 PM', available: true },
-      { time: '2:00 PM', available: true },
-      { time: '3:00 PM', available: false },
-    ],
-  },
-];
+// No coach_availability table yet — empty slot list
+const availableDays: any[] = [];
 
 const CoachingBooking: React.FC = () => {
   const { coachId } = useParams<{ coachId: string }>();
   const navigate = useNavigate();
 
+  const [coach, setCoach] = useState<{ name: string; title: string } | null>(null);
+  const [loadingCoach, setLoadingCoach] = useState(true);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedSlot, setSelectedSlot] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const coach = coachId ? coachesData[coachId] : null;
+  useEffect(() => {
+    if (!coachId) { setLoadingCoach(false); return; }
+    const fetchCoach = async () => {
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('first_name, last_name')
+          .eq('id', coachId)
+          .single();
+        if (!profile) { setLoadingCoach(false); return; }
+
+        const { data: cp } = await supabase
+          .from('coach_profiles')
+          .select('job_title')
+          .eq('id', coachId)
+          .single();
+
+        setCoach({
+          name: `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim(),
+          title: cp?.job_title ?? 'Coach',
+        });
+      } catch {
+        // profile not found
+      } finally {
+        setLoadingCoach(false);
+      }
+    };
+    fetchCoach();
+  }, [coachId]);
+
+  if (loadingCoach) {
+    return (
+      <StudentAppLayout>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#304DB5]" />
+        </div>
+      </StudentAppLayout>
+    );
+  }
 
   if (!coach) {
     return (

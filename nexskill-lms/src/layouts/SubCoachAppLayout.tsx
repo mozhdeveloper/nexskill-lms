@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useUser } from '../context/UserContext';
 import GlobalTopBarControls from '../components/system/GlobalTopBarControls';
 import BrandLogo from '../components/brand/BrandLogo';
-import { LogOut } from 'lucide-react';
+import { LogOut, Menu, X } from 'lucide-react';
 
 interface SubCoachAppLayoutProps {
   children: React.ReactNode;
@@ -15,6 +15,7 @@ const SubCoachAppLayout: React.FC<SubCoachAppLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const { signOut } = useAuth();
   const { profile: currentUser } = useUser();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = async () => {
     await signOut();
@@ -22,84 +23,90 @@ const SubCoachAppLayout: React.FC<SubCoachAppLayoutProps> = ({ children }) => {
   };
 
   const navItems = [
-    { path: '/subcoach/dashboard', label: 'Dashboard', icon: '📊' },
-    { path: '/subcoach/students', label: 'My Students', icon: '👨‍🎓' },
-    { path: '/subcoach/lessons', label: 'My Lessons', icon: '📚' },
-    { path: '/subcoach/grading', label: 'Grading', icon: '✍️' },
-    { path: '/subcoach/groups', label: 'Group Sessions', icon: '👥' },
-    { path: '/subcoach/community', label: 'Community', icon: '💬' },
-    { path: '/subcoach/notifications', label: 'Notifications', icon: '🔔' },
-    { path: '/subcoach/profile', label: 'Profile', icon: '⚙️' },
+    { path: '/subcoach/dashboard', label: 'Dashboard' },
+    { path: '/subcoach/students', label: 'My Students' },
+    { path: '/subcoach/lessons', label: 'My Lessons' },
+    { path: '/subcoach/grading', label: 'Grading' },
+    { path: '/subcoach/groups', label: 'Group Sessions' },
+    { path: '/subcoach/community', label: 'Community' },
+    { path: '/subcoach/notifications', label: 'Notifications' },
+    { path: '/subcoach/profile', label: 'Profile' },
   ];
 
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#E7F0FF] via-[#F9F0FF] to-[#E3F4FF] p-8 transition-colors">
-      <div className="mx-auto bg-white rounded-[32px] shadow-card overflow-hidden flex transition-colors" style={{ minHeight: 'calc(100vh - 64px)' }}>
-        {/* Left Sidebar */}
-        <aside className="w-[240px] flex-shrink-0 flex flex-col p-6 border-r border-[#EDF0FB]">
-          {/* Logo */}
-          <div className="mb-8">
+    <div className="h-screen flex bg-[color:var(--bg-primary)] transition-colors overflow-hidden">
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      <aside
+        className={`fixed lg:static inset-y-0 left-0 z-50 w-[260px] flex-shrink-0 flex flex-col bg-[color:var(--color-bg-sidebar)] border-r border-[color:var(--border-base)] transform transition-transform duration-200 lg:translate-x-0 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="p-6 pb-2">
+          <div className="flex items-center justify-between">
             <Link to="/subcoach/dashboard" className="flex items-center gap-3">
               <BrandLogo size="md" showText={false} />
               <div>
-                <span className="text-xl font-bold text-teal-600 block leading-tight">NexSkill</span>
-                <span className="text-xs text-slate-600">Sub-Coach Portal</span>
+                <span className="text-xl font-bold text-gradient block leading-tight">NexSkill</span>
+                <span className="text-xs text-[color:var(--text-secondary)]">Sub-Coach Portal</span>
               </div>
             </Link>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 space-y-2">
-            {navItems.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive(item.path)
-                    ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-medium shadow-md'
-                    : 'text-text-secondary hover:bg-teal-50 hover:text-teal-700'
-                  }`}
-              >
-                <span className="text-sm">{item.label}</span>
-              </Link>
-            ))}
-          </nav>
-
-          {/* Sub-Coach Profile */}
-          <div className="pt-6 mt-6 border-t border-[#EDF0FB]">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-400 to-cyan-400 flex items-center justify-center text-white font-semibold">
-                {currentUser?.firstName?.charAt(0).toUpperCase() || 'S'}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-text-primary truncate">
-                  {currentUser?.firstName || 'Sub-Coach'}
-                </p>
-                <p className="text-xs text-text-muted">Assistant Instructor</p>
-              </div>
-            </div>
-            {/* Logout Button */}
-            <button
-              onClick={handleLogout}
-              className="mt-4 w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition-all"
-            >
-              <LogOut className="w-5 h-5" />
-              <span className="text-sm font-medium">Logout</span>
+            <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1 rounded-lg text-[color:var(--text-secondary)] hover:bg-[color:var(--bg-glass-hover)]">
+              <X className="w-5 h-5" />
             </button>
           </div>
-        </aside>
+        </div>
 
-        {/* Main Content Area */}
-        <main className="flex-1 flex flex-col overflow-hidden">
-          {/* Top Bar with Global Controls */}
-          <div className="flex items-center justify-end px-8 pt-6 pb-4 border-b border-[#EDF0FB]">
-            <GlobalTopBarControls />
-          </div>
+        <nav className="flex-1 overflow-y-auto scrollbar-hidden px-4 py-2 space-y-1">
+          {navItems.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              onClick={() => setSidebarOpen(false)}
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all ${isActive(item.path)
+                  ? 'bg-gradient-to-r from-[color:var(--color-brand-neon)] to-[color:var(--color-brand-electric)] text-white font-medium shadow-md'
+                  : 'text-[color:var(--text-secondary)] hover:bg-[color:var(--bg-glass-hover)] hover:text-[color:var(--color-brand-electric)]'
+                }`}
+            >
+              <span className="text-sm">{item.label}</span>
+            </Link>
+          ))}
+        </nav>
 
-          <div className="flex-1 overflow-auto">
-            {children}
+        <div className="p-4 border-t border-[color:var(--border-base)]">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center text-white text-sm font-semibold">
+              {currentUser?.firstName?.charAt(0).toUpperCase() || 'S'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-[color:var(--text-primary)] truncate">
+                {currentUser?.firstName || 'Sub-Coach'}
+              </p>
+              <p className="text-xs text-[color:var(--text-secondary)]">Assistant Instructor</p>
+            </div>
           </div>
+          <button onClick={handleLogout} className="mt-3 w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-red-400 hover:bg-red-500/10 transition-all">
+            <LogOut className="w-4 h-4" />
+            <span className="text-sm font-medium">Logout</span>
+          </button>
+        </div>
+      </aside>
+
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="flex items-center justify-between px-4 sm:px-6 lg:px-8 py-3 border-b border-[color:var(--border-base)] bg-[color:var(--bg-secondary)]">
+          <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 rounded-lg text-[color:var(--text-secondary)] hover:bg-[color:var(--bg-glass-hover)]">
+            <Menu className="w-5 h-5" />
+          </button>
+          <div className="flex-1" />
+          <GlobalTopBarControls />
+        </header>
+
+        <main className="flex-1 overflow-auto scrollbar-hidden">
+          {children}
         </main>
       </div>
     </div>

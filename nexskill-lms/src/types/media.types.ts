@@ -17,7 +17,7 @@ export interface MediaMetadata {
     cloudinary_id: string;
     public_id: string;
     url: string;
-    resource_type: "image" | "video";
+    resource_type: "image" | "video" | "raw";
     format: string;
     width?: number;
     height?: number;

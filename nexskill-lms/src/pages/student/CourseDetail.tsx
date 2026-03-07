@@ -5,12 +5,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 
 // Keep dummy data for fallback or development if DB is empty
-const coursesData: Record<string, any> = {
-  // ... (keeping structure minimal or compatible if needed, or largely ignoring if we fully switch)
-  // For now, let's assume if ID doesn't match DB, we show not found, 
-  // but if we want to suppress errors for demo purposes we could keep it. 
-  // I will focus on the REAL implementation.
-};
+// coursesData removed - using live Supabase data
 
 // Define CourseDisplay interface
 interface CourseDisplay {
@@ -50,8 +45,9 @@ const CourseDetail: React.FC = () => {
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [course, setCourse] = useState<CourseDisplay | null>(null);
   const [loading, setLoading] = useState(true);
-  const [enrolling, setEnrolling] = useState(false);
+  const [enrolling] = useState(false);
   const [checkingEnrollment, setCheckingEnrollment] = useState(false);
+  const [isWishlisted, setIsWishlisted] = useState(false);
 
   // Check if user is enrolled in the course
   useEffect(() => {
@@ -99,7 +95,7 @@ const CourseDetail: React.FC = () => {
           .select(`
             *,
             category:categories(name),
-            coach:profiles!courses_coach_id_fkey(first_name, last_name, bio, avatar:avatar_url)
+            coach:profiles!courses_coach_id_fkey(first_name, last_name)
           `)
           .eq('id', courseId)
           .single();
@@ -132,7 +128,42 @@ const CourseDetail: React.FC = () => {
 
         if (itemsError) throw itemsError;
 
-        // 5. Fetch Enrollment & Progress
+        // 5. Fetch Stats + Enrollment & Progress in parallel
+        const [enrollCountResult, reviewsResult, wishlistResult] = await Promise.all([
+          supabase.from('enrollments').select('profile_id', { count: 'exact', head: true }).eq('course_id', courseId),
+          supabase.from('reviews').select('rating').eq('course_id', courseId),
+          user ? supabase.from('student_wishlist').select('id').eq('user_id', user.id).eq('course_id', courseId).maybeSingle() : Promise.resolve({ data: null, error: null })
+        ]);
+
+        const enrollmentCount = enrollCountResult.count ?? 0;
+        const reviewRows = reviewsResult.data || [];
+        const avgRating = reviewRows.length > 0 ? Math.round((reviewRows.reduce((sum, r) => sum + (r.rating || 0), 0) / reviewRows.length) * 10) / 10 : 0;
+        if (wishlistResult.data) setIsWishlisted(true);
+
+        // Fetch coach stats and profile if coach exists
+        let coachStudentsCount = 0;
+        let coachCoursesCount = 0;
+        let coachRating = 0;
+        let coachBio = '';
+        if (courseData.coach_id) {
+          const [coachCoursesResult, coachReviewsResult, coachProfileResult] = await Promise.all([
+            supabase.from('courses').select('id').eq('coach_id', courseData.coach_id),
+            supabase.from('reviews').select('rating').in('course_id',
+              (await supabase.from('courses').select('id').eq('coach_id', courseData.coach_id)).data?.map((c: any) => c.id) || []
+            ),
+            supabase.from('coach_profiles').select('bio').eq('id', courseData.coach_id).maybeSingle(),
+          ]);
+          coachBio = coachProfileResult.data?.bio || '';
+          const coachCourseIds = coachCoursesResult.data?.map((c: any) => c.id) || [];
+          coachCoursesCount = coachCourseIds.length;
+          if (coachCourseIds.length > 0) {
+            const { count } = await supabase.from('enrollments').select('profile_id', { count: 'exact', head: true }).in('course_id', coachCourseIds);
+            coachStudentsCount = count ?? 0;
+          }
+          const coachReviews = coachReviewsResult.data || [];
+          coachRating = coachReviews.length > 0 ? Math.round((coachReviews.reduce((sum, r) => sum + (r.rating || 0), 0) / coachReviews.length) * 10) / 10 : 0;
+        }
+
         let isUserEnrolled = false;
         let enrollmentDate: string | null = null;
         let userProgress: Record<string, boolean> = {};
@@ -256,9 +287,9 @@ const CourseDetail: React.FC = () => {
             title: courseData.title,
             category: courseData.category?.name || 'General',
             level: courseData.level || 'Beginner',
-            rating: 0, // Mock
-            reviewCount: 0, // Mock
-            studentsCount: 0, // Mock
+            rating: avgRating,
+            reviewCount: reviewRows.length,
+            studentsCount: enrollmentCount,
             duration: courseData.duration_hours ? `${courseData.duration_hours}h` : 'N/A',
             price: courseData.price || 0,
             originalPrice: undefined,
@@ -274,10 +305,10 @@ const CourseDetail: React.FC = () => {
             coach: courseData.coach ? {
               name: `${courseData.coach.first_name} ${courseData.coach.last_name || ''}`,
               avatar: '👨‍🏫',
-              bio: courseData.coach.bio || 'Expert Instructor',
-              studentsCount: 0,
-              coursesCount: 0,
-              rating: 5.0
+              bio: coachBio || 'Expert Instructor',
+              studentsCount: coachStudentsCount,
+              coursesCount: coachCoursesCount,
+              rating: coachRating
             } : null,
             includes: ['Lifetime access', 'Certificate of completion']
           });
@@ -304,62 +335,45 @@ const CourseDetail: React.FC = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        alert("Please log in to enroll.");
         navigate('/login');
         return;
       }
-
       if (!course) return;
-
-      // Insert enrollment
       const { error } = await supabase
         .from('enrollments')
-        .insert({
-          profile_id: user.id,
-          course_id: course.id
-        });
-
-      if (error) {
-        // Check for duplicate key error (already enrolled)
-        if (error.code === '23505') {
-          setIsEnrolled(true);
-          alert("You are already enrolled!");
-        } else {
-          throw error;
-        }
-      } else {
-        alert(`✅ Successfully enrolled in ${course.title}!\n\n🎉 Welcome to the course! You can now access all lessons and materials.`);
-        setIsEnrolled(true);
-        // Optionally redirect
-      }
-
+        .insert({ profile_id: user.id, course_id: course.id });
+      if (error && error.code !== '23505') throw error;
+      setIsEnrolled(true);
     } catch (err: any) {
       console.error('Error enrolling:', err);
-      alert('Failed to enroll: ' + err.message);
     }
   };
 
   const handleUnenroll = async () => {
     try {
       if (!user || !course) return;
-
-      // Implement unenroll logic or show instructions
-      // For now, simpler to contact support or just remove from enrollments table
       const { error } = await supabase.from('enrollments').delete().match({ profile_id: user.id, course_id: course.id });
-
       if (error) throw error;
-
       setIsEnrolled(false);
-      alert('You have successfully unenrolled from the course.');
     } catch (error) {
-      console.error("Error unenrolling:", error);
-      alert("Failed to unenroll.");
+      console.error('Error unenrolling:', error);
     }
   };
 
-  const handleAddToWishlist = () => {
-    console.log('Added to wishlist:', course ? course.id : '');
-    alert(`❤️ Added to wishlist!\n\n${course ? course.title : 'Course'} has been saved to your wishlist.`);
+  const handleAddToWishlist = async () => {
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser || !course) return;
+      if (isWishlisted) {
+        await supabase.from('student_wishlist').delete().match({ user_id: authUser.id, course_id: course.id });
+        setIsWishlisted(false);
+      } else {
+        await supabase.from('student_wishlist').insert({ user_id: authUser.id, course_id: course.id });
+        setIsWishlisted(true);
+      }
+    } catch (err) {
+      console.error('Error updating wishlist:', err);
+    }
   };
 
   if (loading) {
@@ -561,8 +575,7 @@ const CourseDetail: React.FC = () => {
                               key={lesson.id}
                               disabled={lesson.isLocked}
                               onClick={() => {
-                                // Navigate to lesson player (Not implemented yet)
-                                alert(`Navigate to lesson: ${lesson.title}`);
+                                if (!lesson.isLocked) navigate(`/student/courses/${courseId}/play`);
                               }}
                               className={`w-full flex items-center justify-between py-2 px-3 rounded-lg transition-colors text-left ${lesson.isLocked ? 'opacity-60 cursor-not-allowed bg-gray-50 dark:bg-gray-800/50' :
                                 'hover:bg-white dark:hover:bg-dark-background-card cursor-pointer'

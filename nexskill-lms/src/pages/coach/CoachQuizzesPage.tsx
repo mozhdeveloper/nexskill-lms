@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import CoachAppLayout from '../../layouts/CoachAppLayout';
 import { Search, Plus, Edit, Copy, Trash2, BarChart3, Users, Clock, CheckCircle, AlertCircle, FileText, Upload } from 'lucide-react';
+import { supabase } from '../../lib/supabaseClient';
+import { useAuth } from '../../context/AuthContext';
 
 interface Quiz {
   id: string;
@@ -34,178 +36,132 @@ interface PendingSubmission {
 }
 
 const CoachQuizzesPage: React.FC = () => {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'published' | 'draft' | 'archived'>('all');
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [, setLoadingQuizzes] = useState(true);
 
-  const [quizzes, setQuizzes] = useState<Quiz[]>([
-    {
-      id: 'quiz-1',
-      title: 'JavaScript Fundamentals - Final Assessment',
-      course: 'JavaScript Mastery',
-      questions: 25,
-      passingScore: 70,
-      timeLimit: 45,
-      attempts: 142,
-      avgScore: 78,
-      completionRate: 89,
-      status: 'published',
-      createdDate: '2024-01-15',
-      lastModified: '2024-01-20',
-      totalAttempts: 159,
-    },
-    {
-      id: 'quiz-2',
-      title: 'React Hooks Deep Dive Quiz',
-      course: 'React Fundamentals',
-      questions: 15,
-      passingScore: 75,
-      timeLimit: 30,
-      attempts: 98,
-      avgScore: 82,
-      completionRate: 94,
-      status: 'published',
-      createdDate: '2024-01-10',
-      lastModified: '2024-01-18',
-      totalAttempts: 104,
-    },
-    {
-      id: 'quiz-3',
-      title: 'Python Data Structures Assessment',
-      course: 'Python for Data Science',
-      questions: 20,
-      passingScore: 70,
-      timeLimit: 40,
-      attempts: 67,
-      avgScore: 74,
-      completionRate: 82,
-      status: 'published',
-      createdDate: '2024-01-08',
-      lastModified: '2024-01-22',
-      totalAttempts: 82,
-    },
-    {
-      id: 'quiz-4',
-      title: 'HTML/CSS Basics Quiz',
-      course: 'Web Development Bootcamp',
-      questions: 12,
-      passingScore: 65,
-      timeLimit: 20,
-      attempts: 189,
-      avgScore: 85,
-      completionRate: 96,
-      status: 'published',
-      createdDate: '2023-12-20',
-      lastModified: '2024-01-05',
-      totalAttempts: 197,
-    },
-    {
-      id: 'quiz-5',
-      title: 'Advanced TypeScript Concepts',
-      course: 'JavaScript Mastery',
-      questions: 18,
-      passingScore: 80,
-      timeLimit: 35,
-      attempts: 0,
-      avgScore: 0,
-      completionRate: 0,
-      status: 'draft',
-      createdDate: '2024-01-25',
-      lastModified: '2024-01-25',
-      totalAttempts: 0,
-    },
-    {
-      id: 'quiz-6',
-      title: 'Node.js Fundamentals Quiz (Old)',
-      course: 'Web Development Bootcamp',
-      questions: 15,
-      passingScore: 70,
-      timeLimit: 30,
-      attempts: 245,
-      avgScore: 79,
-      completionRate: 91,
-      status: 'archived',
-      createdDate: '2023-10-15',
-      lastModified: '2023-12-01',
-      totalAttempts: 269,
-    },
-    {
-      id: 'quiz-7',
-      title: 'Capstone Project Assessment',
-      course: 'JavaScript Mastery',
-      questions: 5,
-      passingScore: 70,
-      timeLimit: undefined,
-      attempts: 34,
-      avgScore: 0,
-      completionRate: 85,
-      status: 'published',
-      createdDate: '2024-01-20',
-      lastModified: '2024-01-28',
-      totalAttempts: 40,
-      hasFileUpload: true,
-      pendingGrading: 8,
-    },
-  ]);
+  useEffect(() => {
+    const fetchQuizzes = async () => {
+      if (!user) return;
+      try {
+        // Get coach's course IDs
+        const { data: courses } = await supabase
+          .from('courses')
+          .select('id, title')
+          .eq('coach_id', user.id);
 
-  // Pending file upload submissions
-  const [pendingSubmissions] = useState<PendingSubmission[]>([
-    {
-      id: 'sub-1',
-      studentName: 'Alex Martinez',
-      studentAvatar: 'AM',
-      quizTitle: 'Capstone Project Assessment',
-      questionTitle: 'Submit your final project code',
-      submittedAt: '2 hours ago',
-      fileName: 'capstone-project-final.zip',
-      fileSize: '4.2 MB',
-      maxPoints: 25,
-    },
-    {
-      id: 'sub-2',
-      studentName: 'Sarah Johnson',
-      studentAvatar: 'SJ',
-      quizTitle: 'Capstone Project Assessment',
-      questionTitle: 'Submit your final project code',
-      submittedAt: '5 hours ago',
-      fileName: 'js-mastery-project.zip',
-      fileSize: '3.8 MB',
-      maxPoints: 25,
-    },
-    {
-      id: 'sub-3',
-      studentName: 'Michael Chen',
-      studentAvatar: 'MC',
-      quizTitle: 'Capstone Project Assessment',
-      questionTitle: 'Submit project documentation',
-      submittedAt: '1 day ago',
-      fileName: 'documentation.pdf',
-      fileSize: '1.2 MB',
-      tentativeScore: 18,
-      maxPoints: 20,
-    },
-    {
-      id: 'sub-4',
-      studentName: 'Emma Wilson',
-      studentAvatar: 'EW',
-      quizTitle: 'Capstone Project Assessment',
-      questionTitle: 'Submit your final project code',
-      submittedAt: '1 day ago',
-      fileName: 'final-submission.zip',
-      fileSize: '5.1 MB',
-      maxPoints: 25,
-    },
-  ]);
+        const courseIds = courses?.map(c => c.id) || [];
+        const courseMap = Object.fromEntries((courses || []).map((c: { id: string; title: string }) => [c.id, c.title]));
+
+        if (courseIds.length === 0) { setLoadingQuizzes(false); return; }
+
+        // Get all module_content_items of type 'quiz' for these courses
+        const { data: modules } = await supabase
+          .from('modules')
+          .select('id, course_id')
+          .in('course_id', courseIds);
+
+        const moduleIds = modules?.map(m => m.id) || [];
+        const moduleToCourse = Object.fromEntries((modules || []).map((m: { id: number; course_id: string }) => [m.id, m.course_id]));
+
+        if (moduleIds.length === 0) { setLoadingQuizzes(false); return; }
+
+        const { data: contentItems } = await supabase
+          .from('module_content_items')
+          .select('content_id, module_id')
+          .in('module_id', moduleIds)
+          .eq('content_type', 'quiz');
+
+        const quizIds = (contentItems || []).map((ci: { content_id: string }) => ci.content_id);
+        const quizToCourse: Record<string, string> = {};
+        (contentItems || []).forEach((ci: { content_id: string; module_id: number }) => {
+          quizToCourse[ci.content_id] = moduleToCourse[ci.module_id] || '';
+        });
+
+        if (quizIds.length === 0) { setLoadingQuizzes(false); return; }
+
+        // Fetch quizzes
+        const { data: quizRows } = await supabase
+          .from('quizzes')
+          .select('*')
+          .in('id', quizIds);
+
+        // Fetch question counts
+        const { data: questionCounts } = await supabase
+          .from('quiz_questions')
+          .select('quiz_id')
+          .in('quiz_id', quizIds);
+
+        const qCountMap: Record<string, number> = {};
+        (questionCounts || []).forEach((q: { quiz_id: string }) => {
+          qCountMap[q.quiz_id] = (qCountMap[q.quiz_id] || 0) + 1;
+        });
+
+        // Fetch attempt stats
+        const { data: attempts } = await supabase
+          .from('quiz_attempts')
+          .select('quiz_id, score, max_score, status')
+          .in('quiz_id', quizIds);
+
+        const attemptStats: Record<string, { total: number; completed: number; totalScore: number }> = {};
+        (attempts || []).forEach((a: { quiz_id: string; score: number; max_score: number; status: string }) => {
+          if (!attemptStats[a.quiz_id]) attemptStats[a.quiz_id] = { total: 0, completed: 0, totalScore: 0 };
+          attemptStats[a.quiz_id].total++;
+          if (a.status === 'submitted' || a.status === 'graded') {
+            attemptStats[a.quiz_id].completed++;
+            if (a.max_score > 0) {
+              attemptStats[a.quiz_id].totalScore += Math.round((a.score / a.max_score) * 100);
+            }
+          }
+        });
+
+        const mapped: Quiz[] = (quizRows || []).map((q: Record<string, unknown>) => {
+          const stats = attemptStats[q.id as string] || { total: 0, completed: 0, totalScore: 0 };
+          const avgScore = stats.completed > 0 ? Math.round(stats.totalScore / stats.completed) : 0;
+          const completionRate = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
+          const courseId = quizToCourse[q.id as string] || '';
+
+          return {
+            id: q.id as string,
+            title: q.title as string,
+            course: courseMap[courseId] || 'Unknown Course',
+            questions: qCountMap[q.id as string] || 0,
+            passingScore: (q.passing_score as number) || 70,
+            timeLimit: (q.time_limit_minutes as number) || undefined,
+            attempts: (q.max_attempts as number) || 0,
+            avgScore,
+            completionRate,
+            status: 'published' as const,
+            createdDate: (q.created_at as string)?.split('T')[0] || '',
+            lastModified: (q.updated_at as string)?.split('T')[0] || (q.created_at as string)?.split('T')[0] || '',
+            totalAttempts: stats.total,
+          };
+        });
+
+        setQuizzes(mapped);
+      } catch (err) {
+        console.error('Error fetching quizzes:', err);
+      } finally {
+        setLoadingQuizzes(false);
+      }
+    };
+    fetchQuizzes();
+  }, [user]);
+
+  // No pending submissions from DB yet — placeholder for future file upload feature
+  const [pendingSubmissions] = useState<PendingSubmission[]>([]);
 
   const handleCreateQuiz = () => {
     setShowCreateModal(false);
-    window.alert(`✅ Quiz Created Successfully\n\n📝 Quiz Setup:\n• Questions: Start adding\n• Status: Draft\n• Auto-save: Enabled\n\n🎯 Next Steps:\n1. Add questions\n2. Set passing score\n3. Configure time limit\n4. Add feedback messages\n5. Preview quiz\n6. Publish to students\n\n💡 You can save progress and return anytime.`);
   };
 
-  const handleEditQuiz = (quiz: Quiz) => {
-    window.alert(`✏️ Edit Quiz\n\nQuiz: ${quiz.title}\nCourse: ${quiz.course}\n\n📝 Edit Options:\n• Question editor\n• Settings & timing\n• Passing criteria\n• Feedback messages\n• Attempts allowed\n• Grade weighting\n\n📊 Current Stats:\n• Attempts: ${quiz.totalAttempts}\n• Avg Score: ${quiz.avgScore}%\n• Completion: ${quiz.completionRate}%\n\n💡 Changes will be saved as a new version. Current attempts will continue using the existing version.`);
+  const handleEditQuiz = (_quiz: Quiz) => {
+    // Navigate to quiz editor in future
   };
 
   const handleDuplicateQuiz = (quiz: Quiz) => {
@@ -222,15 +178,15 @@ const CoachQuizzesPage: React.FC = () => {
       lastModified: new Date().toISOString().split('T')[0],
     };
     setQuizzes([...quizzes, newQuiz]);
-    window.alert(`📋 Quiz Duplicated\n\nOriginal: ${quiz.title}\nNew Copy: ${newQuiz.title}\n\n✅ Duplicated Elements:\n• All questions and answers\n• Quiz settings\n• Time limits\n• Passing criteria\n\n📝 Status: Draft\n💡 Review and modify before publishing.`);
   };
 
-  const handleDeleteQuiz = (quiz: Quiz) => {
-    if (quiz.totalAttempts > 0) {
-      window.alert(`⚠️ Cannot Delete Quiz\n\nQuiz: ${quiz.title}\n\n❌ Reason:\n• Has ${quiz.totalAttempts} student attempts\n• Student records would be lost\n\n✅ Alternatives:\n• Archive this quiz\n• Create a new version\n• Disable further attempts\n\n💡 Archiving preserves student data while hiding the quiz from active lists.`);
-    } else {
+  const handleDeleteQuiz = async (quiz: Quiz) => {
+    if (quiz.totalAttempts > 0) return;
+    try {
+      await supabase.from('quizzes').delete().eq('id', quiz.id);
       setQuizzes(quizzes.filter(q => q.id !== quiz.id));
-      window.alert(`🗑️ Quiz Deleted\n\nQuiz: ${quiz.title}\n\n✅ Deleted Successfully:\n• No student attempts found\n• Safe to remove\n\n📝 This action cannot be undone.\n\n💡 Consider duplicating quizzes before major changes to preserve your work.`);
+    } catch (err) {
+      console.error('Error deleting quiz:', err);
     }
   };
 
@@ -239,36 +195,20 @@ const CoachQuizzesPage: React.FC = () => {
     setShowDetailModal(true);
   };
 
-  const handlePublishQuiz = (quiz: Quiz) => {
-    const updatedQuizzes = quizzes.map(q =>
-      q.id === quiz.id ? { ...q, status: 'published' as const } : q
-    );
-    setQuizzes(updatedQuizzes);
-    window.alert(`🚀 Quiz Published\n\nQuiz: ${quiz.title}\nCourse: ${quiz.course}\n\n✅ Published Successfully:\n• Visible to all enrolled students\n• Available in course curriculum\n• Progress tracking: Active\n• Notifications sent: Yes\n\n📊 Quiz Details:\n• Questions: ${quiz.questions}\n• Time limit: ${quiz.timeLimit} minutes\n• Passing score: ${quiz.passingScore}%\n• Attempts allowed: ${quiz.attempts}\n\n📧 Students Notified:\n• Email: Sent\n• In-app: Delivered\n• Course dashboard: Updated\n\n💡 Monitor analytics to track student performance and identify difficult questions.`);
+  const handlePublishQuiz = (_quiz: Quiz) => {
+    // Future: update quiz status in DB
   };
 
-  const handleArchiveQuiz = (quiz: Quiz) => {
-    const updatedQuizzes = quizzes.map(q =>
-      q.id === quiz.id ? { ...q, status: 'archived' as const } : q
-    );
-    setQuizzes(updatedQuizzes);
-    window.alert(`📦 Quiz Archived\n\nQuiz: ${quiz.title}\n\n✅ Archived Successfully:\n• Removed from active quizzes\n• Student data: Preserved\n• Can be restored anytime\n• No new attempts allowed\n\n💾 Data Retention:\n• All ${quiz.totalAttempts} attempts saved\n• Analytics still available\n• Scores maintained\n\n🔄 To Restore:\n• Change status back to published\n• Students can resume access\n\n💡 Archive old quizzes to keep your dashboard organized while preserving historical data.`);
+  const handleArchiveQuiz = (_quiz: Quiz) => {
+    // Future: update quiz status in DB
   };
 
-  const handleGradeSubmission = (submission: PendingSubmission) => {
-    const score = prompt(`Grade submission for ${submission.studentName}\n\nQuestion: ${submission.questionTitle}\nFile: ${submission.fileName}\n\nEnter score (max ${submission.maxPoints} points):`);
-    if (score !== null) {
-      const numScore = parseInt(score);
-      if (!isNaN(numScore) && numScore >= 0 && numScore <= submission.maxPoints) {
-        window.alert(`✅ Submission Graded\n\nStudent: ${submission.studentName}\nQuestion: ${submission.questionTitle}\nScore: ${numScore}/${submission.maxPoints}\n\n📊 Score Updated:\n• Student notified via email\n• Quiz score recalculated\n• "Tentative" badge removed for this question\n\n💡 The student's overall quiz score will be updated to reflect this grade.`);
-      } else {
-        window.alert(`❌ Invalid Score\n\nPlease enter a number between 0 and ${submission.maxPoints}.`);
-      }
-    }
+  const handleGradeSubmission = (_submission: PendingSubmission) => {
+    // Future: grade file upload submission
   };
 
-  const handleDownloadSubmission = (submission: PendingSubmission) => {
-    window.alert(`📥 Downloading File\n\nStudent: ${submission.studentName}\nFile: ${submission.fileName}\nSize: ${submission.fileSize}\n\n✅ Download started...\n\n💡 After reviewing the file, click "Grade" to assign a score.`);
+  const handleDownloadSubmission = (_submission: PendingSubmission) => {
+    // Future: download file upload submission
   };
 
   const totalPendingGrading = pendingSubmissions.filter(s => s.tentativeScore === undefined).length;

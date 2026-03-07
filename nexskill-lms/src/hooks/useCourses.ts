@@ -60,17 +60,14 @@ export const useCourse = (courseId: string | undefined) => {
         try {
             setLoading(true);
 
-            // Fetch course with modules and lessons
-            // Assuming 'modules' table has foreign key 'course_id'
-            // and 'lessons' table has foreign key 'module_id'
-
+            // Fetch course with modules and content items (lessons linked via module_content_items)
             const { data, error } = await supabase
                 .from('courses')
                 .select(`
           *,
           modules (
             *,
-            lessons (*)
+            module_content_items (*)
           )
         `)
                 .eq('id', courseId)
@@ -78,12 +75,12 @@ export const useCourse = (courseId: string | undefined) => {
 
             if (error) throw error;
 
-            // Sort modules and lessons by order_index if available
+            // Sort modules by position
             if (data && data.modules) {
-                data.modules.sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0));
+                data.modules.sort((a: any, b: any) => (a.position || 0) - (b.position || 0));
                 data.modules.forEach((mod: any) => {
-                    if (mod.lessons) {
-                        mod.lessons.sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0));
+                    if (mod.module_content_items) {
+                        mod.module_content_items.sort((a: any, b: any) => (a.position || 0) - (b.position || 0));
                     }
                 });
             }

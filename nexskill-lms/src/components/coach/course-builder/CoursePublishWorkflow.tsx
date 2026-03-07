@@ -18,7 +18,7 @@ interface CoursePublishWorkflowProps {
 const CoursePublishWorkflow: React.FC<CoursePublishWorkflowProps> = ({
   courseStatus,
   verificationStatus,
-  adminFeedback,
+  adminFeedback: _adminFeedback,
   onPublish,
   onUnpublish,
   onSubmitForReview,

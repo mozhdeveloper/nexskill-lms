@@ -101,30 +101,56 @@ export const useCourseVerification = (courseId: string | undefined): UseCourseVe
             let contentItems: ModuleContentItem[] = [];
 
             if (moduleIds.length > 0) {
-                // Fetch lessons directly
-                const { data: lessonsData, error: lessonsError } = await supabase
-                    .from('lessons')
-                    .select('id, title, module_id, order_index, duration')
+                // Fetch content items linking modules to lessons/quizzes
+                const { data: mciData, error: mciError } = await supabase
+                    .from('module_content_items')
+                    .select('id, module_id, content_type, content_id, position, is_published')
                     .in('module_id', moduleIds)
-                    .order('order_index', { ascending: true });
+                    .order('position', { ascending: true });
 
-                if (lessonsError) throw lessonsError;
+                if (mciError) throw mciError;
 
-                // Map lessons to content items format
-                contentItems = (lessonsData || []).map((lesson: any) => ({
-                    id: `lesson-${lesson.id}`,
-                    module_id: lesson.module_id,
-                    content_type: 'lesson',
-                    content_id: lesson.id,
-                    position: lesson.order_index || 0,
-                    lesson_id: lesson.id,
-                    lesson_title: lesson.title,
-                    lesson_description: '', // If description exists in lesson table add it, else empty
-                    content_blocks: [], // Content blocks might need separate fetch if they are a separate table, assuming basic details for now
-                    estimated_duration_minutes: parseInt(lesson.duration) || 0,
-                    quiz_id: null,
-                    quiz_title: null
-                }));
+                // Fetch lesson details for lesson-type items
+                const lessonIds = (mciData || []).filter(i => i.content_type === 'lesson').map(i => i.content_id);
+                let lessonsMap: Record<string, any> = {};
+                if (lessonIds.length > 0) {
+                    const { data: lessonsData } = await supabase
+                        .from('lessons')
+                        .select('id, title, description, estimated_duration_minutes')
+                        .in('id', lessonIds);
+                    for (const l of lessonsData || []) lessonsMap[l.id] = l;
+                }
+
+                // Fetch quiz details for quiz-type items
+                const quizIds = (mciData || []).filter(i => i.content_type === 'quiz').map(i => i.content_id);
+                let quizzesMap: Record<string, any> = {};
+                if (quizIds.length > 0) {
+                    const { data: quizzesData } = await supabase
+                        .from('quizzes')
+                        .select('id, title, description')
+                        .in('id', quizIds);
+                    for (const q of quizzesData || []) quizzesMap[q.id] = q;
+                }
+
+                // Map to content items format
+                contentItems = (mciData || []).map((item: any) => {
+                    const lesson = item.content_type === 'lesson' ? lessonsMap[item.content_id] : null;
+                    const quiz = item.content_type === 'quiz' ? quizzesMap[item.content_id] : null;
+                    return {
+                        id: item.id,
+                        module_id: item.module_id,
+                        content_type: item.content_type,
+                        content_id: item.content_id,
+                        position: item.position || 0,
+                        lesson_id: lesson?.id || null,
+                        lesson_title: lesson?.title || null,
+                        lesson_description: lesson?.description || '',
+                        content_blocks: [],
+                        estimated_duration_minutes: lesson?.estimated_duration_minutes || 0,
+                        quiz_id: quiz?.id || null,
+                        quiz_title: quiz?.title || null,
+                    };
+                });
             }
 
             // Group content by module
@@ -203,7 +229,7 @@ export const useCourseVerification = (courseId: string | undefined): UseCourseVe
         }
     };
 
-    const updateVerificationStatus = async (status: CourseVerificationStatus, feedback?: string) => {
+    const updateVerificationStatus = async (status: CourseVerificationStatus, _feedback?: string) => {
         if (!courseId) return;
 
         try {

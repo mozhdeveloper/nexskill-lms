@@ -122,7 +122,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = React.memo(({
     // Update the editor content when the prop changes
     useEffect(() => {
         if (editor && content !== prevContentRef.current) {
-            editor.commands.setContent(content, false); // false means don't preserve selection
+            editor.commands.setContent(content); // update content without preserving selection
             prevContentRef.current = content;
         }
     }, [editor, content]);

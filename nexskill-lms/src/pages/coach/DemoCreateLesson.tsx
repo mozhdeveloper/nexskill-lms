@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import CoachAppLayout from '../../layouts/CoachAppLayout';
 import ContentBlockRenderer from '../../components/learning/ContentBlockRenderer';
 
-// Mock Data for Demo Lessons
-const MOCK_LESSONS = [
+// Demo lesson data — page is not currently routed
+const DEMO_LESSONS = [
     { id: 1, title: 'Introduction to React Hooks', status: 'Published', lastUpdated: '2025-01-20', views: 1250 },
     { id: 2, title: 'State Management with Context API', status: 'Draft', lastUpdated: '2025-01-21', views: 0 },
     { id: 3, title: 'Advanced patterns in generic components', status: 'Published', lastUpdated: '2025-01-15', views: 890 },
@@ -97,7 +97,7 @@ const DemoCreateLesson: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {MOCK_LESSONS.map((lesson) => (
+                            {DEMO_LESSONS.map((lesson) => (
                                 <tr key={lesson.id} className="border-b border-slate-100 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-800/50 transition-colors">
                                     <td className="px-6 py-4">
                                         <p className="font-medium text-slate-900 dark:text-dark-text-primary">{lesson.title}</p>
@@ -129,7 +129,7 @@ const DemoCreateLesson: React.FC = () => {
                         </tbody>
                     </table>
                 </div>
-                {MOCK_LESSONS.length === 0 && (
+                {DEMO_LESSONS.length === 0 && (
                     <div className="p-8 text-center text-slate-500">
                         No lessons found. Create your first one!
                     </div>
