@@ -4,7 +4,7 @@ interface Course {
   id: string;
   title: string;
   instructorName: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'changes_requested';
   qualityScore: number;
   qualityMetrics: {
     contentCompleteness: number;
@@ -61,6 +61,12 @@ const CourseQualityScorePanel: React.FC<CourseQualityScorePanelProps> = ({ selec
           label: 'Rejected',
           bg: 'bg-[#FEE2E2]',
           text: 'text-[#DC2626]',
+        };
+      case 'changes_requested':
+        return {
+          label: 'Changes Req.',
+          bg: 'bg-amber-100',
+          text: 'text-amber-700',
         };
     }
   };

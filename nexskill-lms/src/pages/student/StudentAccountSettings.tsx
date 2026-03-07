@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabaseClient';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
 import ProfileInterestsGoals from '../../components/profile/ProfileInterestsGoals';
 import ProfileLanguagePreferences from '../../components/profile/ProfileLanguagePreferences';
@@ -31,10 +32,18 @@ const StudentAccountSettings: React.FC = () => {
   });
 
   const [accountSettings, setAccountSettings] = useState({
-    email: 'sarah.johnson@example.com',
+    email: '',
     timezone: 'Pacific Time (PST)',
     lastPasswordUpdate: 'Nov 15, 2025',
   });
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user?.email) {
+        setAccountSettings(prev => ({ ...prev, email: data.user!.email! }));
+      }
+    });
+  }, []);
 
   const handleSave = () => {
     console.log('Saving all settings:', {

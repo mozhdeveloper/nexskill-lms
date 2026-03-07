@@ -35,7 +35,7 @@ interface BookingType {
 const CoachingToolsHub: React.FC = () => {
   const [activeTool, setActiveTool] = useState<ActiveTool>('availability');
 
-  // Dummy state for components that need it
+  // Local UI state for components
   const [availabilityConfig, setAvailabilityConfig] = useState<DayAvailability[]>([
     {
       day: 'Monday',
@@ -109,35 +109,7 @@ const CoachingToolsHub: React.FC = () => {
     },
   ]);
 
-  const [bookingTypes, setBookingTypes] = useState<BookingType[]>([
-    {
-      id: 'booking-1',
-      name: '1:1 Strategy Session',
-      duration: 60,
-      format: 'Online',
-      price: 150,
-      maxParticipants: 1,
-      status: 'Active',
-    },
-    {
-      id: 'booking-2',
-      name: 'Quick Q&A',
-      duration: 30,
-      format: 'Online',
-      price: 50,
-      maxParticipants: 1,
-      status: 'Active',
-    },
-    {
-      id: 'booking-3',
-      name: 'Group Workshop',
-      duration: 90,
-      format: 'Online',
-      price: 200,
-      maxParticipants: 10,
-      status: 'Active',
-    },
-  ]);
+  const [bookingTypes, setBookingTypes] = useState<BookingType[]>([]);
 
   const toolTabs = [
     { id: 'availability' as ActiveTool, label: 'Availability', icon: '📅' },
@@ -179,7 +151,7 @@ const CoachingToolsHub: React.FC = () => {
                 />
               </svg>
             </div>
-            <p className="text-4xl font-bold">127</p>
+            <p className="text-4xl font-bold">0</p>
             <p className="text-xs opacity-80 mt-1">This year</p>
           </div>
 
@@ -200,7 +172,7 @@ const CoachingToolsHub: React.FC = () => {
                 />
               </svg>
             </div>
-            <p className="text-4xl font-bold text-[#111827]">8</p>
+            <p className="text-4xl font-bold text-[#111827]">0</p>
             <p className="text-xs text-[#9CA3B5] mt-1">Next 7 days</p>
           </div>
 
@@ -221,7 +193,7 @@ const CoachingToolsHub: React.FC = () => {
                 />
               </svg>
             </div>
-            <p className="text-4xl font-bold text-[#111827]">42</p>
+            <p className="text-4xl font-bold text-[#111827]">0</p>
             <p className="text-xs text-[#9CA3B5] mt-1">Currently coaching</p>
           </div>
 
@@ -236,8 +208,8 @@ const CoachingToolsHub: React.FC = () => {
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
               </svg>
             </div>
-            <p className="text-4xl font-bold text-[#111827]">4.9</p>
-            <p className="text-xs text-[#9CA3B5] mt-1">From 87 reviews</p>
+            <p className="text-4xl font-bold text-[#111827]">—</p>
+            <p className="text-xs text-[#9CA3B5] mt-1">From 0 reviews</p>
           </div>
         </div>
 

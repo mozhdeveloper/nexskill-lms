@@ -51,7 +51,7 @@ const SecurityCenterPage: React.FC = () => {
 
   return (
     <AdminAppLayout>
-      <div className="space-y-6">
+      <div className="m-5 space-y-6">
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold text-[#111827] mb-2">Security Center</h1>

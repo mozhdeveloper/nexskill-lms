@@ -112,7 +112,7 @@ const SubCoachStudentsPage: React.FC = () => {
     <SubCoachAppLayout>
       {/* Header */}
       <div className="px-8 py-6 border-b border-[#EDF0FB]">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-1xl">
           <h1 className="text-3xl font-bold text-text-primary mb-2">My Students</h1>
           <p className="text-sm text-text-secondary">
             Students assigned to you across {courses.length} courses
@@ -122,7 +122,7 @@ const SubCoachStudentsPage: React.FC = () => {
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto px-8 py-8">
-        <div className="max-w-7xl mx-auto space-y-6">
+        <div className="max-w-1xl mx-auto space-y-6">
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white rounded-2xl p-5 border border-[#EDF0FB]">
@@ -274,14 +274,13 @@ const SubCoachStudentsPage: React.FC = () => {
                         <div>
                           <h4 className="text-lg font-bold text-text-primary">{student.name}</h4>
                           <p className="text-sm text-text-secondary">{student.email}</p>
-                          <span className={`inline-block mt-1 px-2 py-1 text-xs font-medium rounded-lg ${
-                            student.status === 'active' ? 'bg-green-100 text-green-700' :
+                          <span className={`inline-block mt-1 px-2 py-1 text-xs font-medium rounded-lg ${student.status === 'active' ? 'bg-green-100 text-green-700' :
                             student.status === 'needs-support' ? 'bg-amber-100 text-amber-700' :
-                            'bg-red-100 text-red-700'
-                          }`}>
+                              'bg-red-100 text-red-700'
+                            }`}>
                             {student.status === 'active' ? '✅ Active' :
-                             student.status === 'needs-support' ? '⚠️ Needs Support' :
-                             '🔴 At Risk'}
+                              student.status === 'needs-support' ? '⚠️ Needs Support' :
+                                '🔴 At Risk'}
                           </span>
                         </div>
                       </div>
@@ -296,7 +295,7 @@ const SubCoachStudentsPage: React.FC = () => {
                         <div className="text-2xl font-bold text-teal-600">{student.progress}%</div>
                       </div>
                       <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
+                        <div
                           className="h-full bg-gradient-to-r from-teal-500 to-cyan-500"
                           style={{ width: `${student.progress}%` }}
                         />

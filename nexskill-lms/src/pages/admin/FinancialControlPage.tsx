@@ -490,7 +490,7 @@ const FinancialControlPage: React.FC = () => {
 
   return (
     <AdminAppLayout>
-      <div className="space-y-6">
+      <div className="m-5 space-y-6">
         {/* Page Header */}
         <div>
           <h1 className="text-2xl font-bold text-[#111827] mb-2">Financial Control</h1>

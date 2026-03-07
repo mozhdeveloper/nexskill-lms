@@ -100,7 +100,7 @@ const SubCoachGroupsPage: React.FC = () => {
     <SubCoachAppLayout>
       {/* Header */}
       <div className="px-8 py-6 border-b border-[#EDF0FB]">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-1xl">
           <h1 className="text-3xl font-bold text-text-primary mb-2">Group Sessions</h1>
           <p className="text-sm text-text-secondary">
             Manage live sessions and workshops
@@ -110,7 +110,7 @@ const SubCoachGroupsPage: React.FC = () => {
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto px-8 py-8">
-        <div className="max-w-7xl mx-auto space-y-6">
+        <div className="max-w-1xl mx-auto space-y-6">
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white rounded-2xl p-5 border border-[#EDF0FB]">
@@ -160,7 +160,7 @@ const SubCoachGroupsPage: React.FC = () => {
           <div className="bg-white rounded-2xl p-6 border border-[#EDF0FB]">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-text-primary">Your Sessions</h3>
-              <button 
+              <button
                 onClick={() => setShowScheduleModal(true)}
                 className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 rounded-xl transition-all"
               >
@@ -364,11 +364,10 @@ const SubCoachGroupsPage: React.FC = () => {
                       </div>
                       <div className="bg-gray-50 rounded-xl p-4">
                         <div className="text-xs text-text-secondary mb-1">Status</div>
-                        <span className={`inline-block px-2 py-1 text-xs font-medium rounded-lg ${
-                          session.status === 'Upcoming' ? 'bg-blue-100 text-blue-700' :
+                        <span className={`inline-block px-2 py-1 text-xs font-medium rounded-lg ${session.status === 'Upcoming' ? 'bg-blue-100 text-blue-700' :
                           session.status === 'Completed' ? 'bg-green-100 text-green-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>{session.status}</span>
+                            'bg-gray-100 text-gray-700'
+                          }`}>{session.status}</span>
                       </div>
                     </div>
 
@@ -378,7 +377,7 @@ const SubCoachGroupsPage: React.FC = () => {
                         {session.registeredStudents} / {session.maxCapacity} students
                       </div>
                       <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
+                        <div
                           className="h-full bg-gradient-to-r from-teal-500 to-cyan-500"
                           style={{ width: `${(session.registeredStudents / session.maxCapacity) * 100}%` }}
                         />

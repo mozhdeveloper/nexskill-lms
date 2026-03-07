@@ -15,19 +15,19 @@ const AICourseToolsHome: React.FC = () => {
   const kpiCards = [
     {
       label: 'Drafts created this week',
-      value: '12',
+      value: '0',
       icon: '📝',
       bgColor: 'from-blue-50 to-blue-100',
     },
     {
       label: 'Courses using AI tools',
-      value: '8',
+      value: '0',
       icon: '🤖',
       bgColor: 'from-purple-50 to-purple-100',
     },
     {
       label: 'Estimated time saved',
-      value: '24h',
+      value: '0h',
       icon: '⏱️',
       bgColor: 'from-green-50 to-green-100',
     },

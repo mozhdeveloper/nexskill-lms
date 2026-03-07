@@ -5,10 +5,32 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>NexSkill</title>
-    <script type="module" crossorigin src="/assets/index-CMV0pH4g.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-C4thv8dQ.css">
+    <script>
+      (function() {
+        try {
+          const localTheme = localStorage.getItem('ui-theme');
+          const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          
+          if (!localTheme) {
+            // Requirement 1: Force Default Dark Mode on very first visit
+            localStorage.setItem('ui-theme', 'dark');
+            document.documentElement.classList.add('dark');
+          } else {
+            if (localTheme === 'dark') {
+              document.documentElement.classList.add('dark');
+            } else {
+              document.documentElement.classList.remove('dark');
+            }
+          }
+        } catch (e) {
+          console.error('Theme initialization failed', e);
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-CMVPks0U.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-C6B7Dhc0.css">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"></div>
   </body>
 </html>

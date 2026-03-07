@@ -98,7 +98,7 @@ const SubCoachLessonsPage: React.FC = () => {
     <SubCoachAppLayout>
       {/* Header */}
       <div className="px-8 py-6 border-b border-[#EDF0FB]">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-1xl mx-auto">
           <h1 className="text-3xl font-bold text-text-primary mb-2">My Lessons</h1>
           <p className="text-sm text-text-secondary">
             Lessons you're supporting across {courses.length} courses
@@ -108,7 +108,7 @@ const SubCoachLessonsPage: React.FC = () => {
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto px-8 py-8">
-        <div className="max-w-7xl mx-auto space-y-6">
+        <div className="max-w-1xl mx-auto space-y-6">
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-white rounded-2xl p-5 border border-[#EDF0FB]">
@@ -241,16 +241,15 @@ const SubCoachLessonsPage: React.FC = () => {
                       <div className="flex items-start gap-3 mb-3">
                         <div className="text-2xl">
                           {lesson.type === 'Video' ? '🎥' :
-                           lesson.type === 'PDF' ? '📝' :
-                           lesson.type === 'Quiz' ? '❓' : '📚'}
+                            lesson.type === 'PDF' ? '📝' :
+                              lesson.type === 'Quiz' ? '❓' : '📚'}
                         </div>
                         <div className="flex-1">
                           <h4 className="text-lg font-bold text-text-primary mb-1">{lesson.lessonTitle}</h4>
                           <p className="text-sm text-text-secondary">{lesson.courseName}</p>
                         </div>
-                        <span className={`px-2 py-1 text-xs font-medium rounded-lg ${
-                          lesson.status === 'Published' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
-                        }`}>
+                        <span className={`px-2 py-1 text-xs font-medium rounded-lg ${lesson.status === 'Published' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                          }`}>
                           {lesson.status}
                         </span>
                       </div>

@@ -40,7 +40,7 @@ const SubCoachProfilePage: React.FC = () => {
     <SubCoachAppLayout>
       {/* Header */}
       <div className="px-8 py-6 border-b border-[#EDF0FB]">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-3xl">
           <h1 className="text-3xl font-bold text-text-primary mb-2">My Profile</h1>
           <p className="text-sm text-text-secondary">Manage your profile and preferences</p>
         </div>
@@ -48,7 +48,7 @@ const SubCoachProfilePage: React.FC = () => {
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto px-8 py-8">
-        <div className="max-w-4xl mx-auto space-y-6">
+        <div className="max-w-1xl mx-auto space-y-6">
           {/* Profile Card */}
           <div className="bg-gradient-to-br from-teal-500 to-cyan-500 rounded-2xl p-8 text-white">
             <div className="flex items-start gap-6">
@@ -74,31 +74,28 @@ const SubCoachProfilePage: React.FC = () => {
               <div className="flex gap-4">
                 <button
                   onClick={() => setActiveTab('profile')}
-                  className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-                    activeTab === 'profile'
-                      ? 'bg-gradient-to-r from-teal-50 to-cyan-50 text-teal-700 border-b-2 border-teal-500'
-                      : 'text-text-secondary hover:text-text-primary'
-                  }`}
+                  className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${activeTab === 'profile'
+                    ? 'bg-gradient-to-r from-teal-50 to-cyan-50 text-teal-700 border-b-2 border-teal-500'
+                    : 'text-text-secondary hover:text-text-primary'
+                    }`}
                 >
                   Profile Info
                 </button>
                 <button
                   onClick={() => setActiveTab('courses')}
-                  className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-                    activeTab === 'courses'
-                      ? 'bg-gradient-to-r from-teal-50 to-cyan-50 text-teal-700 border-b-2 border-teal-500'
-                      : 'text-text-secondary hover:text-text-primary'
-                  }`}
+                  className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${activeTab === 'courses'
+                    ? 'bg-gradient-to-r from-teal-50 to-cyan-50 text-teal-700 border-b-2 border-teal-500'
+                    : 'text-text-secondary hover:text-text-primary'
+                    }`}
                 >
                   My Courses
                 </button>
                 <button
                   onClick={() => setActiveTab('preferences')}
-                  className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-                    activeTab === 'preferences'
-                      ? 'bg-gradient-to-r from-teal-50 to-cyan-50 text-teal-700 border-b-2 border-teal-500'
-                      : 'text-text-secondary hover:text-text-primary'
-                  }`}
+                  className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${activeTab === 'preferences'
+                    ? 'bg-gradient-to-r from-teal-50 to-cyan-50 text-teal-700 border-b-2 border-teal-500'
+                    : 'text-text-secondary hover:text-text-primary'
+                    }`}
                 >
                   Preferences
                 </button>
@@ -160,7 +157,7 @@ const SubCoachProfilePage: React.FC = () => {
 
                   {/* Save Button */}
                   <div className="flex justify-end">
-                    <button 
+                    <button
                       onClick={() => {
                         window.alert('✅ Profile Updated Successfully\n\n📝 Changes Saved:\n• Personal information\n• Professional bio\n• Contact details\n• Availability schedule\n• Teaching preferences\n\n🌟 Profile Impact:\n• Visibility: Enhanced\n• Student trust: Improved\n• Professionalism: Complete\n\n💡 Your updated profile will be visible to students and the supervising coach immediately.');
                       }}
@@ -192,7 +189,7 @@ const SubCoachProfilePage: React.FC = () => {
                             <span className="font-medium">{course.studentsAssigned}</span> students assigned
                           </div>
                         </div>
-                        <button 
+                        <button
                           onClick={() => {
                             window.alert(`📚 Course Details\n\nCourse: ${course.name}\nStudents: ${course.studentsAssigned}\n\n📋 Your Responsibilities:\n• Teach assigned lessons\n• Grade assignments and quizzes\n• Monitor student progress\n• Respond to student questions\n• Hold office hours\n• Provide feedback\n\n✅ Course Access:\n• Full lesson materials\n• Teaching resources\n• Student roster\n• Grading tools\n• Communication platform\n\n💡 Contact supervising coach for curriculum questions or adjustments.`);
                           }}
@@ -310,7 +307,7 @@ const SubCoachProfilePage: React.FC = () => {
 
                   {/* Save Button */}
                   <div className="flex justify-end">
-                    <button 
+                    <button
                       onClick={() => {
                         window.alert('✅ Notification Preferences Saved\n\n🔔 Active Notifications:\n• Student questions: Enabled\n• Assignment submissions: Enabled\n• Grade reminders: Enabled\n• Session reminders: Enabled\n• Coach announcements: Enabled\n\n📧 Delivery Channels:\n• Email: Immediate\n• In-app: Real-time\n• Push notifications: Enabled\n• Daily digest: 8:00 AM\n\n⚙️ Quiet Hours:\n• Active: 10 PM - 7 AM\n• Emergency override: Enabled\n\n💡 You can adjust these settings anytime to match your workflow.');
                       }}

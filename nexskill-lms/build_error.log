@@ -1,0 +1,225 @@
+﻿[36mvite v7.2.6 [32mbuilding client environment for production...[36m[39m
+transforming...
+node.exe : [33msrc/p
+ages/student/CourseCu
+rriculumPage.tsx 
+(4:30): 
+"ModuleWithContent" 
+is not exported by "s
+rc/hooks/useCourseCur
+riculum.ts", 
+imported by "src/page
+s/student/CourseCurri
+culumPage.tsx".[39m
+At line:1 char:1
++ & "C:\Program Files
+\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo 
+...
++ ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: ([33msr   
+ c/pages/...Page.    
+tsx".[39m:Strin    
+g) [], RemoteExc    
+eption
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+[33msrc/pages/studen
+t/CourseCurriculumPag
+e.tsx (4:49): 
+"ContentItem" is not 
+exported by "src/hook
+s/useCourseCurriculum
+.ts", imported by "sr
+c/pages/student/Cours
+eCurriculumPage.tsx".
+[39m
+[32mΓ£ô[39m 3277 modules transformed.
+[33m[plugin 
+vite:reporter] 
+(!) C:/Users/Emmanuel
+/Documents/updatednex
+skill/nexskill-lms/ne
+xskill-lms/src/lib/su
+pabaseClient.ts is 
+dynamically imported 
+by C:/Users/Emmanuel/
+Documents/updatednexs
+kill/nexskill-lms/nex
+skill-lms/src/compone
+nts/coach/live-sessio
+ns/LiveSessionManager
+.tsx, C:/Users/Emmanu
+el/Documents/updatedn
+exskill/nexskill-lms/
+nexskill-lms/src/page
+s/admin/CoachesManage
+mentPage.tsx, C:/User
+s/Emmanuel/Documents/
+updatednexskill/nexsk
+ill-lms/nexskill-lms/
+src/pages/admin/Cours
+eModerationPage.tsx, 
+C:/Users/Emmanuel/Doc
+uments/updatednexskil
+l/nexskill-lms/nexski
+ll-lms/src/pages/admi
+n/UsersManagementPage
+.tsx, C:/Users/Emmanu
+el/Documents/updatedn
+exskill/nexskill-lms/
+nexskill-lms/src/page
+s/auth/AdminLogin.tsx
+, C:/Users/Emmanuel/D
+ocuments/updatednexsk
+ill/nexskill-lms/nexs
+kill-lms/src/pages/co
+ach/CoachStudentsPage
+.tsx but also 
+statically imported 
+by C:/Users/Emmanuel/
+Documents/updatednexs
+kill/nexskill-lms/nex
+skill-lms/src/compone
+nts/coach/course-buil
+der/CourseSettingsFor
+m.tsx, C:/Users/Emman
+uel/Documents/updated
+nexskill/nexskill-lms
+/nexskill-lms/src/con
+text/AuthContext.tsx,
+ C:/Users/Emmanuel/Do
+cuments/updatednexski
+ll/nexskill-lms/nexsk
+ill-lms/src/context/U
+serContext.tsx, C:/Us
+ers/Emmanuel/Document
+s/updatednexskill/nex
+skill-lms/nexskill-lm
+s/src/hooks/useChat.t
+s, C:/Users/Emmanuel/
+Documents/updatednexs
+kill/nexskill-lms/nex
+skill-lms/src/hooks/u
+seCourse.ts, C:/Users
+/Emmanuel/Documents/u
+pdatednexskill/nexski
+ll-lms/nexskill-lms/s
+rc/hooks/useCourseCur
+riculum.ts, C:/Users/
+Emmanuel/Documents/up
+datednexskill/nexskil
+l-lms/nexskill-lms/sr
+c/hooks/useCourses.ts
+, C:/Users/Emmanuel/D
+ocuments/updatednexsk
+ill/nexskill-lms/nexs
+kill-lms/src/hooks/us
+eEnrolledCourses.ts, 
+C:/Users/Emmanuel/Doc
+uments/updatednexskil
+l/nexskill-lms/nexski
+ll-lms/src/hooks/useE
+nrollment.ts, C:/User
+s/Emmanuel/Documents/
+updatednexskill/nexsk
+ill-lms/nexskill-lms/
+src/hooks/useLiveSess
+ions.ts, C:/Users/Emm
+anuel/Documents/updat
+ednexskill/nexskill-l
+ms/nexskill-lms/src/p
+ages/coach/CoachAppli
+cationPage.tsx, C:/Us
+ers/Emmanuel/Document
+s/updatednexskill/nex
+skill-lms/nexskill-lm
+s/src/pages/coach/Coa
+chMessagesPage.tsx, C
+:/Users/Emmanuel/Docu
+ments/updatednexskill
+/nexskill-lms/nexskil
+l-lms/src/pages/coach
+/CourseBuilder.tsx, C
+:/Users/Emmanuel/Docu
+ments/updatednexskill
+/nexskill-lms/nexskil
+l-lms/src/pages/coach
+/CourseCreate.tsx, C:
+/Users/Emmanuel/Docum
+ents/updatednexskill/
+nexskill-lms/nexskill
+-lms/src/pages/coach/
+CourseList.tsx, C:/Us
+ers/Emmanuel/Document
+s/updatednexskill/nex
+skill-lms/nexskill-lm
+s/src/pages/student/C
+ourseCircle.tsx, C:/U
+sers/Emmanuel/Documen
+ts/updatednexskill/ne
+xskill-lms/nexskill-l
+ms/src/pages/student/
+CoursePlayer.tsx, C:/
+Users/Emmanuel/Docume
+nts/updatednexskill/n
+exskill-lms/nexskill-
+lms/src/pages/student
+/OnboardingPreference
+s.tsx, C:/Users/Emman
+uel/Documents/updated
+nexskill/nexskill-lms
+/nexskill-lms/src/pag
+es/student/StudentMes
+sagesPage.tsx, C:/Use
+rs/Emmanuel/Documents
+/updatednexskill/nexs
+kill-lms/nexskill-lms
+/src/pages/student/St
+udentProfileEdit.tsx,
+ C:/Users/Emmanuel/Do
+cuments/updatednexski
+ll/nexskill-lms/nexsk
+ill-lms/src/pages/stu
+dent/StudentProfileVi
+ew.tsx, dynamic 
+import will not move 
+module into another 
+chunk.
+[39m
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mindex.html                         [39m[1m[2m    0.47 kB[22m[1m[22m[2m Γöé gzip:   0.30 kB[22m
+[2mdist/[22m[32massets/nexskill-logo-CZS8D4ib.png  [39m[1m[2m1,386.24 kB[22m[1m[22m
+[2mdist/[22m[35massets/index-CZcfkYk1.css          [39m[1m[2m  128.90 kB[22m[1m[22m[2m Γöé gzip:  17.42 kB[22m
+[2mdist/[22m[36massets/index-DRRCedpR.js           [39m[1m[33m3,523.50 kB[39m[22m[2m Γöé gzip: 870.13 kB[22m
+[33m
+(!) Some chunks are 
+larger than 500 kB 
+after minification. 
+Consider:
+- Using dynamic 
+import() to 
+code-split the 
+application
+- Use build.rollupOpt
+ions.output.manualChu
+nks to improve 
+chunking: https://rol
+lupjs.org/configurati
+on-options/#output-ma
+nualchunks
+- Adjust chunk size 
+limit for this 
+warning via build.chu
+nkSizeWarningLimit.[
+39m
+[32mΓ£ô built in 24.41s[39m

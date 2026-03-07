@@ -242,7 +242,7 @@ const UsersRolesPage: React.FC = () => {
                     <div className="flex items-center gap-3 mb-2">
                       <span className="text-2xl">{roleIcons[role]}</span>
                       <span className="text-2xl font-bold text-text-primary">
-                        {roleStats[role]}
+                        {(roleStats as Record<string, number>)[role] ?? 0}
                       </span>
                     </div>
                     <p className="text-xs text-text-muted">{labelByRole[role]}</p>

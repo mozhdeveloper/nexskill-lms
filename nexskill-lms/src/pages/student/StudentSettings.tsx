@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
 import ProfileInterestsGoals from '../../components/profile/ProfileInterestsGoals';
@@ -41,10 +42,18 @@ const StudentSettings: React.FC = () => {
   });
 
   const [accountSettings, setAccountSettings] = useState({
-    email: 'sarah.johnson@example.com',
+    email: '',
     timezone: 'Pacific Time (PST)',
     lastPasswordUpdate: 'Nov 15, 2025',
   });
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user?.email) {
+        setAccountSettings(prev => ({ ...prev, email: data.user!.email! }));
+      }
+    });
+  }, []);
 
   const [privacySettings, setPrivacySettings] = useState({
     profileVisibility: 'public',
@@ -135,7 +144,7 @@ const StudentSettings: React.FC = () => {
           </div>
         )}
 
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-1xl mx-auto">
           {/* Tabs */}
           <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-[#EDF0FB] dark:border-gray-700 mb-6">
             <div className="flex overflow-x-auto">
@@ -143,11 +152,10 @@ const StudentSettings: React.FC = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex-1 min-w-[140px] px-6 py-4 text-sm font-medium transition-all whitespace-nowrap ${
-                    activeTab === tab.id
+                  className={`flex-1 min-w-[140px] px-6 py-4 text-sm font-medium transition-all whitespace-nowrap ${activeTab === tab.id
                       ? 'text-brand-primary border-b-2 border-brand-primary bg-blue-50'
                       : 'text-text-secondary hover:bg-gray-50'
-                  }`}
+                    }`}
                 >
                   <span className="mr-2">{tab.icon}</span>
                   {tab.label}
@@ -162,7 +170,7 @@ const StudentSettings: React.FC = () => {
             {activeTab === 'account' && (
               <div className="space-y-6">
                 <ProfileAccountSettingsForm account={accountSettings} onChange={setAccountSettings} />
-                
+
                 {/* Delete Account Section */}
                 <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-red-200 p-6">
                   <h3 className="text-lg font-bold text-text-primary dark:text-dark-text-primary mb-2">Danger Zone</h3>
@@ -195,7 +203,7 @@ const StudentSettings: React.FC = () => {
                   onChange={setInterestsGoals}
                 />
                 <ProfileLanguagePreferences preferences={languagePrefs} onChange={setLanguagePrefs} />
-                
+
                 {/* Learning Preferences */}
                 <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-[#EDF0FB] dark:border-gray-700 p-6">
                   <h3 className="text-lg font-bold text-text-primary dark:text-dark-text-primary mb-4">Learning Preferences</h3>
@@ -242,7 +250,7 @@ const StudentSettings: React.FC = () => {
                   settings={notificationSettings}
                   onChange={setNotificationSettings}
                 />
-                
+
                 {/* Email Digest Settings */}
                 <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-[#EDF0FB] dark:border-gray-700 p-6">
                   <h3 className="text-lg font-bold text-text-primary dark:text-dark-text-primary mb-4">Email Digest</h3>
@@ -269,7 +277,7 @@ const StudentSettings: React.FC = () => {
                       <label className="text-sm font-medium text-text-primary mb-2 block">
                         Who can see your profile?
                       </label>
-                      <select 
+                      <select
                         value={privacySettings.profileVisibility}
                         onChange={(e) => setPrivacySettings({ ...privacySettings, profileVisibility: e.target.value })}
                         className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
@@ -279,16 +287,16 @@ const StudentSettings: React.FC = () => {
                         <option value="private">Only me</option>
                       </select>
                     </div>
-                    
+
                     <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                       <div>
                         <p className="text-sm font-medium text-text-primary dark:text-dark-text-primary">Show course progress</p>
                         <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Display your progress publicly on your profile</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          className="sr-only peer" 
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
                           checked={privacySettings.showProgress}
                           onChange={(e) => setPrivacySettings({ ...privacySettings, showProgress: e.target.checked })}
                         />
@@ -302,9 +310,9 @@ const StudentSettings: React.FC = () => {
                         <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Display earned certificates on your profile</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          className="sr-only peer" 
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
                           checked={privacySettings.showCertificates}
                           onChange={(e) => setPrivacySettings({ ...privacySettings, showCertificates: e.target.checked })}
                         />
@@ -318,9 +326,9 @@ const StudentSettings: React.FC = () => {
                         <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Let other students send you messages</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          className="sr-only peer" 
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
                           checked={privacySettings.allowMessages}
                           onChange={(e) => setPrivacySettings({ ...privacySettings, allowMessages: e.target.checked })}
                         />
@@ -339,16 +347,16 @@ const StudentSettings: React.FC = () => {
                         <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Share anonymous usage data to improve the platform</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          className="sr-only peer" 
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
                           checked={privacySettings.shareDataForImprovement}
                           onChange={(e) => setPrivacySettings({ ...privacySettings, shareDataForImprovement: e.target.checked })}
                         />
                         <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-primary"></div>
                       </label>
                     </div>
-                    
+
                     <div className="pt-4 border-t border-gray-200">
                       <button
                         onClick={() => setShowDownloadModal(true)}
@@ -372,7 +380,7 @@ const StudentSettings: React.FC = () => {
                       <label className="text-sm font-medium text-text-primary mb-2 block">
                         Font Size
                       </label>
-                      <select 
+                      <select
                         value={accessibilitySettings.fontSize}
                         onChange={(e) => setAccessibilitySettings({ ...accessibilitySettings, fontSize: e.target.value })}
                         className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
@@ -390,9 +398,9 @@ const StudentSettings: React.FC = () => {
                         <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Increase contrast for better readability</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          className="sr-only peer" 
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
                           checked={accessibilitySettings.highContrast}
                           onChange={(e) => setAccessibilitySettings({ ...accessibilitySettings, highContrast: e.target.checked })}
                         />
@@ -406,9 +414,9 @@ const StudentSettings: React.FC = () => {
                         <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Minimize animations and transitions</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          className="sr-only peer" 
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
                           checked={accessibilitySettings.reducedMotion}
                           onChange={(e) => setAccessibilitySettings({ ...accessibilitySettings, reducedMotion: e.target.checked })}
                         />
@@ -427,9 +435,9 @@ const StudentSettings: React.FC = () => {
                         <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Optimize interface for screen readers</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          className="sr-only peer" 
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
                           checked={accessibilitySettings.screenReaderOptimized}
                           onChange={(e) => setAccessibilitySettings({ ...accessibilitySettings, screenReaderOptimized: e.target.checked })}
                         />
@@ -443,9 +451,9 @@ const StudentSettings: React.FC = () => {
                         <p className="text-xs text-text-secondary dark:text-dark-text-secondary">Enable advanced keyboard shortcuts</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          className="sr-only peer" 
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
                           checked={accessibilitySettings.keyboardNavigation}
                           onChange={(e) => setAccessibilitySettings({ ...accessibilitySettings, keyboardNavigation: e.target.checked })}
                         />

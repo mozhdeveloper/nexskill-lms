@@ -14,88 +14,8 @@ interface Thread {
   reactionCount: number;
 }
 
-const dummyThreads: Thread[] = [
-  {
-    id: '1',
-    title: 'Best practices for managing global state in React?',
-    excerpt: 'I\'ve been working on a large application and struggling to decide between Context API and Redux. What do you all recommend for...',
-    courseTag: 'Advanced React Patterns',
-    authorName: 'Sarah Chen',
-    replyCount: 12,
-    lastActivity: '2 hours ago',
-    reactionCount: 18,
-  },
-  {
-    id: '2',
-    title: 'How to optimize performance in large component trees?',
-    excerpt: 'My app has a deeply nested component structure and I\'m seeing performance issues. I\'ve tried React.memo but...',
-    courseTag: 'React Performance',
-    authorName: 'Michael Torres',
-    replyCount: 8,
-    lastActivity: '5 hours ago',
-    reactionCount: 14,
-  },
-  {
-    id: '3',
-    title: 'Question about CSS Grid vs Flexbox for responsive layouts',
-    excerpt: 'I\'m redesigning my portfolio and can\'t decide which layout system to use. What are the pros and cons of each?',
-    courseTag: 'UI Design Basics',
-    authorName: 'Priya Patel',
-    replyCount: 15,
-    lastActivity: 'Yesterday',
-    reactionCount: 22,
-  },
-  {
-    id: '4',
-    title: 'TypeScript generics are confusing me',
-    excerpt: 'I understand the basics of TypeScript but generics still don\'t click. Can someone explain with a practical example?',
-    courseTag: 'TypeScript Fundamentals',
-    authorName: 'Jamal Williams',
-    replyCount: 6,
-    lastActivity: '1 day ago',
-    reactionCount: 9,
-  },
-  {
-    id: '5',
-    title: 'What\'s the best way to handle form validation?',
-    excerpt: 'I\'ve been using plain React state for forms but it\'s getting messy. Should I use a library like Formik or React Hook Form?',
-    courseTag: 'React Forms',
-    authorName: 'Emma Rodriguez',
-    replyCount: 10,
-    lastActivity: '2 days ago',
-    reactionCount: 16,
-  },
-  {
-    id: '6',
-    title: 'Advice for junior developers starting their first job?',
-    excerpt: 'I just accepted my first developer position and I\'m nervous. What should I focus on in my first few months?',
-    courseTag: 'Career Development',
-    authorName: 'Alex Kim',
-    replyCount: 24,
-    lastActivity: '3 days ago',
-    reactionCount: 35,
-  },
-  {
-    id: '7',
-    title: 'Testing async functions with Jest - help needed',
-    excerpt: 'I\'m having trouble mocking API calls in my tests. The async/await syntax isn\'t working as expected...',
-    courseTag: 'Testing React Apps',
-    authorName: 'David Lee',
-    replyCount: 5,
-    lastActivity: '4 days ago',
-    reactionCount: 7,
-  },
-  {
-    id: '8',
-    title: 'How do you organize your component folder structure?',
-    excerpt: 'My project is growing and I need a better way to organize components. What patterns do you use for file structure?',
-    courseTag: 'React Architecture',
-    authorName: 'Olivia Martinez',
-    replyCount: 18,
-    lastActivity: '1 week ago',
-    reactionCount: 28,
-  },
-];
+// No discussion_threads table yet — empty state shown below
+const threads: Thread[] = [];
 
 const DiscussionBoard: React.FC = () => {
   const navigate = useNavigate();
@@ -120,7 +40,7 @@ const DiscussionBoard: React.FC = () => {
   return (
     <StudentAppLayout>
       <div className="min-h-screen bg-gradient-to-br from-[#E7F0FF] via-[#F9F0FF] to-[#E3F4FF] dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 py-8 px-6 transition-colors">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-1xl mx-auto">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Community discussions</h1>
@@ -133,11 +53,10 @@ const DiscussionBoard: React.FC = () => {
               <button
                 key={filter.id}
                 onClick={() => setActiveFilter(filter.id)}
-                className={`px-5 py-2 rounded-full font-medium text-sm transition-all ${
-                  activeFilter === filter.id
-                    ? 'bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white shadow-md'
-                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600'
-                }`}
+                className={`px-5 py-2 rounded-full font-medium text-sm transition-all ${activeFilter === filter.id
+                  ? 'bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white shadow-md'
+                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600'
+                  }`}
               >
                 {filter.label}
               </button>
@@ -151,7 +70,18 @@ const DiscussionBoard: React.FC = () => {
 
           {/* Thread list */}
           <div className="space-y-4">
-            {dummyThreads.map((thread) => (
+            {threads.length === 0 && (
+              <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-12 text-center">
+                <div className="text-slate-400 mb-4">
+                  <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                </div>
+                <p className="text-lg font-semibold text-slate-700 dark:text-slate-300 mb-2">No discussions yet</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Be the first to start a conversation! Use the composer above to post a question or share an insight.</p>
+              </div>
+            )}
+            {threads.map((thread) => (
               <button
                 key={thread.id}
                 onClick={() => handleThreadClick(thread.id)}

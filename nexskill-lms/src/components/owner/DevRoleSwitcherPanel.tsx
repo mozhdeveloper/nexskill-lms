@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useUser } from '../../context/UserContext';
 import type { UserRole } from '../../types/roles';
 import { labelByRole, defaultLandingRouteByRole, roleIcons } from '../../types/roles';
 
 const DevRoleSwitcherPanel: React.FC = () => {
   const navigate = useNavigate();
-  const { switchRole } = useAuth();
+  const { switchRole } = useUser();
   const [selectedRole, setSelectedRole] = useState<UserRole>('STUDENT');
 
   const allRoles: UserRole[] = [

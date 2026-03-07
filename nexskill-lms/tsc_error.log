@@ -1,0 +1,6 @@
+﻿src/pages/student/CourseDetail.tsx(358,16): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+src/pages/student/CourseDetail.tsx(488,15): error TS1005: ')' expected.
+src/pages/student/CourseDetail.tsx(617,9): error TS17002: Expected corresponding JSX closing tag for 'StudentAppLayout'.
+src/pages/student/CourseDetail.tsx(618,5): error TS1005: ')' expected.
+src/pages/student/CourseDetail.tsx(619,3): error TS1109: Expression expected.
+src/pages/student/CourseDetail.tsx(620,1): error TS1128: Declaration or statement expected.

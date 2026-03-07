@@ -1,9 +1,9 @@
 import React from 'react';
 import type { ReactNode } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
 import type { UserRole } from '../../types/roles';
 import { labelByRole } from '../../types/roles';
+import { useUser } from '../../context/UserContext';
 
 interface RoleGuardProps {
   children: ReactNode;
@@ -19,11 +19,20 @@ interface RoleGuardProps {
  * </RoleGuard>
  */
 const RoleGuard: React.FC<RoleGuardProps> = ({ children, allowedRoles }) => {
-  const { currentUser, isAuthenticated, getDefaultRoute } = useAuth();
+  const { profile: currentUser, loading, getDefaultRoute } = useUser();
   const navigate = useNavigate();
 
+  // Show loading state while fetching profile
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#E7F0FF] via-[#F9F0FF] to-[#E3F4FF]">
+        <div className="w-12 h-12 border-4 border-[#304DB5] border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   // Not authenticated - redirect to login
-  if (!isAuthenticated || !currentUser) {
+  if (!currentUser) {
     return <Navigate to="/login" replace />;
   }
 
@@ -67,7 +76,7 @@ const RoleGuard: React.FC<RoleGuardProps> = ({ children, allowedRoles }) => {
           {/* Action Buttons */}
           <div className="space-y-3">
             <button
-              onClick={() => navigate(getDefaultRoute())}
+              onClick={async () => navigate(await getDefaultRoute())}
               className="w-full py-3 px-6 bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white font-medium rounded-full shadow-[0_12px_24px_rgba(35,76,200,0.35)] hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all"
             >
               Go to My Dashboard

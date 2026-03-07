@@ -72,10 +72,10 @@ const QuizResult: React.FC = () => {
 
   return (
     <StudentAppLayout>
-      <div className="min-h-screen bg-gradient-to-br from-[#E7F0FF] via-[#F9F0FF] to-[#E3F4FF] py-8 px-6">
+      <div className="min-h-screen bg-[color:var(--bg-primary)] py-8 px-6">
         <div className="max-w-4xl mx-auto">
           {/* Score summary hero card */}
-          <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-xl p-8 mb-8 text-center">
+          <div className="glass-card rounded-3xl p-8 mb-8 text-center">
             <div className="mb-4">
               <div
                 className={`
@@ -88,26 +88,26 @@ const QuizResult: React.FC = () => {
             </div>
 
             <div className="mb-4">
-              <div className="text-6xl font-bold text-slate-900 mb-2">{score}%</div>
-              <p className="text-lg text-slate-600">
-                You answered <span className="font-semibold text-slate-900">{correctCount}</span> out of{' '}
-                <span className="font-semibold text-slate-900">{totalQuestions}</span> questions correctly.
+              <div className="text-6xl font-bold text-text-primary mb-2">{score}%</div>
+              <p className="text-lg text-text-secondary">
+                You answered <span className="font-semibold text-text-primary">{correctCount}</span> out of{' '}
+                <span className="font-semibold text-text-primary">{totalQuestions}</span> questions correctly.
               </p>
             </div>
 
             {/* Breakdown */}
-            <div className="flex justify-center gap-8 mb-6 pt-6 border-t border-slate-200">
+            <div className="flex justify-center gap-8 mb-6 pt-6 border-t border-[color:var(--border-base)]">
               <div className="text-center">
                 <div className="text-3xl font-bold text-green-600 mb-1">{correctCount}</div>
-                <div className="text-sm text-slate-600">Correct</div>
+                <div className="text-sm text-text-secondary">Correct</div>
               </div>
               <div className="text-center">
                 <div className="text-3xl font-bold text-red-600 mb-1">{incorrectCount}</div>
-                <div className="text-sm text-slate-600">Incorrect</div>
+                <div className="text-sm text-text-secondary">Incorrect</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-slate-400 mb-1">{passingScore}%</div>
-                <div className="text-sm text-slate-600">Passing Score</div>
+                <div className="text-3xl font-bold text-text-muted mb-1">{passingScore}%</div>
+                <div className="text-sm text-text-secondary">Passing Score</div>
               </div>
             </div>
 
@@ -115,13 +115,13 @@ const QuizResult: React.FC = () => {
             <div className="flex gap-4 justify-center">
               <button
                 onClick={handleRetry}
-                className="px-8 py-3 rounded-full font-semibold bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white shadow-lg hover:shadow-xl transition-all"
+                className="px-8 py-3 rounded-full font-semibold bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all"
               >
                 Retry quiz
               </button>
               <button
                 onClick={handleBackToCourse}
-                className="px-8 py-3 rounded-full font-semibold text-[#304DB5] border-2 border-[#304DB5] hover:bg-blue-50 transition-all"
+                className="px-8 py-3 rounded-full font-semibold text-brand-primary border-2 border-brand-primary hover:bg-brand-primary/5 transition-all"
               >
                 Back to course
               </button>
@@ -132,8 +132,8 @@ const QuizResult: React.FC = () => {
           {questions.length > 0 && (
             <div>
               <div className="mb-6">
-                <h2 className="text-2xl font-bold text-slate-900 mb-2">Question-by-question feedback</h2>
-                <p className="text-slate-600">
+                <h2 className="text-2xl font-bold text-text-primary mb-2">Question-by-question feedback</h2>
+                <p className="text-text-secondary">
                   Review your answers and learn from detailed explanations below.
                 </p>
               </div>
@@ -141,7 +141,7 @@ const QuizResult: React.FC = () => {
               <div className="space-y-4">
                 {feedbackData.map((item, index) => (
                   <div key={item.question.id}>
-                    <div className="text-sm font-semibold text-slate-500 mb-2">
+                    <div className="text-sm font-semibold text-text-muted mb-2">
                       Question {index + 1} of {totalQuestions}
                     </div>
                     <QuestionFeedback question={item.question} userAnswer={item.userAnswer} />
@@ -155,7 +155,7 @@ const QuizResult: React.FC = () => {
           <div className="mt-8 text-center">
             <button
               onClick={handleBackToCourse}
-              className="text-slate-600 hover:text-[#304DB5] font-medium transition-colors"
+              className="text-text-secondary hover:text-brand-primary font-medium transition-colors"
             >
               ← Return to course overview
             </button>

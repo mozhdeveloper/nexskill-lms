@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
 import MembershipChangeFlow from '../../components/membership/MembershipChangeFlow';
 import MembershipCancelPanel from '../../components/membership/MembershipCancelPanel';
 
-// Dummy plans data (same as in MembershipPlans)
+// Tier pricing config (same as in MembershipPlans)
 const allPlans = {
   free: {
     id: 'free',
@@ -52,9 +52,21 @@ const MembershipManage: React.FC = () => {
 
   // Get target plan from router state, or default to 'elite'
   const targetPlanId = (location.state as any)?.targetPlanId || 'elite';
-  
-  // Current plan is 'pro' (dummy)
-  const currentPlan = allPlans.pro;
+
+  const [currentTier] = useState<string>('free');
+  useEffect(() => {
+    // membership_tier column not yet in DB — default to 'free'
+    // When the column is added, uncomment the Supabase query below
+    // supabase.auth.getUser().then(async ({ data }) => {
+    //   if (!data?.user) return;
+    //   const { data: sp } = await supabase
+    //     .from('student_profiles').select('membership_tier')
+    //     .eq('user_id', data.user.id).maybeSingle();
+    //   if (sp?.membership_tier) setCurrentTier(sp.membership_tier);
+    // });
+  }, []);
+
+  const currentPlan = allPlans[currentTier as keyof typeof allPlans] || allPlans.free;
   const targetPlan = allPlans[targetPlanId as keyof typeof allPlans] || allPlans.elite;
 
   const handleConfirmChange = () => {

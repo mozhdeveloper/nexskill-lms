@@ -27,7 +27,8 @@ const SupportTicketsPage = () => {
   });
 
   const handleCreateTicket = () => {
-    alert(`🎫 Ticket Created Successfully\n\nSubject: ${newTicket.subject}\nPriority: ${newTicket.priority.toUpperCase()}\nCategory: ${newTicket.category}\n\n✅ Ticket ID: T-${Math.floor(Math.random() * 9000) + 1000}\n📧 Student will be notified via email\n⏱️ Initial response within 30 minutes\n\nYou can track this ticket in the 'All Tickets' view.`);
+    const ticketId = `T-${Date.now().toString().slice(-6)}`;
+    console.log('Ticket created:', { id: ticketId, ...newTicket });
     setShowCreateModal(false);
     setNewTicket({ subject: '', description: '', priority: 'medium', category: 'technical' });
   };
@@ -38,12 +39,12 @@ const SupportTicketsPage = () => {
   };
 
   const handleResolveTicket = (ticketId: string) => {
-    alert(`✅ Ticket Resolved Successfully\n\nTicket ID: ${ticketId}\n\n📊 Resolution Summary:\n• Status: Closed\n• Resolution time: 2h 45m\n• Student satisfaction: Pending feedback\n\n📧 Student has been notified\n📈 Your stats have been updated\n🎯 Average resolution time: 2.8h\n\nGreat work maintaining our high service standards!`);
+    console.log('Ticket resolved:', ticketId);
     setShowViewModal(false);
   };
 
   const handleExportTickets = () => {
-    alert(`📊 Exporting Tickets Report\n\n📦 Export Contents:\n• All active tickets (24)\n• Resolved tickets (156)\n• Student information\n• Resolution times\n• Satisfaction ratings\n\n📄 Format: CSV\n📧 Delivery: Download starts in 3 seconds\n💾 File size: ~450 KB\n\nYou can use this data for performance analysis and reporting.`);
+    console.log('Exporting tickets...');
   };
 
   return (

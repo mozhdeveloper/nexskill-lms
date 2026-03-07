@@ -395,7 +395,7 @@ const AdminAnalyticsPage: React.FC = () => {
 
   return (
     <AdminAppLayout>
-      <div className="max-w-7xl mx-auto px-8 py-8 space-y-8">
+      <div className="m-5 px-8 py-8 space-y-8">
         {/* Page Header */}
         <div className="space-y-2">
           <h1 className="text-3xl font-bold text-gray-900">Analytics</h1>

@@ -1,107 +1,191 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabaseClient';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
 import LessonSidebar from '../../components/learning/LessonSidebar';
-import VideoPlayer from '../../components/learning/VideoPlayer';
-import PdfReader from '../../components/learning/PdfReader';
+import ContentBlockRenderer from '../../components/learning/ContentBlockRenderer';
 import DownloadCenter from '../../components/learning/DownloadCenter';
 import LessonNotesPanel from '../../components/learning/LessonNotesPanel';
-import TranscriptPanel from '../../components/learning/TranscriptPanel';
 import AISummaryDrawer from '../../components/learning/AISummaryDrawer';
 import AskAIWidget from '../../components/learning/AskAIWidget';
 import MarkLessonCompleteModal from '../../components/learning/MarkLessonCompleteModal';
+import type { Lesson } from '../../types/lesson';
 
-// Dummy course data
-const courseData = {
-  courseId: '1',
-  title: 'Advanced React Patterns',
-  coachName: 'David Kim',
-  totalLessons: 12,
-  completedLessons: 5,
-  modules: [
-    {
-      id: '1',
-      title: 'Module 1: React Foundations',
-      lessons: [
-        { id: '1', title: 'Introduction to Advanced React', type: 'video' as const, duration: '10:30', status: 'completed' as const, description: 'Welcome to this comprehensive course on advanced React patterns. We\'ll explore modern techniques used by top React developers.' },
-        { id: '2', title: 'Course Setup Guide', type: 'pdf' as const, duration: '5:00', status: 'completed' as const, description: 'Follow this guide to set up your development environment for the course.' },
-        { id: '3', title: 'React Basics Refresher', type: 'video' as const, duration: '15:20', status: 'completed' as const, description: 'A quick refresher on fundamental React concepts before diving into advanced patterns.' },
-      ],
-    },
-    {
-      id: '2',
-      title: 'Module 2: Custom Hooks',
-      lessons: [
-        { id: '4', title: 'Understanding Custom Hooks', type: 'video' as const, duration: '18:45', status: 'completed' as const, description: 'Learn how to create reusable custom hooks to extract component logic.' },
-        { id: '5', title: 'Hook Composition Patterns', type: 'video' as const, duration: '22:15', status: 'completed' as const, description: 'Discover advanced patterns for composing multiple hooks together.' },
-        { id: '6', title: 'Custom Hooks Best Practices', type: 'pdf' as const, duration: '8:00', status: 'current' as const, description: 'A comprehensive guide to best practices when building custom hooks.' },
-        { id: '7', title: 'Building a useAuth Hook', type: 'video' as const, duration: '25:30', status: 'locked' as const, description: 'Practical example: Build a complete authentication hook from scratch.' },
-      ],
-    },
-    {
-      id: '3',
-      title: 'Module 3: Performance Optimization',
-      lessons: [
-        { id: '8', title: 'React Performance Fundamentals', type: 'video' as const, duration: '20:00', status: 'locked' as const, description: 'Understanding how React renders and when to optimize.' },
-        { id: '9', title: 'useMemo and useCallback', type: 'video' as const, duration: '17:30', status: 'locked' as const, description: 'Master these essential hooks for performance optimization.' },
-        { id: '10', title: 'Code Splitting Strategies', type: 'pdf' as const, duration: '10:00', status: 'locked' as const, description: 'Learn when and how to split your code for optimal performance.' },
-        { id: '11', title: 'React.memo Deep Dive', type: 'video' as const, duration: '19:45', status: 'locked' as const, description: 'Prevent unnecessary re-renders with React.memo.' },
-        { id: '12', title: 'Final Project: Optimized Dashboard', type: 'video' as const, duration: '35:00', status: 'locked' as const, description: 'Build a fully optimized dashboard using all techniques learned.' },
-      ],
-    },
-  ],
-};
-
-// Dummy resources
-const dummyResources = [
-  { id: '1', fileName: 'lesson-slides.pdf', size: '2.4 MB', type: 'pdf' as const },
-  { id: '2', fileName: 'code-examples.zip', size: '1.8 MB', type: 'zip' as const },
-  { id: '3', fileName: 'cheat-sheet.docx', size: '450 KB', type: 'docx' as const },
-];
-
-// Dummy transcript
-const dummyTranscript = [
-  { time: '00:00:15', text: 'Welcome to this lesson on custom hooks. In this video, we\'ll explore how to build reusable logic...' },
-  { time: '00:01:30', text: 'Let\'s start by understanding what makes a good custom hook. The key is to extract logic that can be shared...' },
-  { time: '00:03:45', text: 'Here\'s our first example. We\'ll create a useLocalStorage hook that syncs state with localStorage...' },
-  { time: '00:05:20', text: 'Notice how we\'re using useEffect to handle the side effects. This is a common pattern in custom hooks...' },
-  { time: '00:07:00', text: 'Now let\'s add error handling to make our hook more robust in production environments...' },
-];
+type LessonWithModule = Lesson & { moduleTitle?: string };
 
 const CoursePlayer: React.FC = () => {
   const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>();
   const navigate = useNavigate();
   const [showAIDrawer, setShowAIDrawer] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
-  const [completedLessons, setCompletedLessons] = useState<string[]>(['1', '2', '3', '4', '5']);
+  const [showGraduation, setShowGraduation] = useState(false);
+  const [completedLessons, setCompletedLessons] = useState<string[]>([]);
+  const [totalLessonsInCourse, setTotalLessonsInCourse] = useState(0);
+  const [courseTitle, setCourseTitle] = useState('');
+  const [currentLesson, setCurrentLesson] = useState<LessonWithModule | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Find current lesson
-  const currentLesson = useMemo(() => {
-    for (const module of courseData.modules) {
-      const lesson = module.lessons.find((l) => l.id === lessonId);
-      if (lesson) {
-        return { ...lesson, moduleTitle: module.title };
+  useEffect(() => {
+    const fetchLessonData = async () => {
+      if (!courseId || !lessonId) return;
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Fetch course title
+        const { data: courseData, error: courseError } = await supabase
+          .from('courses')
+          .select('title')
+          .eq('id', courseId)
+          .single();
+
+        if (courseError) throw courseError;
+        setCourseTitle(courseData.title);
+
+        // Fetch lesson data including content_blocks
+        const { data: lessonData, error: lessonError } = await supabase
+          .from('lessons')
+          .select('id, title, description, content_blocks, estimated_duration_minutes, is_published, created_at, updated_at')
+          .eq('id', lessonId)
+          .single();
+
+        if (lessonError) throw lessonError;
+
+        // Also fetch module information for the lesson
+        const { data: moduleData, error: moduleError } = await supabase
+          .from('module_content_items')
+          .select(`
+            module_id,
+            modules(title)
+          `)
+          .eq('content_id', lessonId)
+          .eq('content_type', 'lesson')
+          .single();
+
+        if (moduleError) throw moduleError;
+
+        const lessonWithModule = {
+          ...lessonData,
+          moduleTitle: (moduleData.modules as unknown as { title: string } | null)?.title || ''
+        };
+
+        setCurrentLesson(lessonWithModule);
+
+        // Fetch completed lessons using user_lesson_progress
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          // Get all lesson ids for this course via modules → module_content_items
+          const { data: modItems } = await supabase
+            .from('modules')
+            .select('module_content_items(content_id)')
+            .eq('course_id', courseId);
+
+          const lessonIds: string[] = (modItems || []).flatMap(
+            (m: any) => (m.module_content_items || []).map((ci: any) => ci.content_id)
+          );
+
+          if (lessonIds.length > 0) {
+            setTotalLessonsInCourse(lessonIds.length);
+            const { data: progressRows } = await supabase
+              .from('user_lesson_progress')
+              .select('lesson_id')
+              .eq('user_id', user.id)
+              .eq('is_completed', true)
+              .in('lesson_id', lessonIds);
+
+            setCompletedLessons((progressRows || []).map((r: any) => r.lesson_id));
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching lesson data:', err);
+        setError('Failed to load lesson data');
+      } finally {
+        setLoading(false);
       }
-    }
-    return null;
-  }, [lessonId]);
+    };
 
-  // Calculate progress
-  const progress = Math.round((completedLessons.length / courseData.totalLessons) * 100);
+    fetchLessonData();
+  }, [courseId, lessonId]);
+
+  // Calculate progress based on completed lessons
+  const progress = totalLessonsInCourse > 0
+    ? Math.min(100, Math.round((completedLessons.length / totalLessonsInCourse) * 100))
+    : 0;
 
   const handleSelectLesson = (newLessonId: string) => {
     navigate(`/student/courses/${courseId}/lessons/${newLessonId}`);
   };
 
-  const handleMarkComplete = () => {
-    if (lessonId && !completedLessons.includes(lessonId)) {
-      setCompletedLessons([...completedLessons, lessonId]);
+  const handleMarkComplete = async () => {
+    if (!lessonId || !courseId) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Upsert into user_lesson_progress
+      const { error } = await supabase
+        .from('user_lesson_progress')
+        .upsert({
+          user_id: user.id,
+          lesson_id: lessonId,
+          is_completed: true,
+          completed_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,lesson_id' });
+
+      if (error) throw error;
+
+      // Optimistically update local state
+      setCompletedLessons(prev => prev.includes(lessonId) ? prev : [...prev, lessonId]);
+      setShowCompleteModal(false);
+    } catch (err) {
+      console.error('Error marking lesson as complete:', err);
+      alert('Failed to mark lesson as complete. Please try again.');
     }
-    setShowCompleteModal(false);
-    
-    // Show success message (could be a toast)
-    alert('✓ Lesson marked as complete!');
   };
+
+  // Show graduation banner when all lessons are complete
+  useEffect(() => {
+    if (totalLessonsInCourse > 0 && completedLessons.length >= totalLessonsInCourse) {
+      setShowGraduation(true);
+    }
+  }, [completedLessons, totalLessonsInCourse]);
+
+  if (loading) {
+    return (
+      <StudentAppLayout>
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center">
+            <div className="text-6xl mb-4">⏳</div>
+            <h2 className="text-2xl font-bold text-text-primary dark:text-dark-text-primary mb-2">Loading lesson...</h2>
+            <p className="text-text-secondary dark:text-dark-text-secondary">Please wait while we load your content.</p>
+          </div>
+        </div>
+      </StudentAppLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <StudentAppLayout>
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center">
+            <div className="text-6xl mb-4">⚠️</div>
+            <h2 className="text-2xl font-bold text-text-primary dark:text-dark-text-primary mb-2">Error loading lesson</h2>
+            <p className="text-text-secondary dark:text-dark-text-secondary mb-6">{error}</p>
+            <button
+              onClick={() => navigate('/student/courses')}
+              className="px-6 py-3 bg-gradient-to-r from-brand-primary to-brand-primary-light text-white font-medium rounded-full hover:shadow-lg transition-all"
+            >
+              Back to courses
+            </button>
+          </div>
+        </div>
+      </StudentAppLayout>
+    );
+  }
 
   if (!currentLesson) {
     return (
@@ -129,14 +213,14 @@ const CoursePlayer: React.FC = () => {
       <div className="px-8 py-4 border-b border-[#EDF0FB] dark:border-gray-700">
         <div className="flex items-start justify-between mb-2">
           <div className="flex-1">
-            <h1 className="text-xl font-bold text-text-primary dark:text-dark-text-primary mb-1">{courseData.title}</h1>
+            <h1 className="text-xl font-bold text-text-primary dark:text-dark-text-primary mb-1">{courseTitle}</h1>
             <h2 className="text-lg text-text-secondary dark:text-dark-text-secondary mb-2">{currentLesson.title}</h2>
             <div className="flex items-center gap-4 text-sm text-text-muted dark:text-dark-text-muted">
-              <span>{currentLesson.moduleTitle}</span>
+              <span>{currentLesson.moduleTitle ?? ''}</span>
               <span>•</span>
               <span>Lesson {lessonId}</span>
               <span>•</span>
-              <span>{currentLesson.duration}</span>
+              <span>{currentLesson.estimated_duration_minutes} min</span>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -160,7 +244,7 @@ const CoursePlayer: React.FC = () => {
           {/* Left: Lesson Sidebar */}
           <aside className="w-80 flex-shrink-0">
             <LessonSidebar
-              modules={courseData.modules}
+              courseId={courseId || ''}
               activeLessonId={lessonId || ''}
               onSelectLesson={handleSelectLesson}
             />
@@ -168,26 +252,16 @@ const CoursePlayer: React.FC = () => {
 
           {/* Center: Main Content */}
           <div className="flex-1 min-w-0">
-            {currentLesson.type === 'video' ? (
-              <VideoPlayer lesson={currentLesson} />
-            ) : (
-              <PdfReader
-                pdf={{
-                  title: currentLesson.title,
-                  fileName: `${currentLesson.title.toLowerCase().replace(/\s+/g, '-')}.pdf`,
-                  totalPages: 12,
-                }}
-              />
-            )}
+            {/* Render content blocks (lessons store all content as content_blocks jsonb) */}
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl p-6 shadow-md border border-gray-100 dark:border-gray-700">
+              <ContentBlockRenderer contentBlocks={currentLesson.content_blocks || []} />
+            </div>
           </div>
 
           {/* Right: Secondary Panels */}
           <aside className="w-80 flex-shrink-0 space-y-4">
-            <DownloadCenter resources={dummyResources} />
-            <LessonNotesPanel activeLessonId={lessonId || ''} />
-            {currentLesson.type === 'video' && <TranscriptPanel transcript={dummyTranscript} />}
-            <AskAIWidget activeLessonId={lessonId || ''} />
-            
+            <DownloadCenter resources={[]} />\n            <LessonNotesPanel activeLessonId={lessonId || ''} />\n            <AskAIWidget activeLessonId={lessonId || ''} />
+
             {/* AI Summary Button */}
             <button
               onClick={() => setShowAIDrawer(true)}
@@ -213,6 +287,35 @@ const CoursePlayer: React.FC = () => {
         onConfirm={handleMarkComplete}
         onCancel={() => setShowCompleteModal(false)}
       />
+
+      {/* Graduation Banner */}
+      {showGraduation && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm w-full">
+          <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-2xl shadow-2xl p-5 flex items-start gap-4">
+            <span className="text-3xl flex-shrink-0">🎓</span>
+            <div className="flex-1 min-w-0">
+              <div className="font-bold text-lg mb-1">Course Complete!</div>
+              <div className="text-sm text-green-100 mb-3">
+                You've completed all lessons in <span className="font-semibold">{courseTitle}</span>. Your certificate is ready!
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => navigate(`/student/certificates/${courseId}`)}
+                  className="px-4 py-1.5 bg-white text-green-700 font-semibold rounded-full text-sm hover:bg-green-50 transition-colors"
+                >
+                  Get Certificate
+                </button>
+                <button
+                  onClick={() => setShowGraduation(false)}
+                  className="px-4 py-1.5 bg-green-700/40 text-white font-medium rounded-full text-sm hover:bg-green-700/60 transition-colors"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </StudentAppLayout>
   );
 };

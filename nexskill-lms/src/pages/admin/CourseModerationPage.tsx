@@ -12,7 +12,7 @@ interface Course {
   instructorEmail: string;
   instructorId: string;
   category: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'changes_requested';
   submittedAt: string;
   qualityScore: number;
   qualityMetrics: {
@@ -46,7 +46,12 @@ interface Filters {
 
 const CourseModerationPage: React.FC = () => {
   // Dummy data for courses
-  const [courses] = useState<Course[]>([
+  // Supabase for Active Courses
+  const [activeCourses, setActiveCourses] = useState<Course[]>([]);
+  const [, setLoadingActive] = useState(true);
+
+  // Mock for Pending/Rejected
+  const [mockCourses] = useState<Course[]>([
     {
       id: 'c1',
       title: 'Complete Python Programming Bootcamp 2024',
@@ -86,25 +91,6 @@ const CourseModerationPage: React.FC = () => {
       reportsCount: 2,
     },
     {
-      id: 'c3',
-      title: 'Data Science with R and Python',
-      instructorName: 'Dr. Emily Rodriguez',
-      instructorEmail: 'emily.rodriguez@example.com',
-      instructorId: 'i3',
-      category: 'Data Science',
-      status: 'pending',
-      submittedAt: '2024-01-13',
-      qualityScore: 92,
-      qualityMetrics: {
-        contentCompleteness: 95,
-        engagementPotential: 90,
-        productionQuality: 91,
-        policyCompliance: 92,
-      },
-      qualityFlags: [],
-      reportsCount: 0,
-    },
-    {
       id: 'c4',
       title: 'Introduction to Cryptocurrency Trading',
       instructorName: 'Alex Martinez',
@@ -126,82 +112,6 @@ const CourseModerationPage: React.FC = () => {
         'Video resolution below standards',
       ],
       reportsCount: 3,
-    },
-    {
-      id: 'c5',
-      title: 'Advanced JavaScript: ES6 and Beyond',
-      instructorName: 'Kevin Park',
-      instructorEmail: 'kevin.park@example.com',
-      instructorId: 'i5',
-      category: 'Programming',
-      status: 'approved',
-      submittedAt: '2024-01-10',
-      qualityScore: 88,
-      qualityMetrics: {
-        contentCompleteness: 90,
-        engagementPotential: 87,
-        productionQuality: 86,
-        policyCompliance: 89,
-      },
-      qualityFlags: [],
-      reportsCount: 0,
-    },
-    {
-      id: 'c6',
-      title: 'UX/UI Design Fundamentals',
-      instructorName: 'Jessica Lee',
-      instructorEmail: 'jessica.lee@example.com',
-      instructorId: 'i6',
-      category: 'Design',
-      status: 'approved',
-      submittedAt: '2024-01-08',
-      qualityScore: 91,
-      qualityMetrics: {
-        contentCompleteness: 92,
-        engagementPotential: 93,
-        productionQuality: 89,
-        policyCompliance: 90,
-      },
-      qualityFlags: [],
-      reportsCount: 0,
-    },
-    {
-      id: 'c7',
-      title: 'Digital Marketing Strategy 2024',
-      instructorName: 'David Thompson',
-      instructorEmail: 'david.thompson@example.com',
-      instructorId: 'i7',
-      category: 'Marketing',
-      status: 'approved',
-      submittedAt: '2024-01-05',
-      qualityScore: 84,
-      qualityMetrics: {
-        contentCompleteness: 85,
-        engagementPotential: 86,
-        productionQuality: 82,
-        policyCompliance: 83,
-      },
-      qualityFlags: [],
-      reportsCount: 0,
-    },
-    {
-      id: 'c8',
-      title: 'Machine Learning Basics',
-      instructorName: 'Dr. Rachel Kim',
-      instructorEmail: 'rachel.kim@example.com',
-      instructorId: 'i8',
-      category: 'Data Science',
-      status: 'approved',
-      submittedAt: '2024-01-03',
-      qualityScore: 89,
-      qualityMetrics: {
-        contentCompleteness: 90,
-        engagementPotential: 88,
-        productionQuality: 89,
-        policyCompliance: 89,
-      },
-      qualityFlags: [],
-      reportsCount: 0,
     },
     {
       id: 'c9',
@@ -245,8 +155,74 @@ const CourseModerationPage: React.FC = () => {
       },
       qualityFlags: ['Incomplete course structure', 'Copyright concerns'],
       reportsCount: 1,
-    },
+    }
   ]);
+
+  // Tab State
+  const [activeTab, setActiveTab] = useState<'pending' | 'active' | 'rejected'>('pending');
+
+  React.useEffect(() => {
+    const fetchActiveCourses = async () => {
+      setLoadingActive(true);
+      const { supabase } = await import('../../lib/supabaseClient');
+
+      // Fetch courses for the current tab
+      let query = supabase
+        .from('courses')
+        .select('*, coach:profiles!courses_coach_id_fkey(first_name, last_name, email), category:categories(name)')
+        .order('updated_at', { ascending: false });
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error("Error fetching courses:", error);
+      } else if (data) {
+        // Map to Course interface
+        const mapped: Course[] = data.map((c: any) => {
+          // Map DB verification_status to UI status
+          let uiStatus: 'pending' | 'approved' | 'rejected' | 'changes_requested' = 'pending';
+
+          if (c.verification_status === 'approved') uiStatus = 'approved';
+          else if (c.verification_status === 'rejected') uiStatus = 'rejected';
+          else if (c.verification_status === 'changes_requested') uiStatus = 'changes_requested';
+          else if (c.verification_status === 'pending_review') uiStatus = 'pending';
+          else if (c.verification_status === 'draft') uiStatus = 'pending'; // Show drafts in pending for now matches current flow
+
+          return {
+            id: c.id,
+            title: c.title,
+            instructorName: c.coach ? `${c.coach.first_name} ${c.coach.last_name}` : 'Unknown',
+            instructorEmail: c.coach?.email || 'N/A',
+            instructorId: c.coach_id || 'unknown',
+            category: c.category?.name || 'General',
+            status: uiStatus,
+            submittedAt: c.created_at,
+            qualityScore: 85,
+            qualityMetrics: {
+              contentCompleteness: 90,
+              engagementPotential: 85,
+              productionQuality: 80,
+              policyCompliance: 90,
+            },
+            qualityFlags: [],
+            reportsCount: 0
+          };
+        });
+        setActiveCourses(mapped);
+      }
+      setLoadingActive(false);
+    };
+
+    fetchActiveCourses();
+  }, [activeTab]);
+
+  // Combine data
+  const courses = activeTab === 'active'
+    ? activeCourses.filter(c => c.status === 'approved')
+    : activeTab === 'rejected'
+      ? activeCourses.filter(c => c.status === 'rejected' || c.status === 'changes_requested')
+      : activeCourses.filter(c => c.status === 'pending');
+
 
   // Dummy data for reports
   const [reports] = useState<Report[]>([
@@ -376,14 +352,104 @@ const CourseModerationPage: React.FC = () => {
     ? courses.find((c) => c.id === selectedCourseId)
     : undefined;
 
-  const handleApprove = (courseId: string) => {
-    const course = courses.find(c => c.id === courseId);
-    window.alert(`✅ Course Approved & Published\n\nCourse: ${course?.title || courseId}\nInstructor: ${course?.instructorName || 'N/A'}\n\n📢 Publishing Details:\n• Status: Live on platform\n• Visibility: Public catalog\n• Enrollment: Open immediately\n• Search indexing: In progress\n\n📧 Notifications Sent:\n• Instructor: Approval confirmation\n• Marketing team: New course alert\n• Students: Course recommendation\n\n🎯 Next Steps:\n• Monitor initial enrollments\n• Review student feedback\n• Track completion rates`);
+  const handleApprove = async (courseId: string) => {
+    try {
+      const { supabase } = await import('../../lib/supabaseClient');
+      const { error } = await supabase
+        .from('courses')
+        .update({ verification_status: 'approved' })
+        .eq('id', courseId);
+
+      if (error) throw error;
+
+      // Refresh list
+      const updatedCourses = activeCourses.filter(c => c.id !== courseId);
+      setActiveCourses(updatedCourses);
+
+      window.alert(`✅ Course Approved & Published\n\nCourse ID: ${courseId}\n\nStatus updated to Approved.`);
+    } catch (error) {
+      console.error('Error approving course:', error);
+      window.alert('Failed to approve course');
+    }
   };
 
-  const handleReject = (courseId: string, reason: string) => {
-    const course = courses.find(c => c.id === courseId);
-    window.alert(`❌ Course Rejected\n\nCourse: ${course?.title || courseId}\nInstructor: ${course?.instructorName || 'N/A'}\n\n📝 Rejection Details:\n• Reason: ${reason || 'Quality standards not met'}\n• Status: Returned to instructor\n• Resubmission: Allowed after revisions\n\n📧 Instructor Notification:\n• Detailed feedback provided\n• Revision guidelines included\n• Support resources attached\n• Expected response time: 7-14 days\n\n💡 Instructor can:\n• Review specific issues\n• Make required changes\n• Resubmit for review\n• Contact support for clarification`);
+  const handleRequestChanges = async (courseId: string, reason: string) => {
+    try {
+      const { supabase } = await import('../../lib/supabaseClient');
+
+      // Update status and save admin_feedback
+      const { error } = await supabase
+        .from('courses')
+        .update({
+          verification_status: 'changes_requested'
+        })
+        .eq('id', courseId);
+
+      if (error) throw error;
+
+      // Add feedback comment to history log
+      if (reason) {
+        // Need current user ID for admin_id
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from('admin_verification_feedback').insert({
+            course_id: courseId,
+            admin_id: user.id,
+            content: reason,
+            is_resolved: false
+          });
+        }
+      }
+
+      // Refresh list
+      const updatedCourses = activeCourses.filter(c => c.id !== courseId);
+      setActiveCourses(updatedCourses);
+
+      window.alert(`⚠️ Changes Requested\n\nCourse ID: ${courseId}\n\nFeedback sent to instructor.`);
+    } catch (error) {
+      console.error('Error requesting changes:', error);
+      window.alert('Failed to request changes');
+    }
+  };
+
+  const handleReject = async (courseId: string, reason: string) => {
+    try {
+      const { supabase } = await import('../../lib/supabaseClient');
+
+      // Update status and save admin_feedback
+      // We'll treat it as a hard rejection via feedback
+      const { error } = await supabase
+        .from('courses')
+        .update({
+          verification_status: 'changes_requested'
+        })
+        .eq('id', courseId);
+
+      if (error) throw error;
+
+      // Add feedback comment
+      if (reason) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from('admin_verification_feedback').insert({
+            course_id: courseId,
+            admin_id: user.id,
+            content: `REJECTED: ${reason}`,
+            is_resolved: false // Keep unresolved so it appears prominently
+          });
+        }
+      }
+
+      // Refresh list
+      const updatedCourses = activeCourses.filter(c => c.id !== courseId);
+      setActiveCourses(updatedCourses);
+
+      window.alert(`❌ Course Rejected\n\nCourse ID: ${courseId}\n\nStatus updated to Changes Requested (Admin Rejected).`);
+    } catch (error) {
+      console.error('Error rejecting course:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      window.alert(`Failed to reject course: ${errorMessage}`);
+    }
   };
 
   const handleInvestigate = (reportId: string) => {
@@ -400,13 +466,46 @@ const CourseModerationPage: React.FC = () => {
 
   return (
     <AdminAppLayout>
-      <div className="space-y-6">
+      <div className="m-5 space-y-6">
         {/* Page Header */}
         <div>
           <h1 className="text-2xl font-bold text-[#111827] mb-2">Course Moderation</h1>
           <p className="text-sm text-[#5F6473]">
             Review and approve courses, manage quality standards, and handle reported content
           </p>
+        </div>
+
+        {/* Tabs */}
+        <div className="border-b border-gray-200 mb-6">
+          <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+            <button
+              onClick={() => setActiveTab('pending')}
+              className={`${activeTab === 'pending'
+                ? 'border-[#304DB5] text-[#304DB5]'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              Pending Review
+            </button>
+            <button
+              onClick={() => setActiveTab('active')}
+              className={`${activeTab === 'active'
+                ? 'border-[#304DB5] text-[#304DB5]'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              Active Courses
+            </button>
+            <button
+              onClick={() => setActiveTab('rejected')}
+              className={`${activeTab === 'rejected'
+                ? 'border-[#304DB5] text-[#304DB5]'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              Rejected
+            </button>
+          </nav>
         </div>
 
         {/* Filters */}
@@ -417,19 +516,19 @@ const CourseModerationPage: React.FC = () => {
           <div className="bg-gradient-to-br from-[#DBEAFE] to-white rounded-2xl p-4 border border-[#93C5FD]">
             <p className="text-sm text-[#1E40AF] mb-1">Pending Review</p>
             <p className="text-2xl font-bold text-[#111827]">
-              {courses.filter((c) => c.status === 'pending').length}
+              {mockCourses.filter((c) => c.status === 'pending').length}
             </p>
           </div>
           <div className="bg-gradient-to-br from-[#D1FAE5] to-white rounded-2xl p-4 border border-[#6EE7B7]">
             <p className="text-sm text-[#047857] mb-1">Approved</p>
             <p className="text-2xl font-bold text-[#111827]">
-              {courses.filter((c) => c.status === 'approved').length}
+              {activeCourses.length}
             </p>
           </div>
           <div className="bg-gradient-to-br from-[#FEE2E2] to-white rounded-2xl p-4 border border-[#FCA5A5]">
             <p className="text-sm text-[#991B1B] mb-1">Rejected</p>
             <p className="text-2xl font-bold text-[#111827]">
-              {courses.filter((c) => c.status === 'rejected').length}
+              {mockCourses.filter((c) => c.status === 'rejected').length}
             </p>
           </div>
           <div className="bg-gradient-to-br from-[#FED7AA] to-white rounded-2xl p-4 border border-[#FDBA74]">
@@ -449,6 +548,7 @@ const CourseModerationPage: React.FC = () => {
               onSelect={setSelectedCourseId}
               onApprove={handleApprove}
               onReject={handleReject}
+              onRequestChanges={handleRequestChanges}
             />
           </div>
 

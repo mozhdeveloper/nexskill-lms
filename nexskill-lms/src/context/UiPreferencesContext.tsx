@@ -27,38 +27,24 @@ export const UiPreferencesProvider: React.FC<UiPreferencesProviderProps> = ({ ch
 
   const [theme, setThemeState] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('ui-theme') as Theme) || 'light';
+      // Logic mirrors index.html to ensure sync
+      const persisted = localStorage.getItem('ui-theme') as Theme;
+      return persisted || 'dark'; // Default to dark if nothing saved
     }
-    return 'light';
+    return 'dark';
   });
 
   // Apply theme class to document element
   useEffect(() => {
     const root = document.documentElement;
-    
-    const applyTheme = (isDark: boolean) => {
-      if (isDark) {
-        root.classList.add('dark');
-      } else {
-        root.classList.remove('dark');
-      }
-    };
 
     if (theme === 'dark') {
-      applyTheme(true);
-    } else if (theme === 'light') {
-      applyTheme(false);
-    } else if (theme === 'system') {
-      // Detect system preference
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      applyTheme(mediaQuery.matches);
-      
-      // Listen for system theme changes
-      const handler = (e: MediaQueryListEvent) => applyTheme(e.matches);
-      mediaQuery.addEventListener('change', handler);
-      
-      return () => mediaQuery.removeEventListener('change', handler);
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
     }
+
+    localStorage.setItem('ui-theme', theme);
   }, [theme]);
 
   // Persist language changes
@@ -72,9 +58,6 @@ export const UiPreferencesProvider: React.FC<UiPreferencesProviderProps> = ({ ch
   // Persist theme changes
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('ui-theme', newTheme);
-    }
   };
 
   return (

@@ -1,96 +1,33 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import CoachAppLayout from '../../layouts/CoachAppLayout';
-import { useAuth } from '../../context/AuthContext';
+import { useUser } from '../../context/UserContext';
+import { supabase } from '../../lib/supabaseClient';
 
-// Dummy data
+// Revenue placeholder — no earnings table exists yet
 const revenueData = {
-  currentMonth: 2450,
-  totalAllTime: 18920,
-  monthOverMonth: 18,
+  currentMonth: 0,
+  totalAllTime: 0,
+  monthOverMonth: 0,
   lastSixMonths: [
-    { month: 'Jul', amount: 1800 },
-    { month: 'Aug', amount: 2100 },
-    { month: 'Sep', amount: 1950 },
-    { month: 'Oct', amount: 2200 },
-    { month: 'Nov', amount: 2070 },
-    { month: 'Dec', amount: 2450 },
+    { month: 'Jul', amount: 0 },
+    { month: 'Aug', amount: 0 },
+    { month: 'Sep', amount: 0 },
+    { month: 'Oct', amount: 0 },
+    { month: 'Nov', amount: 0 },
+    { month: 'Dec', amount: 0 },
   ],
 };
 
-const studentMetrics = {
-  activeStudents: 126,
-  newThisWeek: 14,
-  averageRating: 4.8,
-};
 
-const courses = [
-  {
-    id: 1,
-    name: 'UI Design Fundamentals',
-    enrolledStudents: 48,
-    rating: 4.9,
-    completionRate: 87,
-  },
-  {
-    id: 2,
-    name: 'JavaScript Mastery',
-    enrolledStudents: 56,
-    rating: 4.7,
-    completionRate: 72,
-  },
-  {
-    id: 3,
-    name: 'Product Management Excellence',
-    enrolledStudents: 34,
-    rating: 4.8,
-    completionRate: 81,
-  },
-  {
-    id: 4,
-    name: 'Data Analytics with Python',
-    enrolledStudents: 42,
-    rating: 4.6,
-    completionRate: 68,
-  },
-];
 
-const upcomingSessions = [
-  {
-    id: 1,
-    dateTime: 'Today, 2:00 PM',
-    studentName: 'Sarah Johnson',
-    sessionType: 'Portfolio review',
-    status: 'Confirmed',
-  },
-  {
-    id: 2,
-    dateTime: 'Tomorrow, 10:00 AM',
-    studentName: 'Michael Chen',
-    sessionType: 'Mock interview',
-    status: 'Confirmed',
-  },
-  {
-    id: 3,
-    dateTime: 'Dec 6, 3:30 PM',
-    studentName: 'Emily Rodriguez',
-    sessionType: 'Career planning',
-    status: 'Reschedule requested',
-  },
-  {
-    id: 4,
-    dateTime: 'Dec 7, 11:00 AM',
-    studentName: 'David Kim',
-    sessionType: 'Technical mentoring',
-    status: 'Confirmed',
-  },
-  {
-    id: 5,
-    dateTime: 'Dec 8, 4:00 PM',
-    studentName: 'Jessica Wang',
-    sessionType: 'Resume review',
-    status: 'Confirmed',
-  },
-];
+
+interface CoursePerf {
+  id: string;
+  name: string;
+  enrolledStudents: number;
+  rating: number;
+}
 
 const aiShortcuts = [
   { id: 1, label: 'Generate lesson outline', icon: '📝' },
@@ -100,24 +37,123 @@ const aiShortcuts = [
 ];
 
 const CoachDashboard: React.FC = () => {
-  const { currentUser } = useAuth();
+  const { profile: currentUser } = useUser();
+  const navigate = useNavigate();
+  const [activeCoursesCount, setActiveCoursesCount] = useState(0);
+  const [activeStudentsCount, setActiveStudentsCount] = useState(0);
+  const [newEnrolleesCount, setNewEnrolleesCount] = useState(0);
+  const [upcomingSessions, setUpcomingSessions] = useState<any[]>([]);
+  const [coursePerfs, setCoursePerfs] = useState<CoursePerf[]>([]);
+  const [avgRating, setAvgRating] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  const handleCourseClick = (courseName: string) => {
-    window.alert(`📚 ${courseName}\n\n🎯 Quick Actions:\n• View course analytics\n• Edit course content\n• Manage students (24 enrolled)\n• View student feedback (4.8/5)\n• Update pricing or settings\n\n📊 Recent Activity:\n• 3 new enrollments today\n• 12 lessons completed\n• 5 student questions pending\n\nClick on course card to access full details.`);
-  };
+  useEffect(() => {
+    if (!currentUser) return;
 
-  const handleSessionClick = (sessionId: number) => {
-    window.alert(`📅 Coaching Session Details\n\nSession ID: ${sessionId}\n\n👥 Session Info:\n• Duration: 60 minutes\n• Format: Video call\n• Student: Premium member\n• Topic: Course feedback\n\n🎯 Preparation:\n• Review student progress\n• Prepare discussion points\n• Test video/audio setup\n• Have course materials ready\n\n⏰ Join 5 minutes early for best experience.`);
-  };
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
 
-  const handleAIShortcut = (label: string) => {
-    const aiFeatures: Record<string, string> = {
-      'Generate lesson outline': '📝 AI Lesson Outline Generator\n\n✨ What it does:\n• Creates structured lesson outlines\n• Suggests learning objectives\n• Recommends activities and assessments\n• Optimizes lesson duration\n\n⚡ Time saved: ~2 hours per lesson\n\n💡 Click to launch AI assistant',
-      'Analyze quiz results': '📊 AI Quiz Analytics\n\n✨ Features:\n• Identifies difficult questions\n• Suggests question improvements\n• Analyzes student performance patterns\n• Recommends personalized feedback\n\n📈 Improves student outcomes by 25%\n\n💡 Click to view analytics',
-      'Draft course announcement': '📢 AI Announcement Writer\n\n✨ Capabilities:\n• Writes engaging announcements\n• Personalizes for your audience\n• Suggests optimal send times\n• A/B testing recommendations\n\n✅ Increases open rates by 40%\n\n💡 Click to start drafting',
-      'Suggest price optimization': '💡 AI Price Optimizer\n\n✨ Analysis includes:\n• Market competitive analysis\n• Student demand prediction\n• Revenue optimization suggestions\n• Discount strategy recommendations\n\n💰 Average revenue increase: 18%\n\n💡 Click to see recommendations'
+        // 1. Active Courses
+        const { count: courseCount, data: coursesData, error: courseError } = await supabase
+          .from('courses')
+          .select('id, title', { count: 'exact' })
+          .eq('coach_id', currentUser.id)
+          .eq('verification_status', 'approved');
+
+        if (courseError) throw courseError;
+        setActiveCoursesCount(courseCount || 0);
+
+        const courseIds = coursesData?.map(c => c.id) || [];
+
+        // Build course performance data
+        if (courseIds.length > 0) {
+          // Enrollment counts per course
+          const { data: allEnrollments } = await supabase
+            .from('enrollments')
+            .select('course_id, profile_id, enrolled_at')
+            .in('course_id', courseIds);
+
+          const enrollmentsByCourse: Record<string, number> = {};
+          const uniqueStudents = new Set<string>();
+          const sevenDaysAgo = new Date();
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+          let newCount = 0;
+
+          (allEnrollments || []).forEach((e: { course_id: string; profile_id: string; enrolled_at: string }) => {
+            enrollmentsByCourse[e.course_id] = (enrollmentsByCourse[e.course_id] || 0) + 1;
+            uniqueStudents.add(e.profile_id);
+            if (new Date(e.enrolled_at) > sevenDaysAgo) newCount++;
+          });
+
+          setActiveStudentsCount(uniqueStudents.size);
+          setNewEnrolleesCount(newCount);
+
+          // Ratings per course
+          const { data: reviews } = await supabase
+            .from('reviews')
+            .select('course_id, rating')
+            .in('course_id', courseIds);
+
+          const ratingsByCourse: Record<string, number[]> = {};
+          (reviews || []).forEach((r: { course_id: string; rating: number }) => {
+            if (!ratingsByCourse[r.course_id]) ratingsByCourse[r.course_id] = [];
+            ratingsByCourse[r.course_id].push(r.rating);
+          });
+
+          const allRatings = (reviews || []).map((r: { rating: number }) => r.rating);
+          const overallAvg = allRatings.length > 0
+            ? Math.round((allRatings.reduce((s: number, v: number) => s + v, 0) / allRatings.length) * 10) / 10
+            : 0;
+          setAvgRating(overallAvg);
+
+          const perfs: CoursePerf[] = (coursesData || []).map((c: { id: string; title: string }) => {
+            const courseRatings = ratingsByCourse[c.id] || [];
+            const avg = courseRatings.length > 0
+              ? Math.round((courseRatings.reduce((s, v) => s + v, 0) / courseRatings.length) * 10) / 10
+              : 0;
+            return {
+              id: c.id,
+              name: c.title,
+              enrolledStudents: enrollmentsByCourse[c.id] || 0,
+              rating: avg,
+            };
+          });
+          setCoursePerfs(perfs);
+        }
+
+        // 4. Upcoming Sessions
+        const { data: sessions, error: sessionError } = await supabase
+          .from('live_sessions')
+          .select('*')
+          .eq('coach_id', currentUser.id)
+          .gte('scheduled_at', new Date().toISOString())
+          .order('scheduled_at', { ascending: true })
+          .limit(5);
+
+        if (sessionError) throw sessionError;
+        setUpcomingSessions(sessions || []);
+
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
     };
-    window.alert(aiFeatures[label] || `🤖 AI Tool: ${label}\n\nThis AI tool helps you work smarter and save time.\n\nClick to explore features.`);
+
+    fetchDashboardData();
+  }, [currentUser]);
+
+  const handleCourseClick = (courseId: string) => {
+    navigate(`/coach/courses/${courseId}`);
+  };
+
+  const handleSessionClick = (_sessionId: string) => {
+    navigate(`/coach/sessions`);
+  };
+
+  const handleAIShortcut = (_label: string) => {
+    // AI shortcuts — future feature
   };
 
   const maxRevenue = Math.max(...revenueData.lastSixMonths.map((m) => m.amount));
@@ -126,21 +162,21 @@ const CoachDashboard: React.FC = () => {
     <CoachAppLayout>
       <div className="flex-1 overflow-y-auto">
         {/* Header */}
-        <div className="bg-white dark:bg-dark-background-card border-b border-slate-200 dark:border-gray-700 dark:border-gray-700 px-8 py-6">
+        <div className="bg-[color:var(--bg-secondary)] border-b border-[color:var(--border-base)] px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-slate-900 dark:text-dark-text-primary mb-2">Welcome back, {currentUser?.firstName || 'Coach'}</h1>
-              <p className="text-slate-600 dark:text-dark-text-secondary">Here's an overview of your teaching performance</p>
+              <h1 className="text-3xl font-bold text-[color:var(--text-primary)] mb-2">Welcome back, {currentUser?.firstName || 'Coach'}</h1>
+              <p className="text-[color:var(--text-secondary)]">Here's an overview of your teaching performance</p>
             </div>
             <div className="flex gap-3">
-              <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-full border border-blue-200 dark:border-blue-800">
-                <span className="text-sm font-semibold text-[#304DB5] dark:text-blue-400">
-                  Active courses: {courses.length}
+              <div className="px-4 py-2 bg-[color:var(--color-brand-electric)]/10 rounded-full border border-[color:var(--color-brand-electric)]/20">
+                <span className="text-sm font-semibold text-[color:var(--color-brand-electric)]">
+                  Active courses: {loading ? '...' : activeCoursesCount}
                 </span>
               </div>
-              <div className="px-4 py-2 bg-purple-50 dark:bg-purple-900/20 rounded-full border border-purple-200 dark:border-purple-800">
-                <span className="text-sm font-semibold text-purple-700 dark:text-purple-400">
-                  Active students: {studentMetrics.activeStudents}
+              <div className="px-4 py-2 bg-purple-500/10 rounded-full border border-purple-500/20">
+                <span className="text-sm font-semibold text-purple-500">
+                  Active students: {loading ? '...' : activeStudentsCount}
                 </span>
               </div>
             </div>
@@ -152,45 +188,45 @@ const CoachDashboard: React.FC = () => {
           {/* Row 1: Revenue Overview + Student Metrics */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Revenue Overview - Spans 2 columns */}
-            <div className="lg:col-span-2 bg-white dark:bg-dark-background-card rounded-3xl shadow-xl p-8">
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-dark-text-primary mb-6">Revenue</h2>
-              
+            <div className="lg:col-span-2 glass-card rounded-[24px] p-8">
+              <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-6">Revenue</h2>
+
               {/* Main KPI */}
               <div className="mb-6">
-                <div className="text-5xl font-bold text-[#304DB5] mb-2">
+                <div className="text-5xl font-bold text-gradient mb-2 inline-block">
                   ${revenueData.currentMonth.toLocaleString()}
                 </div>
-                <p className="text-lg text-slate-600 dark:text-dark-text-secondary">This month</p>
+                <p className="text-lg text-[color:var(--text-secondary)]">This month</p>
               </div>
 
               {/* Secondary KPIs */}
               <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="p-4 bg-slate-50 dark:bg-gray-800 rounded-xl">
-                  <p className="text-sm text-slate-600 dark:text-dark-text-secondary mb-1">Total all-time</p>
-                  <p className="text-2xl font-bold text-slate-900 dark:text-dark-text-primary">
+                <div className="p-4 bg-[color:var(--bg-secondary)] rounded-xl border border-[color:var(--border-base)]">
+                  <p className="text-sm text-[color:var(--text-secondary)] mb-1">Total all-time</p>
+                  <p className="text-2xl font-bold text-[color:var(--text-primary)]">
                     ${revenueData.totalAllTime.toLocaleString()}
                   </p>
                 </div>
-                <div className="p-4 bg-green-50 rounded-xl">
-                  <p className="text-sm text-slate-600 dark:text-dark-text-secondary mb-1">Month-over-month</p>
-                  <p className="text-2xl font-bold text-green-600">+{revenueData.monthOverMonth}%</p>
+                <div className="p-4 bg-[color:var(--color-brand-neon)]/10 rounded-xl border border-[color:var(--color-brand-neon)]/20">
+                  <p className="text-sm text-[color:var(--text-secondary)] mb-1">Month-over-month</p>
+                  <p className="text-2xl font-bold text-[color:var(--color-brand-neon)]">+{revenueData.monthOverMonth}%</p>
                 </div>
               </div>
 
               {/* Simple Bar Chart */}
               <div>
-                <p className="text-sm font-semibold text-slate-700 dark:text-dark-text-primary mb-3">Last 6 months</p>
+                <p className="text-sm font-semibold text-[color:var(--text-primary)] mb-3">Last 6 months</p>
                 <div className="flex items-end justify-between gap-2 h-32">
                   {revenueData.lastSixMonths.map((item, index) => (
                     <div key={index} className="flex-1 flex flex-col items-center gap-2">
                       <div className="w-full flex items-end justify-center h-24">
                         <div
-                          className="w-full bg-gradient-to-t from-[#304DB5] to-[#5E7BFF] rounded-t-lg transition-all hover:opacity-80"
+                          className="w-full bg-gradient-to-t from-[color:var(--color-brand-electric)] to-[color:var(--color-brand-neon)] rounded-t-lg transition-all hover:opacity-80 shadow-[0_0_10px_rgba(34,197,94,0.3)]"
                           style={{ height: `${(item.amount / maxRevenue) * 100}%` }}
                           title={`$${item.amount}`}
                         />
                       </div>
-                      <span className="text-xs text-slate-600 font-medium">{item.month}</span>
+                      <span className="text-xs text-[color:var(--text-secondary)] font-medium">{item.month}</span>
                     </div>
                   ))}
                 </div>
@@ -199,38 +235,38 @@ const CoachDashboard: React.FC = () => {
 
             {/* Student Count & Engagement */}
             <div className="space-y-4">
-              <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-md p-6">
+              <div className="glass-card rounded-[24px] p-6">
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full bg-[color:var(--color-brand-electric)]/20 flex items-center justify-center text-[color:var(--color-brand-electric)]">
                     <span className="text-xl">👥</span>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-600 dark:text-dark-text-secondary">Active students</p>
-                    <p className="text-3xl font-bold text-[#304DB5]">{studentMetrics.activeStudents}</p>
+                    <p className="text-sm text-[color:var(--text-secondary)]">Active students</p>
+                    <p className="text-3xl font-bold text-[color:var(--color-brand-electric)]">{loading ? '...' : activeStudentsCount}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-md p-6">
+              <div className="glass-card rounded-[24px] p-6">
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full bg-[color:var(--color-brand-neon)]/20 flex items-center justify-center text-[color:var(--color-brand-neon)]">
                     <span className="text-xl">🆕</span>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-600 dark:text-dark-text-secondary">New this week</p>
-                    <p className="text-3xl font-bold text-green-600">{studentMetrics.newThisWeek}</p>
+                    <p className="text-sm text-[color:var(--text-secondary)]">New this week</p>
+                    <p className="text-3xl font-bold text-[color:var(--color-brand-neon)]">{loading ? '...' : newEnrolleesCount}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-md p-6">
+              <div className="glass-card rounded-[24px] p-6">
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-500">
                     <span className="text-xl">⭐</span>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-600 dark:text-dark-text-secondary">Average rating</p>
-                    <p className="text-3xl font-bold text-yellow-600">{studentMetrics.averageRating}</p>
+                    <p className="text-sm text-[color:var(--text-secondary)]">Average rating</p>
+                    <p className="text-3xl font-bold text-yellow-500">{avgRating || '—'}</p>
                   </div>
                 </div>
               </div>
@@ -238,101 +274,99 @@ const CoachDashboard: React.FC = () => {
           </div>
 
           {/* Row 2: Course Performance */}
-          <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-md p-6">
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-dark-text-primary mb-6">Course performance</h2>
+          <div className="glass-card rounded-[24px] p-6">
+            <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-6">Course performance</h2>
             <div className="space-y-4">
-              {courses.map((course) => (
+              {coursePerfs.length > 0 ? coursePerfs.map((course) => (
                 <div
                   key={course.id}
-                  onClick={() => handleCourseClick(course.name)}
-                  className="p-4 bg-slate-50 dark:bg-gray-800 rounded-xl hover:bg-slate-100 transition-all cursor-pointer"
+                  onClick={() => handleCourseClick(course.id)}
+                  className="p-4 bg-[color:var(--bg-secondary)] rounded-xl hover:bg-[color:var(--bg-glass-hover)] border border-[color:var(--border-base)] transition-all cursor-pointer group"
                 >
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-slate-900 dark:text-dark-text-primary mb-1">{course.name}</h3>
-                      <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-dark-text-secondary">
+                      <h3 className="text-lg font-semibold text-[color:var(--text-primary)] mb-1 group-hover:text-[color:var(--color-brand-electric)] transition-colors">{course.name}</h3>
+                      <div className="flex items-center gap-4 text-sm text-[color:var(--text-secondary)]">
                         <span>👥 {course.enrolledStudents} students</span>
-                        <span>⭐ {course.rating}</span>
+                        {course.rating > 0 && <span>⭐ {course.rating}</span>}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm text-slate-600 dark:text-dark-text-secondary mb-1">Completion rate</p>
-                      <p className="text-xl font-bold text-[#304DB5]">{course.completionRate}%</p>
-                    </div>
-                  </div>
-                  {/* Progress Bar */}
-                  <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] rounded-full transition-all"
-                      style={{ width: `${course.completionRate}%` }}
-                    />
                   </div>
                 </div>
-              ))}
+              )) : (
+                <p className="text-center text-[color:var(--text-secondary)] py-8">No approved courses yet. Create your first course!</p>
+              )}
             </div>
           </div>
 
           {/* Row 3: Upcoming Sessions + AI Shortcuts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Upcoming Coaching Sessions */}
-            <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-md p-6">
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-dark-text-primary mb-6">Upcoming coaching sessions</h2>
+            <div className="glass-card rounded-[24px] p-6">
+              <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-6">Upcoming coaching sessions</h2>
               <div className="space-y-4">
-                {upcomingSessions.map((session) => (
-                  <div
-                    key={session.id}
-                    className="p-4 border border-slate-200 dark:border-gray-700 rounded-xl hover:border-[#5E7BFF] transition-all"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <p className="text-sm font-semibold text-[#304DB5] mb-1">{session.dateTime}</p>
-                        <p className="text-lg font-semibold text-slate-900 dark:text-dark-text-primary">{session.studentName}</p>
-                        <p className="text-sm text-slate-600 dark:text-dark-text-secondary">{session.sessionType}</p>
-                      </div>
-                      <span
-                        className={`px-3 py-1 text-xs font-bold rounded-full ${
-                          session.status === 'Confirmed'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-orange-100 text-orange-700'
-                        }`}
-                      >
-                        {session.status}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => handleSessionClick(session.id)}
-                      className="text-sm font-medium text-[#304DB5] hover:text-[#5E7BFF] transition-colors"
+                {upcomingSessions.length > 0 ? (
+                  upcomingSessions.map((session) => (
+                    <div
+                      key={session.id}
+                      className="p-4 border border-[color:var(--border-base)] rounded-xl hover:border-[color:var(--color-brand-electric)] hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all bg-[color:var(--bg-secondary)]"
                     >
-                      View details →
-                    </button>
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <p className="text-sm font-semibold text-[color:var(--color-brand-electric)] mb-1">
+                            {new Date(session.scheduled_at).toLocaleDateString()} {new Date(session.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                          <p className="text-lg font-semibold text-[color:var(--text-primary)]">{session.title}</p>
+                          <p className="text-sm text-[color:var(--text-secondary)]">{session.description || 'No description'}</p>
+                        </div>
+                        <span
+                          className={`px-3 py-1 text-xs font-bold rounded-full ${session.status === 'scheduled' || session.status === 'live'
+                            ? 'bg-[color:var(--color-brand-neon)]/10 text-[color:var(--color-brand-neon)]'
+                            : 'bg-orange-500/10 text-orange-500'
+                            }`}
+                        >
+                          {session.status}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleSessionClick(session.id)}
+                        className="text-sm font-medium text-[color:var(--color-brand-electric)] hover:text-[color:var(--color-brand-neon)] transition-colors"
+                      >
+                        View details →
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-8 text-center text-[color:var(--text-secondary)] bg-[color:var(--bg-secondary)] rounded-xl border border-[color:var(--border-base)]">
+                    <p>No upcoming sessions scheduled.</p>
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
             {/* AI Tool Shortcuts */}
-            <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-md p-6">
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-dark-text-primary mb-6">AI tool shortcuts</h2>
+            <div className="glass-card rounded-[24px] p-6">
+              <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-6">AI tool shortcuts</h2>
               <div className="grid grid-cols-2 gap-4">
                 {aiShortcuts.map((shortcut) => (
                   <button
                     key={shortcut.id}
                     onClick={() => handleAIShortcut(shortcut.label)}
-                    className="p-5 bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl border-2 border-transparent hover:border-[#5E7BFF] hover:shadow-md transition-all group"
+                    className="p-5 bg-gradient-to-br from-[color:var(--bg-secondary)] to-[color:var(--bg-primary)] rounded-2xl border border-[color:var(--border-base)] hover:border-[color:var(--color-brand-electric)] hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all group"
                   >
-                    <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">
+                    <div className="text-3xl mb-3 group-hover:scale-110 transition-transform filter drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">
                       {shortcut.icon}
                     </div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-dark-text-primary leading-tight">
+                    <p className="text-sm font-semibold text-[color:var(--text-primary)] leading-tight">
                       {shortcut.label}
                     </p>
                   </button>
                 ))}
               </div>
-              <div className="mt-6 p-4 bg-slate-50 dark:bg-gray-800 rounded-xl">
+              <div className="mt-6 p-4 bg-[color:var(--bg-secondary)] rounded-xl border border-[color:var(--border-base)]">
                 <div className="flex items-start gap-2">
                   <span className="text-lg">✨</span>
-                  <p className="text-xs text-slate-600 dark:text-dark-text-secondary">
+                  <p className="text-xs text-[color:var(--text-secondary)]">
                     AI-powered tools to help you create better content, analyze student performance, and
                     optimize your teaching.
                   </p>

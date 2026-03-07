@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import CoachAppLayout from '../../layouts/CoachAppLayout';
 import StudentListTable from '../../components/coach/students/StudentListTable';
@@ -6,137 +6,165 @@ import StudentProgressOverview from '../../components/coach/students/StudentProg
 import StudentExportBar from '../../components/coach/students/StudentExportBar';
 import GroupAnnouncementPanel from '../../components/coach/students/GroupAnnouncementPanel';
 import StudentScoresPanel from '../../components/coach/students/StudentScoresPanel';
+import { supabase } from '../../lib/supabaseClient';
+import { Loader2 } from 'lucide-react';
 
-// Dummy student data
-const dummyStudents = [
-  {
-    id: 'student-1',
-    name: 'Emma Watson',
-    email: 'emma.watson@email.com',
-    enrollmentDate: '2024-11-15',
-    status: 'Active' as const,
-    progressPercent: 78,
-    lastActiveAt: '2 hours ago',
-    averageScore: 92,
-  },
-  {
-    id: 'student-2',
-    name: 'James Rodriguez',
-    email: 'james.r@email.com',
-    enrollmentDate: '2024-11-10',
-    status: 'Completed' as const,
-    progressPercent: 100,
-    lastActiveAt: '1 day ago',
-    averageScore: 88,
-  },
-  {
-    id: 'student-3',
-    name: 'Sophia Chen',
-    email: 'sophia.chen@email.com',
-    enrollmentDate: '2024-11-20',
-    status: 'Active' as const,
-    progressPercent: 65,
-    lastActiveAt: '5 hours ago',
-    averageScore: 85,
-  },
-  {
-    id: 'student-4',
-    name: 'Michael Brown',
-    email: 'michael.b@email.com',
-    enrollmentDate: '2024-11-08',
-    status: 'At risk' as const,
-    progressPercent: 23,
-    lastActiveAt: '2 weeks ago',
-    averageScore: 58,
-  },
-  {
-    id: 'student-5',
-    name: 'Olivia Martinez',
-    email: 'olivia.m@email.com',
-    enrollmentDate: '2024-11-25',
-    status: 'Active' as const,
-    progressPercent: 45,
-    lastActiveAt: '1 hour ago',
-    averageScore: 76,
-  },
-  {
-    id: 'student-6',
-    name: 'Daniel Kim',
-    email: 'daniel.kim@email.com',
-    enrollmentDate: '2024-11-05',
-    status: 'Completed' as const,
-    progressPercent: 100,
-    lastActiveAt: '3 days ago',
-    averageScore: 95,
-  },
-  {
-    id: 'student-7',
-    name: 'Isabella Garcia',
-    email: 'isabella.g@email.com',
-    enrollmentDate: '2024-11-18',
-    status: 'Active' as const,
-    progressPercent: 82,
-    lastActiveAt: '30 minutes ago',
-    averageScore: 89,
-  },
-  {
-    id: 'student-8',
-    name: 'William Taylor',
-    email: 'william.t@email.com',
-    enrollmentDate: '2024-11-12',
-    status: 'At risk' as const,
-    progressPercent: 31,
-    lastActiveAt: '1 week ago',
-    averageScore: 62,
-  },
-];
-
-// Dummy course data
-const dummyCourses: Record<string, { title: string }> = {
-  'course-1': { title: 'UI Design Fundamentals' },
-  'course-2': { title: 'JavaScript Mastery' },
-  'course-3': { title: 'Product Management Excellence' },
-  'course-4': { title: 'Data Analytics with Python' },
-};
+interface Student {
+  id: string;
+  name: string;
+  email: string;
+  enrollmentDate: string;
+  status: 'Active' | 'Completed' | 'At risk';
+  progressPercent: number;
+  lastActiveAt: string;
+  averageScore: number;
+}
 
 const CourseStudents: React.FC = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'at-risk' | 'completed'>(
-    'all'
-  );
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'at-risk' | 'completed'>('all');
   const [isAnnouncementOpen, setIsAnnouncementOpen] = useState(false);
   const [exportSuccess, setExportSuccess] = useState(false);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [courseTitle, setCourseTitle] = useState('Course');
+  const [isLoading, setIsLoading] = useState(true);
 
-  const course = courseId ? dummyCourses[courseId] : null;
-  const courseTitle = course?.title || 'Course';
+  useEffect(() => {
+    if (!courseId) return;
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        // 1. Course title
+        const { data: courseRow } = await supabase
+          .from('courses').select('title').eq('id', courseId).single();
+        if (courseRow) setCourseTitle(courseRow.title);
 
-  // Calculate aggregate metrics
-  const totalEnrolled = dummyStudents.length;
-  const averageCompletion = Math.round(
-    dummyStudents.reduce((sum, s) => sum + s.progressPercent, 0) / dummyStudents.length
-  );
-  const averageQuizScore = Math.round(
-    dummyStudents.reduce((sum, s) => sum + s.averageScore, 0) / dummyStudents.length
-  );
+        // 2. Enrollments for this course
+        const { data: enrollments } = await supabase
+          .from('enrollments')
+          .select('profile_id, enrolled_at')
+          .eq('course_id', courseId);
 
-  const handleExport = (payload: { type: string; format: string }) => {
-    window.alert(`📊 Exporting Student Data\n\nExport Type: ${payload.type}\nFormat: ${payload.format.toUpperCase()}\n\n📦 Export Contents:\n• Student names and emails\n• Enrollment dates\n• Progress percentages\n• Quiz scores and grades\n• Last activity dates\n• Completion certificates\n\n⏱️ Processing Time: 10-30 seconds\n📧 Delivery: Download link ready\n💾 File Size: ~${Math.ceil(totalEnrolled / 10)}MB\n\n🔒 Data Privacy:\n• Encrypted during transfer\n• Complies with GDPR/CCPA\n• Use responsibly\n\n✅ Export will begin shortly...`);
+        if (!enrollments?.length) { setStudents([]); return; }
+
+        const studentIds = enrollments.map(e => e.profile_id);
+
+        // 3. Student profiles
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, email, first_name, last_name, updated_at')
+          .in('id', studentIds);
+
+        // 4. Lesson ids for this course
+        const { data: modules } = await supabase
+          .from('modules').select('id').eq('course_id', courseId);
+        const moduleIds = (modules || []).map(m => m.id);
+
+        let lessonIds: string[] = [];
+        if (moduleIds.length) {
+          const { data: items } = await supabase
+            .from('module_content_items')
+            .select('content_id')
+            .in('module_id', moduleIds)
+            .eq('content_type', 'lesson');
+          lessonIds = (items || []).map(i => i.content_id);
+        }
+
+        // 5. Lesson progress per student
+        let progressRows: { user_id: string; is_completed: boolean }[] = [];
+        if (lessonIds.length) {
+          const { data } = await supabase
+            .from('user_lesson_progress')
+            .select('user_id, is_completed')
+            .in('user_id', studentIds)
+            .in('lesson_id', lessonIds);
+          progressRows = data || [];
+        }
+
+        // 6. Quiz scores per student
+        let quizIds: string[] = [];
+        if (moduleIds.length) {
+          const { data: qi } = await supabase
+            .from('module_content_items')
+            .select('content_id')
+            .in('module_id', moduleIds)
+            .eq('content_type', 'quiz');
+          quizIds = (qi || []).map(q => q.content_id);
+        }
+        let attemptRows: { user_id: string; score: number; max_score: number }[] = [];
+        if (quizIds.length) {
+          const { data } = await supabase
+            .from('quiz_attempts')
+            .select('user_id, score, max_score')
+            .in('user_id', studentIds)
+            .in('quiz_id', quizIds)
+            .in('status', ['submitted', 'graded']);
+          attemptRows = data || [];
+        }
+
+        // 7. Map to Student shape
+        const totalLessons = lessonIds.length;
+        const mapped: Student[] = (profiles || []).map(p => {
+          const enr = enrollments.find(e => e.profile_id === p.id);
+          const pRows = progressRows.filter(r => r.user_id === p.id);
+          const completed = pRows.filter(r => r.is_completed).length;
+          const progress = totalLessons > 0 ? Math.round((completed / totalLessons) * 100) : 0;
+
+          const aRows = attemptRows.filter(r => r.user_id === p.id);
+          const avgScore = aRows.length > 0
+            ? Math.round(aRows.reduce((s, r) => s + (r.max_score > 0 ? (r.score / r.max_score) * 100 : 0), 0) / aRows.length)
+            : 0;
+
+          const lastActive = new Date(p.updated_at || new Date());
+          const diffDays = Math.floor((Date.now() - lastActive.getTime()) / 86400000);
+          const lastActiveStr = diffDays === 0 ? 'Today'
+            : diffDays === 1 ? '1 day ago'
+            : diffDays < 7 ? `${diffDays} days ago`
+            : lastActive.toLocaleDateString();
+
+          let status: 'Active' | 'Completed' | 'At risk' = 'At risk';
+          if (progress === 100) status = 'Completed';
+          else if (diffDays < 14) status = 'Active';
+
+          return {
+            id: p.id,
+            name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.email,
+            email: p.email,
+            enrollmentDate: enr ? new Date(enr.enrolled_at).toLocaleDateString() : 'N/A',
+            status,
+            progressPercent: progress,
+            lastActiveAt: lastActiveStr,
+            averageScore: avgScore,
+          };
+        });
+
+        setStudents(mapped);
+      } catch (err) {
+        console.error('Error fetching course students:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, [courseId]);
+
+  const totalEnrolled = students.length;
+  const averageCompletion = students.length > 0
+    ? Math.round(students.reduce((s, st) => s + st.progressPercent, 0) / students.length) : 0;
+  const averageQuizScore = students.length > 0
+    ? Math.round(students.reduce((s, st) => s + st.averageScore, 0) / students.length) : 0;
+
+  const handleExport = (_payload: { type: string; format: string }) => {
     setExportSuccess(true);
     setTimeout(() => setExportSuccess(false), 3000);
   };
 
-  const handleSendAnnouncement = (payload: {
+  const handleSendAnnouncement = (_payload: {
     subject: string;
     channels: { email: boolean; inApp: boolean };
     body: string;
   }) => {
-    const recipientCount = dummyStudents.length;
-    const channels = [];
-    if (payload.channels.email) channels.push('Email');
-    if (payload.channels.inApp) channels.push('In-App');
-    
-    window.alert(`📢 Announcement Sent Successfully\n\nSubject: "${payload.subject}"\n\n📊 Delivery Details:\n• Recipients: ${recipientCount} students\n• Channels: ${channels.join(', ')}\n• Status: Delivered\n• Sent: ${new Date().toLocaleTimeString()}\n\n✅ Delivery Confirmation:\n${payload.channels.email ? `• Email: Sent to ${recipientCount} addresses\n` : ''}${payload.channels.inApp ? `• In-App: ${recipientCount} notifications delivered\n` : ''}\n📈 Expected Engagement:\n• Open rate: ~65%\n• Read time: 2-3 minutes\n• Response rate: ~15%\n\n💡 Track engagement in analytics dashboard.`);
     setIsAnnouncementOpen(false);
   };
 
@@ -162,13 +190,13 @@ const CourseStudents: React.FC = () => {
               <h1 className="text-4xl font-bold text-[#111827] mb-3">{courseTitle} – Students</h1>
               <div className="flex items-center gap-3">
                 <span className="px-4 py-2 bg-[#E0E5FF] text-[#304DB5] rounded-full text-sm font-semibold">
-                  Enrolled: {totalEnrolled}
+                  Enrolled: {isLoading ? '...' : totalEnrolled}
                 </span>
                 <span className="px-4 py-2 bg-[#E0F2FE] text-[#0284C7] rounded-full text-sm font-semibold">
-                  Avg completion: {averageCompletion}%
+                  Avg completion: {isLoading ? '...' : averageCompletion}%
                 </span>
                 <span className="px-4 py-2 bg-[#D1FAE5] text-[#059669] rounded-full text-sm font-semibold">
-                  Avg quiz score: {averageQuizScore}%
+                  Avg quiz score: {isLoading ? '...' : averageQuizScore}%
                 </span>
               </div>
             </div>
@@ -247,11 +275,16 @@ const CourseStudents: React.FC = () => {
         )}
 
         {/* Main Content: Two Column Layout */}
+        {isLoading ? (
+          <div className="flex justify-center items-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-[#304DB5]" />
+          </div>
+        ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column: Student List (wider) */}
           <div className="lg:col-span-2">
             <StudentListTable
-              students={dummyStudents}
+              students={students}
               searchQuery={searchQuery}
               filterStatus={filterStatus}
             />
@@ -259,10 +292,11 @@ const CourseStudents: React.FC = () => {
 
           {/* Right Column: Overview Cards (narrower) */}
           <div className="space-y-6">
-            <StudentProgressOverview students={dummyStudents} />
+            <StudentProgressOverview students={students} />
             <StudentScoresPanel />
           </div>
         </div>
+        )}
       </div>
 
       {/* Announcement Panel */}
