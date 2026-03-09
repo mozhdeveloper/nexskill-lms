@@ -236,7 +236,7 @@ const MembershipConfirmation: React.FC = () => {
               Questions about your membership or billing?
             </p>
             <button
-              onClick={() => alert('📞 Contact Support\n\nWe\'re here to help!\n\nEmail: support@nexskill.com\nLive Chat: Click the chat icon in the bottom right')}
+              onClick={() => navigate('/student/support')}
               className="text-sm font-semibold text-[#304DB5] hover:text-[#5E7BFF] transition-colors"
             >
               Contact our support team →

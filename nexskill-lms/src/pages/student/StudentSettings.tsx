@@ -53,6 +53,20 @@ const StudentSettings: React.FC = () => {
         setAccountSettings(prev => ({ ...prev, email: data.user!.email! }));
       }
     });
+
+    // Load saved preferences from localStorage
+    try {
+      const saved = localStorage.getItem('nexskill_student_prefs');
+      if (saved) {
+        const prefs = JSON.parse(saved);
+        if (prefs.languagePrefs) setLanguagePrefs(prefs.languagePrefs);
+        if (prefs.notificationSettings) setNotificationSettings(prefs.notificationSettings);
+        if (prefs.privacySettings) setPrivacySettings(prefs.privacySettings);
+        if (prefs.accessibilitySettings) setAccessibilitySettings(prefs.accessibilitySettings);
+      }
+    } catch {
+      // Invalid JSON in storage — use defaults
+    }
   }, []);
 
   const [privacySettings, setPrivacySettings] = useState({
@@ -72,31 +86,56 @@ const StudentSettings: React.FC = () => {
   });
 
   const handleSave = () => {
-    console.log('Saving settings:', {
-      interestsGoals,
-      languagePrefs,
-      notificationSettings,
-      accountSettings,
-      privacySettings,
-      accessibilitySettings,
-    });
-    alert('✅ Settings saved successfully!\n\nAll your preferences have been updated.');
-    setShowSuccessMessage(true);
-    setTimeout(() => setShowSuccessMessage(false), 3000);
+    try {
+      localStorage.setItem('nexskill_student_prefs', JSON.stringify({
+        languagePrefs,
+        notificationSettings,
+        privacySettings,
+        accessibilitySettings,
+      }));
+      setShowSuccessMessage(true);
+      setTimeout(() => setShowSuccessMessage(false), 3000);
+    } catch {
+      // localStorage quota exceeded — ignore silently
+    }
   };
 
   const handleDeleteAccount = () => {
     if (deleteConfirmText === 'DELETE') {
-      alert('⚠️ Account deletion initiated\n\nYour account and all data will be permanently deleted within 24 hours.');
       setShowDeleteModal(false);
-      navigate('/auth/login');
-    } else {
-      alert('❌ Please type DELETE to confirm account deletion.');
+      // Account deletion requires admin/support action
+      navigate('/student/support', { state: { reason: 'Account deletion request' } });
     }
   };
 
-  const handleDownloadData = () => {
-    alert('📥 Data export started\n\nYour data archive will be ready in a few minutes. We\'ll send you a download link via email.');
+  const handleDownloadData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const [profileRes, interestsRes, goalsRes, enrollmentsRes] = await Promise.all([
+        supabase.from('student_profiles').select('*').eq('user_id', user.id).maybeSingle(),
+        supabase.from('student_interests').select('*, interest:interests(name)').eq('student_profile_id', user.id),
+        supabase.from('student_goals').select('*, goal:goals(name)').eq('student_profile_id', user.id),
+        supabase.from('enrollments').select('*, course:courses(title)').eq('student_id', user.id),
+      ]);
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        email: user.email,
+        profile: profileRes.data,
+        interests: interestsRes.data,
+        goals: goalsRes.data,
+        enrollments: enrollmentsRes.data,
+      };
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nexskill-data-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // Export failed silently
+    }
     setShowDownloadModal(false);
   };
 
@@ -508,7 +547,7 @@ const StudentSettings: React.FC = () => {
                   <span className="font-semibold">⚠️ Warning:</span> This action cannot be undone!
                 </p>
                 <p className="text-xs text-red-700">
-                  All your courses, progress, certificates, and personal data will be permanently deleted.
+                  Typing DELETE and confirming will submit an account deletion request to our support team. They will process it within 48 hours.
                 </p>
               </div>
               <div>

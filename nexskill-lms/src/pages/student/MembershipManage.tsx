@@ -70,8 +70,7 @@ const MembershipManage: React.FC = () => {
   const targetPlan = allPlans[targetPlanId as keyof typeof allPlans] || allPlans.elite;
 
   const handleConfirmChange = () => {
-    console.log(`Plan change confirmed: ${currentPlan.id} → ${targetPlan.id}`);
-    alert(`✅ Plan upgrade confirmed!\n\nSwitching to ${targetPlan.name} plan\nNew price: $${targetPlan.price}/${targetPlan.billingCycle}\n\nYour new benefits will be available immediately!`);
+    // Membership features not yet available — no membership tables in DB
     navigate('/student/membership/confirmation', {
       state: {
         type: 'change',
@@ -88,8 +87,7 @@ const MembershipManage: React.FC = () => {
   };
 
   const handleCancelConfirmed = () => {
-    console.log('Membership cancellation confirmed');
-    alert('⚠️ Membership cancelled\n\nYour Pro membership will remain active until the end of your current billing cycle.\n\nWe\'re sorry to see you go!');
+    // Membership features not yet available — no membership tables in DB
     navigate('/student/membership/confirmation', {
       state: {
         type: 'cancel',
@@ -114,6 +112,15 @@ const MembershipManage: React.FC = () => {
           </button>
           <h1 className="text-4xl font-bold text-slate-900 mb-3">Manage membership</h1>
           <p className="text-lg text-slate-600">Change your plan or cancel your subscription</p>
+        </div>
+
+        {/* Coming Soon Banner */}
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+          <span className="text-xl flex-shrink-0">🚀</span>
+          <div>
+            <p className="font-semibold text-amber-800">Membership Management — Coming Soon</p>
+            <p className="text-sm text-amber-700">Plan upgrades and billing are not yet available. All features are currently free.</p>
+          </div>
         </div>
 
         {/* Main Layout */}
@@ -154,13 +161,13 @@ const MembershipManage: React.FC = () => {
               </p>
               <div className="flex flex-wrap gap-3">
                 <button
-                  onClick={() => alert('📞 Contact Support\n\nEmail: support@nexskill.com\nPhone: 1-800-NEXSKILL\nLive Chat: Available 24/7\n\nOur team will respond within 2 hours.')}
+                  onClick={() => navigate('/student/support')}
                   className="px-5 py-2 bg-white text-[#304DB5] font-medium rounded-full border-2 border-[#304DB5] hover:bg-blue-50 transition-all text-sm"
                 >
                   Contact support
                 </button>
                 <button
-                  onClick={() => alert('❓ Frequently Asked Questions\n\n• How do I change my plan?\n• What payment methods are accepted?\n• Can I cancel anytime?\n• Do you offer refunds?\n\nVisit our help center for more answers.')}
+                  onClick={() => navigate('/student/support')}
                   className="px-5 py-2 text-slate-700 font-medium rounded-full border border-slate-300 hover:bg-white transition-all text-sm"
                 >
                   View FAQ

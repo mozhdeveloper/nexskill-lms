@@ -73,12 +73,8 @@ const MembershipPlans: React.FC = () => {
   const currentPlan = membershipPlans.find(p => p.isCurrent);
 
   const handleSelectPlan = (planId: string) => {
-    console.log('Selected plan:', planId);
-    const selectedPlan = membershipPlans.find(p => p.id === planId);
-    if (selectedPlan) {
-      alert(`✅ ${selectedPlan.name} Plan Selected!\n\nPrice: $${selectedPlan.price}/${selectedPlan.billingCycle}\n\nProceeding to checkout...`);
-      navigate('/student/membership/manage', { state: { targetPlanId: planId } });
-    }
+    // Membership features not yet available — no membership tables in DB
+    navigate('/student/membership/manage', { state: { targetPlanId: planId } });
   };
 
   return (
@@ -88,6 +84,15 @@ const MembershipPlans: React.FC = () => {
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-3">Membership plans</h1>
           <p className="text-lg text-slate-600 dark:text-slate-400">Choose the plan that matches your learning goals</p>
+        </div>
+
+        {/* Coming Soon Banner */}
+        <div className="mb-8 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+          <span className="text-xl flex-shrink-0">🚀</span>
+          <div>
+            <p className="font-semibold text-amber-800">Membership Plans — Coming Soon</p>
+            <p className="text-sm text-amber-700">Paid membership tiers are not yet available. All features are currently free while we build out this experience.</p>
+          </div>
         </div>
 
         {/* Current Plan Banner */}
@@ -138,7 +143,7 @@ const MembershipPlans: React.FC = () => {
             Our team can help you find the perfect plan for your learning goals.
           </p>
           <button
-            onClick={() => alert('📞 Contact our team\n\nOur sales team will reach out within 24 hours to discuss your needs.\n\nEmail: sales@nexskill.com\nPhone: 1-800-NEXSKILL')}
+            onClick={() => navigate('/student/support')}
             className="px-8 py-3 bg-white text-[#304DB5] font-semibold rounded-full hover:shadow-lg transition-all"
           >
             Talk to our team

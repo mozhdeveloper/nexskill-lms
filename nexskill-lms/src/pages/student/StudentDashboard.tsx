@@ -39,6 +39,7 @@ const StudentDashboard: React.FC = () => {
   }, [courseProgress]);
 
   const hoursLearned = Math.round((totalTimeSeconds / 3600) * 10) / 10;
+  const certificateCount = courseProgress.filter(p => p.totalLessons > 0 && p.completedLessons >= p.totalLessons).length;
 
   // Get greeting based on time
   const getGreeting = () => {
@@ -144,7 +145,7 @@ const StudentDashboard: React.FC = () => {
             {!showAICoach && (
               <div className="lg:col-span-1 glass-card rounded-2xl p-6">
                 <p className="text-sm text-text-secondary mb-2">Certificates earned</p>
-                <p className="text-4xl font-bold text-text-primary mb-3">4</p>
+                <p className="text-4xl font-bold text-text-primary mb-3">{certificateCount}</p>
                 <Link to="/student/certificates" className="text-sm text-brand-primary font-medium hover:text-brand-electric transition-colors">
                   View certificates →
                 </Link>
@@ -156,7 +157,7 @@ const StudentDashboard: React.FC = () => {
           {showAICoach && (
             <div className="glass-card rounded-2xl p-6 max-w-xs">
               <p className="text-sm text-text-secondary mb-2">Certificates earned</p>
-              <p className="text-4xl font-bold text-text-primary mb-3">4</p>
+              <p className="text-4xl font-bold text-text-primary mb-3">{certificateCount}</p>
               <Link to="/student/certificates" className="text-sm text-brand-primary font-medium hover:text-brand-primary-light transition-colors">
                 View certificates →
               </Link>
