@@ -87,7 +87,7 @@ const MembershipPaymentSummary: React.FC<MembershipPaymentSummaryProps> = ({ sum
           <div className="flex items-baseline justify-between">
             <span className="text-sm text-slate-600">Amount charged</span>
             <span className="text-2xl font-bold text-[#304DB5]">
-              ${summary.price.toFixed(2)}
+              ₱{summary.price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
               <span className="text-sm font-normal text-slate-600"> / {summary.billingCycle}</span>
             </span>
           </div>

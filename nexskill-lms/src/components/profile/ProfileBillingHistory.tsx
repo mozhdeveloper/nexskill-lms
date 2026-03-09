@@ -53,7 +53,7 @@ const ProfileBillingHistory: React.FC<ProfileBillingHistoryProps> = ({ transacti
                   <td className="py-4 text-sm text-slate-700">{transaction.date}</td>
                   <td className="py-4 text-sm text-slate-900">{transaction.description}</td>
                   <td className="py-4 text-sm font-semibold text-slate-900 text-right">
-                    ${transaction.amount.toFixed(2)}
+                    ₱{transaction.amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                   </td>
                   <td className="py-4 text-center">
                     <span

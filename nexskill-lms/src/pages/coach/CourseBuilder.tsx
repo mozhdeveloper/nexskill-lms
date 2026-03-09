@@ -133,20 +133,19 @@ const CourseBuilder: React.FC = () => {
           learningObjectives: [],
         }));
 
-        setCourseStatus(courseData.is_published ? "published" : "draft");
+        setCourseStatus(courseData.verification_status === 'approved' ? "published" : "draft");
         setVerificationStatus(courseData.verification_status || "draft");
 
         // Initialize pricing from DB
         const dbPrice = courseData.price ?? 0;
-        const dbCurrency = courseData.currency || 'USD';
         const pricingMode: 'free' | 'one-time' | 'subscription' =
-          dbPrice === 0 ? 'free' : (courseData.pricing_mode || 'one-time');
+          dbPrice === 0 ? 'free' : 'one-time';
         setPricing({
           mode: pricingMode,
           price: dbPrice,
-          currency: dbCurrency,
-          salePrice: courseData.sale_price ?? undefined,
-          subscriptionInterval: courseData.subscription_interval ?? undefined,
+          currency: 'PHP',
+          salePrice: undefined,
+          subscriptionInterval: undefined,
         });
 
         // Get latest feedback if exists
@@ -801,10 +800,12 @@ const CourseBuilder: React.FC = () => {
   const handlePublish = async () => {
     try {
       const { error } = await supabase.from('courses').update({
-        is_published: true,
+        verification_status: 'approved',
+        visibility: 'public',
         updated_at: new Date().toISOString(),
       }).eq('id', courseId);
       if (error) throw error;
+      setVerificationStatus('approved');
       setCourseStatus("published");
       alert("Course Published Successfully!");
     } catch (error: any) {
@@ -815,10 +816,12 @@ const CourseBuilder: React.FC = () => {
   const handleUnpublish = async () => {
     try {
       const { error } = await supabase.from('courses').update({
-        is_published: false,
+        verification_status: 'draft',
+        visibility: 'private',
         updated_at: new Date().toISOString(),
       }).eq('id', courseId);
       if (error) throw error;
+      setVerificationStatus('draft');
       setCourseStatus("draft");
       alert("Course Unpublished.");
     } catch (error: any) {
@@ -830,7 +833,6 @@ const CourseBuilder: React.FC = () => {
     if (!courseId) return;
     const { error } = await supabase.from('courses').update({
       price: pricing.mode === 'free' ? 0 : pricing.price,
-      currency: pricing.currency,
       updated_at: new Date().toISOString(),
     }).eq('id', courseId);
     if (error) throw error;

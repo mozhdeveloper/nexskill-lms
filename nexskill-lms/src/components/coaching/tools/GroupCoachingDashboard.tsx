@@ -171,7 +171,7 @@ const GroupCoachingDashboard: React.FC = () => {
               />
             </svg>
           </div>
-          <p className="text-4xl font-bold text-[#111827]">${totalRevenue.toLocaleString()}</p>
+          <p className="text-4xl font-bold text-[#111827]">₱{totalRevenue.toLocaleString()}</p>
           <p className="text-xs text-[#9CA3B5] mt-1">From group sessions</p>
         </div>
 
@@ -263,7 +263,7 @@ const GroupCoachingDashboard: React.FC = () => {
                     </div>
                     <div>
                       <p className="text-[#9CA3B5] text-xs mb-1">Price</p>
-                      <p className="font-medium text-[#111827]">${session.price}</p>
+                      <p className="font-medium text-[#111827]">₱{session.price?.toLocaleString()}</p>
                     </div>
                   </div>
                 </div>
@@ -392,7 +392,7 @@ const GroupCoachingDashboard: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[#111827] mb-2">
-                    Price ($)
+                    Price (₱)
                   </label>
                   <input
                     type="number"

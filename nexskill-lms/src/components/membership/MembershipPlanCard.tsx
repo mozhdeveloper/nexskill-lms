@@ -66,7 +66,7 @@ const MembershipPlanCard: React.FC<MembershipPlanCardProps> = ({ plan, onSelectP
       <div className="mb-4">
         <div className="flex items-baseline gap-1">
           <span className="text-4xl font-bold text-[#304DB5]">
-            ${plan.price}
+            ₱{plan.price.toLocaleString()}
           </span>
           <span className="text-lg text-slate-600">/ {plan.billingCycle}</span>
         </div>

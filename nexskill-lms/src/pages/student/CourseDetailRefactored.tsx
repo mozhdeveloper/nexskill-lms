@@ -46,6 +46,10 @@ const CourseDetailRefactored: React.FC = () => {
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Progress tracking state
+  const [completedLessonIds, setCompletedLessonIds] = useState<Set<string>>(new Set());
+  const [completedQuizIds, setCompletedQuizIds] = useState<Set<string>>(new Set());
+
   useEffect(() => {
     const checkWishlist = async () => {
       if (!courseId) return;
@@ -61,6 +65,57 @@ const CourseDetailRefactored: React.FC = () => {
     };
     checkWishlist();
   }, [courseId]);
+
+  // Fetch user progress (completed lessons & quizzes)
+  useEffect(() => {
+    const fetchProgress = async () => {
+      if (!courseId || !isEnrolled) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get all lesson IDs for this course via modules → module_content_items
+      const { data: modules } = await supabase
+        .from('modules')
+        .select('id')
+        .eq('course_id', courseId);
+      if (!modules || modules.length === 0) return;
+
+      const moduleIds = modules.map((m: { id: string }) => m.id);
+
+      // Get content items for these modules (published only)
+      const { data: contentItems } = await supabase
+        .from('module_content_items')
+        .select('content_type, content_id')
+        .in('module_id', moduleIds)
+        .eq('is_published', true);
+
+      const lessonIds = (contentItems || []).filter((i: { content_type: string }) => i.content_type === 'lesson').map((i: { content_id: string }) => i.content_id);
+      const quizIds = (contentItems || []).filter((i: { content_type: string }) => i.content_type === 'quiz').map((i: { content_id: string }) => i.content_id);
+
+      // Fetch completed lessons
+      if (lessonIds.length > 0) {
+        const { data: lessonProgress } = await supabase
+          .from('user_lesson_progress')
+          .select('lesson_id')
+          .eq('user_id', user.id)
+          .eq('is_completed', true)
+          .in('lesson_id', lessonIds);
+        setCompletedLessonIds(new Set((lessonProgress || []).map((p: { lesson_id: string }) => p.lesson_id)));
+      }
+
+      // Fetch completed quizzes (passed)
+      if (quizIds.length > 0) {
+        const { data: quizAttempts } = await supabase
+          .from('quiz_attempts')
+          .select('quiz_id')
+          .eq('user_id', user.id)
+          .eq('passed', true)
+          .in('quiz_id', quizIds);
+        setCompletedQuizIds(new Set((quizAttempts || []).map((a: { quiz_id: string }) => a.quiz_id)));
+      }
+    };
+    fetchProgress();
+  }, [courseId, isEnrolled]);
 
   // Simple event handlers that delegate to hooks
   const showFeedback = (type: 'success' | 'error', text: string) => {
@@ -238,6 +293,40 @@ const CourseDetailRefactored: React.FC = () => {
                 <span>{course.duration}</span>
               </div>
             </div>
+
+            {/* Course progress bar (enrolled students) */}
+            {isEnrolled && course.curriculum && course.curriculum.length > 0 && (() => {
+              const totalItems = course.curriculum.reduce((sum: number, m: { lessons?: unknown[] }) => sum + (m.lessons?.length || 0), 0);
+              const totalDone = course.curriculum.reduce(
+                (sum: number, m: { lessons?: Array<{ id: string; type: string }> }) =>
+                  sum + (m.lessons?.filter((l) => l.type === 'quiz' ? completedQuizIds.has(l.id) : completedLessonIds.has(l.id)).length || 0),
+                0
+              );
+              const pct = totalItems > 0 ? Math.round((totalDone / totalItems) * 100) : 0;
+              return (
+                <div className="mt-4">
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="font-medium text-text-primary dark:text-dark-text-primary">
+                      Your Progress
+                    </span>
+                    <span className="text-text-muted dark:text-dark-text-muted">
+                      {totalDone}/{totalItems} lessons · {pct}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                    <div
+                      className={`h-2.5 rounded-full transition-all duration-500 ${pct === 100 ? 'bg-green-500' : 'bg-brand-primary'}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  {pct === 100 && (
+                    <p className="text-sm text-green-600 dark:text-green-400 font-medium mt-1">
+                      🎉 Course completed! View your certificate.
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -276,7 +365,13 @@ const CourseDetailRefactored: React.FC = () => {
               )}
 
               {activeTab === "curriculum" && (
-                <CourseCurriculumTab curriculum={course.curriculum || []} />
+                <CourseCurriculumTab
+                  curriculum={course.curriculum || []}
+                  courseId={courseId}
+                  isEnrolled={isEnrolled}
+                  completedLessonIds={completedLessonIds}
+                  completedQuizIds={completedQuizIds}
+                />
               )}
 
               {activeTab === "reviews" && (

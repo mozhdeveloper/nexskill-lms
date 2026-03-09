@@ -575,7 +575,7 @@ const CourseDetail: React.FC = () => {
                               key={lesson.id}
                               disabled={lesson.isLocked}
                               onClick={() => {
-                                if (!lesson.isLocked) navigate(`/student/courses/${courseId}/play`);
+                                if (!lesson.isLocked) navigate(`/student/courses/${courseId}/lessons/${lesson.id}`);
                               }}
                               className={`w-full flex items-center justify-between py-2 px-3 rounded-lg transition-colors text-left ${lesson.isLocked ? 'opacity-60 cursor-not-allowed bg-gray-50 dark:bg-gray-800/50' :
                                 'hover:bg-white dark:hover:bg-dark-background-card cursor-pointer'
@@ -696,11 +696,11 @@ const CourseDetail: React.FC = () => {
               <div className="mb-6">
                 <div className="flex items-baseline gap-3 mb-2">
                   <span className="text-3xl font-bold text-text-primary dark:text-dark-text-primary">
-                    ${course.price}
+                    ₱{course.price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                   </span>
                   {course.originalPrice && (
                     <span className="text-lg text-text-muted line-through">
-                      ${course.originalPrice}
+                      ₱{course.originalPrice.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                     </span>
                   )}
                 </div>

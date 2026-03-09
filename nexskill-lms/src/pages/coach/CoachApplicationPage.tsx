@@ -190,7 +190,7 @@ const CoachApplicationPage: React.FC = () => {
                 verification_status: 'pending'
             });
             if (coachError) throw coachError;
-            navigate('/verification-pending');
+            navigate('/coach/login', { state: { message: 'Your application has been submitted and is pending verification. You will be notified once approved.' } });
         } catch (err: any) {
             console.error("Application error:", err);
             setError(err.message || "An error occurred during application");

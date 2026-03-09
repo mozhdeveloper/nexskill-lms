@@ -107,6 +107,7 @@ const CoursePricingForm: React.FC<CoursePricingFormProps> = ({ pricing, onChange
                   onChange={(e) => onChange({ ...pricing, currency: e.target.value })}
                   className="w-full px-4 py-3 bg-slate-50 dark:bg-gray-800 rounded-xl border border-slate-200 dark:border-gray-700 focus:border-[#304DB5] focus:outline-none focus:ring-2 focus:ring-blue-100"
                 >
+                  <option value="PHP">PHP (₱)</option>
                   <option value="USD">USD ($)</option>
                   <option value="EUR">EUR (€)</option>
                   <option value="GBP">GBP (£)</option>

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
 import QuestionFeedback from '../../components/quiz/QuestionFeedback';
+import { supabase } from '../../lib/supabaseClient';
 
 interface Question {
   id: string;
@@ -28,15 +29,58 @@ const QuizResult: React.FC = () => {
   const location = useLocation();
   const state = location.state as LocationState;
 
-  // Fallback to dummy data if state is missing
-  const {
-    score = 80,
-    correctCount = 8,
-    totalQuestions = 10,
-    passingScore = 70,
-    questions = [],
-    userAnswers = {},
-  } = state || {};
+  const [dbScore, setDbScore] = useState<number | null>(null);
+  const [dbCorrect, setDbCorrect] = useState<number | null>(null);
+  const [dbTotal, setDbTotal] = useState<number | null>(null);
+  const [dbPassing, setDbPassing] = useState<number | null>(null);
+  const [loadingDb, setLoadingDb] = useState(!state);
+
+  // If no state (page refresh), fetch the latest attempt from DB
+  useEffect(() => {
+    if (state || !quizId) return;
+    const fetchLatestAttempt = async () => {
+      try {
+        setLoadingDb(true);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: attempt } = await supabase
+          .from('quiz_attempts')
+          .select('score, max_score, passed')
+          .eq('user_id', user.id)
+          .eq('quiz_id', quizId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (attempt) {
+          const pct = attempt.max_score > 0 ? Math.round((attempt.score / attempt.max_score) * 100) : 0;
+          setDbScore(pct);
+          setDbCorrect(attempt.score);
+          setDbTotal(attempt.max_score);
+        }
+
+        const { data: quiz } = await supabase
+          .from('quizzes')
+          .select('passing_score')
+          .eq('id', quizId)
+          .single();
+        if (quiz) setDbPassing(quiz.passing_score || 70);
+      } catch (err) {
+        console.error('Error fetching quiz result:', err);
+      } finally {
+        setLoadingDb(false);
+      }
+    };
+    fetchLatestAttempt();
+  }, [quizId, state]);
+
+  const score = state?.score ?? dbScore ?? 0;
+  const correctCount = state?.correctCount ?? dbCorrect ?? 0;
+  const totalQuestions = state?.totalQuestions ?? dbTotal ?? 0;
+  const passingScore = state?.passingScore ?? dbPassing ?? 70;
+  const questions = state?.questions ?? [];
+  const userAnswers = state?.userAnswers ?? {};
 
   const passed = score >= passingScore;
   const incorrectCount = totalQuestions - correctCount;
@@ -69,6 +113,19 @@ const QuizResult: React.FC = () => {
       },
     };
   });
+
+  if (loadingDb) {
+    return (
+      <StudentAppLayout>
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center">
+            <div className="text-6xl mb-4">⏳</div>
+            <h2 className="text-2xl font-bold text-text-primary mb-2">Loading quiz result...</h2>
+          </div>
+        </div>
+      </StudentAppLayout>
+    );
+  }
 
   return (
     <StudentAppLayout>

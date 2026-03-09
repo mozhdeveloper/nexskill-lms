@@ -38,7 +38,7 @@ const CourseCurriculumPage: React.FC = () => {
             if (firstItem.type === 'lesson') {
                 navigate(`/student/courses/${courseId}/lessons/${firstItem.id}`);
             } else {
-                navigate(`/student/courses/${courseId}/quiz/${firstItem.id}`);
+                navigate(`/student/courses/${courseId}/quizzes/${firstItem.id}`);
             }
         }
     };
@@ -226,7 +226,7 @@ const ModuleAccordion: React.FC<ModuleAccordionProps> = ({
         if (item.type === 'lesson') {
             navigate(`/student/courses/${courseId}/lessons/${item.id}`);
         } else {
-            navigate(`/student/courses/${courseId}/quiz/${item.id}`);
+            navigate(`/student/courses/${courseId}/quizzes/${item.id}`);
         }
     };
 

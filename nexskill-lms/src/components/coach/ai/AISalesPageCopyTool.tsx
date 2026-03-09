@@ -39,7 +39,7 @@ const AISalesPageCopyTool: React.FC = () => {
       const sections: SalesCopySection[] = [];
       const courseName = formData.courseTitle;
       const audience = formData.audiencePersona || 'aspiring professionals';
-      const priceText = formData.price || '$299';
+      const priceText = formData.price || '₱14,999';
 
       // Hero Section
       if (formData.tone === 'story-driven') {
@@ -117,7 +117,7 @@ const AISalesPageCopyTool: React.FC = () => {
         section: 'Pricing & Guarantee',
         content: `Investment: ${priceText}\n\n${
           formData.bonusGuarantee || defaultGuarantee
-        }\n\nBonus: Enroll today and receive exclusive access to our advanced masterclass series (Value: $199) absolutely free!`,
+        }\n\nBonus: Enroll today and receive exclusive access to our advanced masterclass series (Value: ₱9,999) absolutely free!`,
       });
 
       // Final CTA

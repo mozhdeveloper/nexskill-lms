@@ -98,9 +98,9 @@ const CourseGridItem: React.FC<CourseGridItemProps> = ({ course, onClick }) => {
         {/* Pricing & CTA */}
         <div className="flex items-center justify-between">
           <div className="flex items-baseline gap-2">
-            <span className="text-xl font-bold text-text-primary dark:text-white">${course.price}</span>
+            <span className="text-xl font-bold text-text-primary dark:text-white">₱{course.price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
             {course.originalPrice && (
-              <span className="text-sm text-text-muted dark:text-slate-500 line-through">${course.originalPrice}</span>
+              <span className="text-sm text-text-muted dark:text-slate-500 line-through">₱{course.originalPrice.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
             )}
           </div>
           <button className="px-4 py-2 bg-brand-primary-soft text-brand-primary text-sm font-medium rounded-full hover:bg-brand-primary hover:text-white transition-colors">

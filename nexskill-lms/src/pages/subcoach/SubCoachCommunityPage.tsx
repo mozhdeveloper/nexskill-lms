@@ -195,7 +195,7 @@ Replies: ${post.replies}
 🎯 Popular Replies:
 • Most helpful: 12 likes
 • Most recent: Just now
-• Your replies: ${Math.floor(Math.random() * 3)}
+• Your replies: 0
 
 💡 Engaging with student discussions strengthens community and enhances learning outcomes.`);
                           }}

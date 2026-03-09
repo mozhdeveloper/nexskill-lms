@@ -57,7 +57,7 @@ const EnrolledCoursesOverview: React.FC<EnrolledCoursesOverviewProps> = ({ maxCo
         return;
       }
 
-      // For each course, fetch module and lesson counts
+      // For each course, fetch module and lesson counts + real progress
       const coursesWithCounts = await Promise.all(
         courseData.map(async (course) => {
           const { count: moduleCount } = await supabase
@@ -71,14 +71,28 @@ const EnrolledCoursesOverview: React.FC<EnrolledCoursesOverviewProps> = ({ maxCo
             .eq('course_id', course.id);
 
           let lessonCount = 0;
+          let lessonIds: string[] = [];
           if (modules && modules.length > 0) {
             const moduleIds = modules.map(m => m.id);
-            const { count } = await supabase
+            const { data: contentItems, count } = await supabase
               .from('module_content_items')
-              .select('*', { count: 'exact', head: true })
+              .select('content_id', { count: 'exact' })
               .in('module_id', moduleIds)
               .eq('content_type', 'lesson');
             lessonCount = count || 0;
+            lessonIds = (contentItems || []).map((ci: any) => ci.content_id);
+          }
+
+          // Calculate real progress from user_lesson_progress
+          let progress = 0;
+          if (lessonIds.length > 0) {
+            const { count: completedCount } = await supabase
+              .from('user_lesson_progress')
+              .select('*', { count: 'exact', head: true })
+              .eq('user_id', user!.id)
+              .eq('is_completed', true)
+              .in('lesson_id', lessonIds);
+            progress = Math.round(((completedCount || 0) / lessonIds.length) * 100);
           }
 
           return {
@@ -87,7 +101,7 @@ const EnrolledCoursesOverview: React.FC<EnrolledCoursesOverviewProps> = ({ maxCo
             level: course.level || 'Beginner',
             moduleCount: moduleCount || 0,
             lessonCount,
-            progress: Math.floor(Math.random() * 100), // Placeholder - should be calculated from user_module_progress
+            progress,
           };
         })
       );

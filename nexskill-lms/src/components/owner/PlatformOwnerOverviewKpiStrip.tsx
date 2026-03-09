@@ -39,7 +39,7 @@ const PlatformOwnerOverviewKpiStrip: React.FC<PlatformOwnerOverviewKpiStripProps
     },
     {
       label: 'MRR',
-      value: `$${(stats.monthlyRecurringRevenue / 1000).toFixed(0)}K`,
+      value: `₱${(stats.monthlyRecurringRevenue / 1000).toFixed(0)}K`,
       icon: '💰',
       color: 'from-amber-500 to-amber-600',
       route: '/owner/billing',

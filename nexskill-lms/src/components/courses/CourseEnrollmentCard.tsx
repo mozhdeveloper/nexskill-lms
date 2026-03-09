@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { formatPrice } from "../../utils/formatPrice";
 
 interface CourseEnrollmentCardProps {
   courseId: string;
@@ -32,11 +33,11 @@ const CourseEnrollmentCard: React.FC<CourseEnrollmentCardProps> = ({
       <div className="mb-6">
         <div className="flex items-baseline gap-3 mb-2">
           <span className="text-3xl font-bold text-text-primary dark:text-dark-text-primary">
-            ${price}
+            {formatPrice(price)}
           </span>
           {originalPrice && (
             <span className="text-lg text-text-muted line-through">
-              ${originalPrice}
+              {formatPrice(originalPrice)}
             </span>
           )}
         </div>
