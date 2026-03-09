@@ -66,21 +66,28 @@ const CoachProfilePage: React.FC = () => {
   const fetchProfile = useCallback(async () => {
     if (!user) return;
     try {
-      // Fetch profile + coach_profile in parallel
-      const [profileRes, coachRes, courseCountRes, studentCountRes, ratingRes] = await Promise.all([
+      // Fetch profile, coach_profile, and course IDs in parallel
+      const [profileRes, coachRes, coursesRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
         supabase.from('coach_profiles').select('*').eq('id', user.id).single(),
-        supabase.from('courses').select('id', { count: 'exact', head: true }).eq('coach_id', user.id),
-        supabase.from('enrollments').select('profile_id', { count: 'exact', head: true })
-          .in('course_id', (await supabase.from('courses').select('id').eq('coach_id', user.id)).data?.map((c: { id: string }) => c.id) || []),
-        supabase.from('reviews').select('rating')
-          .in('course_id', (await supabase.from('courses').select('id').eq('coach_id', user.id)).data?.map((c: { id: string }) => c.id) || []),
+        supabase.from('courses').select('id').eq('coach_id', user.id),
       ]);
+
+      const courseIds = coursesRes.data?.map((c: { id: string }) => c.id) || [];
+
+      // Now fetch student count and ratings using the courseIds
+      const [studentCountRes, ratingRes] = courseIds.length > 0
+        ? await Promise.all([
+            supabase.from('enrollments').select('profile_id', { count: 'exact', head: true }).in('course_id', courseIds),
+            supabase.from('reviews').select('rating').in('course_id', courseIds),
+          ])
+        : [{ count: 0 }, { data: [] as { rating: number }[] }];
 
       const p = profileRes.data;
       const cp = coachRes.data;
-      const avgRating = ratingRes.data && ratingRes.data.length > 0
-        ? Math.round((ratingRes.data.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / ratingRes.data.length) * 10) / 10
+      const ratings = 'data' in ratingRes ? ratingRes.data : [];
+      const avgRating = ratings && ratings.length > 0
+        ? Math.round((ratings.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / ratings.length) * 10) / 10
         : 0;
 
       setProfile({
@@ -103,8 +110,8 @@ const CoachProfilePage: React.FC = () => {
         achievements: [],
         policies: { cancellation: '', refund: '', rescheduling: '', conduct: '' },
         stats: {
-          courses: courseCountRes.count || 0,
-          students: studentCountRes.count || 0,
+          courses: courseIds.length,
+          students: ('count' in studentCountRes ? studentCountRes.count : 0) || 0,
           rating: avgRating,
         },
       });

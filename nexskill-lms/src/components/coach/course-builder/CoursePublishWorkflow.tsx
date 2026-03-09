@@ -13,22 +13,29 @@ interface CoursePublishWorkflowProps {
   onPublish: () => void;
   onUnpublish: () => void;
   onSubmitForReview: () => void;
+  hasTitle?: boolean;
+  hasModules?: boolean;
+  hasLessons?: boolean;
+  hasPricing?: boolean;
 }
 
 const CoursePublishWorkflow: React.FC<CoursePublishWorkflowProps> = ({
   courseStatus,
   verificationStatus,
-  adminFeedback: _adminFeedback,
+  adminFeedback,
   onPublish,
   onUnpublish,
   onSubmitForReview,
+  hasTitle = false,
+  hasModules = false,
+  hasLessons = false,
+  hasPricing = false,
 }) => {
-  // Simulated readiness checks
   const checks: CheckItem[] = [
-    { id: '1', label: 'Course title and description added', completed: true },
-    { id: '2', label: 'At least one module with lessons created', completed: true },
-    { id: '3', label: 'Pricing configured', completed: true },
-    { id: '4', label: 'At least one video uploaded', completed: true },
+    { id: '1', label: 'Course title and description added', completed: hasTitle },
+    { id: '2', label: 'At least one module created', completed: hasModules },
+    { id: '3', label: 'At least one lesson or quiz added', completed: hasLessons },
+    { id: '4', label: 'Pricing configured', completed: hasPricing },
   ];
 
   const allComplete = checks.every((c) => c.completed);
@@ -80,6 +87,14 @@ const CoursePublishWorkflow: React.FC<CoursePublishWorkflowProps> = ({
               <p className="text-sm text-slate-600 dark:text-dark-text-secondary capitalize">{courseStatus}</p>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Admin Feedback */}
+      {adminFeedback && (verificationStatus === 'changes_requested' || verificationStatus === 'rejected') && (
+        <div className="mb-6 p-4 rounded-2xl border bg-amber-50 border-amber-200">
+          <p className="font-semibold text-slate-900 mb-2">Admin Feedback</p>
+          <p className="text-sm text-amber-800 whitespace-pre-wrap">{adminFeedback}</p>
         </div>
       )}
 

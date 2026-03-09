@@ -2,22 +2,10 @@ import React, { useState } from 'react';
 import { useLiveSessions } from '../../../hooks/useLiveSessions';
 import type { LiveSession, SessionStatus } from '../../../types/db';
 import { useParams } from 'react-router-dom';
+import { supabase } from '../../../lib/supabaseClient';
 
 const LiveSessionManager: React.FC = () => {
     const { courseId } = useParams<{ courseId: string }>();
-    // We need a coachId. In a real app, this comes from the auth context.
-    // For now, we will grab the current user's ID or assume it's passed down.
-    // However, the SQL requires a coach_id.
-    // Let's assume for this component we can get the user session from supabase or context.
-    // Since I don't see an explicit AuthContext usage here easily, I'll fetch it or use a placeholder if needed.
-    // Actually, usually app layouts provide user info.
-    // Let's use a simple approach: fetch user on mount or use a prop if available.
-    // For now I will assume the parent passes it or we get it from local storage/supabase.
-
-    // Simplification: We will just use a hardcoded UUID or fetch from supabase auth in the hook if needed depending on RLS.
-    // But wait, the INSERT requires `coach_id`. 
-    // I'll grab the user ID using supabase.auth.getUser() inside the creation handler for safety.
-
     const { sessions, loading, error, createSession, updateSession, deleteSession } = useLiveSessions(courseId);
     const [isCreating, setIsCreating] = useState(false);
     const [editingSession, setEditingSession] = useState<LiveSession | null>(null);
@@ -32,6 +20,14 @@ const LiveSessionManager: React.FC = () => {
         is_live: false,
         status: 'scheduled'
     });
+
+    if (!courseId) {
+        return (
+            <div className="text-center py-12 text-slate-500">
+                <p>Invalid course. No course ID provided.</p>
+            </div>
+        );
+    }
 
     const resetForm = () => {
         setFormData({
@@ -61,7 +57,6 @@ const LiveSessionManager: React.FC = () => {
         e.preventDefault();
         try {
             // Need the current user ID for coach_id
-            const { supabase } = await import('../../../lib/supabaseClient');
             const { data: { user } } = await supabase.auth.getUser();
 
             if (!user) {
@@ -211,7 +206,7 @@ const LiveSessionManager: React.FC = () => {
                                         <StatusBadge status={session.status} is_live={session.is_live} />
                                     </div>
                                     <p className="text-sm text-slate-500 mb-2">
-                                        {new Date(session.scheduled_at).toLocaleString()} • {session.duration_minutes} mins
+                                        {session.scheduled_at ? new Date(session.scheduled_at).toLocaleString() : 'Date not set'} • {session.duration_minutes} mins
                                     </p>
                                     {session.description && <p className="text-sm text-slate-600 line-clamp-2">{session.description}</p>}
                                     {session.is_live && session.meeting_link && (

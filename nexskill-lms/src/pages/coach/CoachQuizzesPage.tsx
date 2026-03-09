@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import CoachAppLayout from '../../layouts/CoachAppLayout';
 import { Search, Plus, Edit, Copy, Trash2, BarChart3, Users, Clock, CheckCircle, AlertCircle, FileText, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
@@ -8,6 +9,7 @@ interface Quiz {
   id: string;
   title: string;
   course: string;
+  courseId: string;
   questions: number;
   passingScore: number;
   timeLimit?: number;
@@ -37,6 +39,7 @@ interface PendingSubmission {
 
 const CoachQuizzesPage: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'published' | 'draft' | 'archived'>('all');
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
@@ -130,6 +133,7 @@ const CoachQuizzesPage: React.FC = () => {
             id: q.id as string,
             title: q.title as string,
             course: courseMap[courseId] || 'Unknown Course',
+            courseId,
             questions: qCountMap[q.id as string] || 0,
             passingScore: (q.passing_score as number) || 70,
             timeLimit: (q.time_limit_minutes as number) || undefined,
@@ -160,24 +164,67 @@ const CoachQuizzesPage: React.FC = () => {
     setShowCreateModal(false);
   };
 
-  const handleEditQuiz = (_quiz: Quiz) => {
-    // Navigate to quiz editor in future
+  const handleEditQuiz = (quiz: Quiz) => {
+    if (quiz.courseId) {
+      navigate(`/coach/courses/${quiz.courseId}/edit`);
+    }
   };
 
-  const handleDuplicateQuiz = (quiz: Quiz) => {
-    const newQuiz: Quiz = {
-      ...quiz,
-      id: `quiz-${Date.now()}`,
-      title: `${quiz.title} (Copy)`,
-      status: 'draft',
-      attempts: 0,
-      avgScore: 0,
-      completionRate: 0,
-      totalAttempts: 0,
-      createdDate: new Date().toISOString().split('T')[0],
-      lastModified: new Date().toISOString().split('T')[0],
-    };
-    setQuizzes([...quizzes, newQuiz]);
+  const handleDuplicateQuiz = async (quiz: Quiz) => {
+    try {
+      // 1. Duplicate the quiz in the DB
+      const { data: newQuiz, error: quizError } = await supabase
+        .from('quizzes')
+        .insert({
+          title: `${quiz.title} (Copy)`,
+          description: '',
+          passing_score: quiz.passingScore,
+          time_limit_minutes: quiz.timeLimit || null,
+          max_attempts: quiz.attempts || null,
+          is_published: false,
+        })
+        .select()
+        .single();
+
+      if (quizError || !newQuiz) throw quizError;
+
+      // 2. Copy questions from original quiz
+      const { data: originalQuestions } = await supabase
+        .from('quiz_questions')
+        .select('*')
+        .eq('quiz_id', quiz.id)
+        .order('position');
+
+      if (originalQuestions && originalQuestions.length > 0) {
+        const newQuestions = originalQuestions.map(q => ({
+          quiz_id: newQuiz.id,
+          position: q.position,
+          question_type: q.question_type,
+          question_content: q.question_content,
+          points: q.points,
+          requires_manual_grading: q.requires_manual_grading,
+          answer_config: q.answer_config,
+        }));
+        await supabase.from('quiz_questions').insert(newQuestions);
+      }
+
+      // 3. Add to local state
+      const duplicated: Quiz = {
+        ...quiz,
+        id: newQuiz.id,
+        title: newQuiz.title,
+        status: 'draft',
+        totalAttempts: 0,
+        avgScore: 0,
+        completionRate: 0,
+        createdDate: new Date().toISOString().split('T')[0],
+        lastModified: new Date().toISOString().split('T')[0],
+      };
+      setQuizzes(prev => [...prev, duplicated]);
+    } catch (err) {
+      console.error('Error duplicating quiz:', err);
+      alert('Failed to duplicate quiz.');
+    }
   };
 
   const handleDeleteQuiz = async (quiz: Quiz) => {
@@ -195,12 +242,30 @@ const CoachQuizzesPage: React.FC = () => {
     setShowDetailModal(true);
   };
 
-  const handlePublishQuiz = (_quiz: Quiz) => {
-    // Future: update quiz status in DB
+  const handlePublishQuiz = async (quiz: Quiz) => {
+    try {
+      const { error } = await supabase
+        .from('quizzes')
+        .update({ is_published: true })
+        .eq('id', quiz.id);
+      if (error) throw error;
+      setQuizzes(prev => prev.map(q => q.id === quiz.id ? { ...q, status: 'published' } : q));
+    } catch (err) {
+      console.error('Error publishing quiz:', err);
+    }
   };
 
-  const handleArchiveQuiz = (_quiz: Quiz) => {
-    // Future: update quiz status in DB
+  const handleArchiveQuiz = async (quiz: Quiz) => {
+    try {
+      const { error } = await supabase
+        .from('quizzes')
+        .update({ is_published: false })
+        .eq('id', quiz.id);
+      if (error) throw error;
+      setQuizzes(prev => prev.map(q => q.id === quiz.id ? { ...q, status: 'draft' } : q));
+    } catch (err) {
+      console.error('Error archiving quiz:', err);
+    }
   };
 
   const handleGradeSubmission = (_submission: PendingSubmission) => {

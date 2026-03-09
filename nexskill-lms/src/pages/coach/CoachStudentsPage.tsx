@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import CoachAppLayout from '../../layouts/CoachAppLayout';
 import { Search, Download, Mail, BarChart3, TrendingUp, Award, Clock, Loader2, Users, UserCheck } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
+import { supabase } from '../../lib/supabaseClient';
 import GlassCard from '../../components/ui/GlassCard';
 import NeonButton from '../../components/ui/NeonButton';
 import SkillProgressBar from '../../components/ui/SkillProgressBar';
@@ -23,6 +25,7 @@ interface Student {
 
 const CoachStudentsPage: React.FC = () => {
   const { profile } = useUser();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive' | 'completed'>('all');
   const [sortBy] = useState<'name' | 'progress' | 'score' | 'lastActive'>('name');
@@ -30,8 +33,6 @@ const CoachStudentsPage: React.FC = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-
-
 
   // Fetch students from Supabase
   useEffect(() => {
@@ -41,7 +42,6 @@ const CoachStudentsPage: React.FC = () => {
       setIsLoading(true);
 
       try {
-        const { supabase } = await import('../../lib/supabaseClient');
 
         // 1. Get courses taught by this coach
         const { data: courses, error: coursesError } = await supabase
@@ -238,11 +238,24 @@ const CoachStudentsPage: React.FC = () => {
   }, [profile]);
 
   const handleExportStudents = () => {
-    window.alert("Export feature coming soon");
+    if (filteredStudents.length === 0) return;
+    const headers = ['Name', 'Email', 'Enrolled Courses', 'Progress %', 'Avg Score %', 'Status', 'Last Active', 'Joined', 'Time Spent'];
+    const rows = filteredStudents.map(s => [
+      s.name, s.email, s.enrolledCourses, s.totalProgress, s.averageScore,
+      s.status, s.lastActive, s.joinedDate, s.totalTimeSpent,
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${v}"`).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `students_export_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
-  const handleMessageStudent = (student: Student) => {
-    window.alert(`Message to ${student.name}`);
+  const handleMessageStudent = (_student: Student) => {
+    navigate('/coach/messages');
   };
 
   const handleViewProgress = (student: Student) => {
@@ -251,11 +264,20 @@ const CoachStudentsPage: React.FC = () => {
   };
 
   const handleSendBulkEmail = () => {
-    window.alert("Bulk email feature");
+    navigate('/coach/messages');
   };
 
   const handleExportReport = (student: Student) => {
-    window.alert(`Exporting report for ${student.name}`);
+    const headers = ['Name', 'Email', 'Enrolled Courses', 'Progress %', 'Avg Score %', 'Status', 'Last Active', 'Joined', 'Time Spent'];
+    const row = [student.name, student.email, student.enrolledCourses, student.totalProgress, student.averageScore, student.status, student.lastActive, student.joinedDate, student.totalTimeSpent];
+    const csv = [headers.join(','), row.map(v => `"${v}"`).join(',')].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `student_report_${student.name.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const filteredStudents = students

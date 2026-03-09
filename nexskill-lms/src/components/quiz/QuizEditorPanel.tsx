@@ -58,6 +58,17 @@ const getDefaultAnswerConfig = (type: QuestionType): AnswerConfig => {
                 accepted_formats: ["mp4", "mov", "avi", "webm"],
                 instructions: "",
             };
+        default: {
+            const _exhaustive: never = type;
+            return {
+                options: [
+                    { id: generateId(), text: "", is_correct: false },
+                    { id: generateId(), text: "", is_correct: false },
+                ],
+                allow_multiple: false,
+                randomize_options: false,
+            };
+        }
     }
 };
 

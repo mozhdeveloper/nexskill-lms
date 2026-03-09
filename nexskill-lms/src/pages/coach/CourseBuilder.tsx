@@ -74,7 +74,7 @@ const CourseBuilder: React.FC = () => {
   const [verificationStatus, setVerificationStatus] = useState<string>("draft");
   const [adminFeedback, setAdminFeedback] = useState<string>("");
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [, setInstructorName] = useState<string>("Instructor");
+  const [instructorName, setInstructorName] = useState<string>("Instructor");
 
   // Settings state
   const [settings, setSettings] = useState<CourseSettings>({
@@ -130,12 +130,24 @@ const CourseBuilder: React.FC = () => {
           level: courseData.level,
           category: courseData.category?.name || "",
           topics: courseData.course_topics?.map((ct: any) => ct.topic_id) || [],
-          // Mock data for now since column likely doesn't exist
-          learningObjectives: courseData.what_you_will_learn || [],
+          learningObjectives: [],
         }));
 
         setCourseStatus(courseData.is_published ? "published" : "draft");
         setVerificationStatus(courseData.verification_status || "draft");
+
+        // Initialize pricing from DB
+        const dbPrice = courseData.price ?? 0;
+        const dbCurrency = courseData.currency || 'USD';
+        const pricingMode: 'free' | 'one-time' | 'subscription' =
+          dbPrice === 0 ? 'free' : (courseData.pricing_mode || 'one-time');
+        setPricing({
+          mode: pricingMode,
+          price: dbPrice,
+          currency: dbCurrency,
+          salePrice: courseData.sale_price ?? undefined,
+          subscriptionInterval: courseData.subscription_interval ?? undefined,
+        });
 
         // Get latest feedback if exists
         const feedbacks = courseData.admin_verification_feedback;
@@ -786,14 +798,42 @@ const CourseBuilder: React.FC = () => {
 
   const handleCloseQuizEditor = () => setEditingQuiz(null);
 
-  const handlePublish = () => {
-    setCourseStatus("published");
-    alert("Course Published Successfully!");
+  const handlePublish = async () => {
+    try {
+      const { error } = await supabase.from('courses').update({
+        is_published: true,
+        updated_at: new Date().toISOString(),
+      }).eq('id', courseId);
+      if (error) throw error;
+      setCourseStatus("published");
+      alert("Course Published Successfully!");
+    } catch (error: any) {
+      alert(`Failed to publish: ${error.message}`);
+    }
   };
 
-  const handleUnpublish = () => {
-    setCourseStatus("draft");
-    alert("Course Unpublished.");
+  const handleUnpublish = async () => {
+    try {
+      const { error } = await supabase.from('courses').update({
+        is_published: false,
+        updated_at: new Date().toISOString(),
+      }).eq('id', courseId);
+      if (error) throw error;
+      setCourseStatus("draft");
+      alert("Course Unpublished.");
+    } catch (error: any) {
+      alert(`Failed to unpublish: ${error.message}`);
+    }
+  };
+
+  const handleSavePricing = async () => {
+    if (!courseId) return;
+    const { error } = await supabase.from('courses').update({
+      price: pricing.mode === 'free' ? 0 : pricing.price,
+      currency: pricing.currency,
+      updated_at: new Date().toISOString(),
+    }).eq('id', courseId);
+    if (error) throw error;
   };
 
   const handleSubmitForReview = async () => {
@@ -902,7 +942,7 @@ const CourseBuilder: React.FC = () => {
       case "drip":
         return <DripSchedulePanel modules={drip} onChange={setDrip} onSave={handleSaveDrip} />;
       case "pricing":
-        return <CoursePricingForm pricing={pricing} onChange={setPricing} />;
+        return <CoursePricingForm pricing={pricing} onChange={setPricing} onSave={handleSavePricing} />;
       case "goals":
         return <CourseGoalsPanel courseId={courseId!} />;
       case "publish":
@@ -914,6 +954,10 @@ const CourseBuilder: React.FC = () => {
             onPublish={handlePublish}
             onUnpublish={handleUnpublish}
             onSubmitForReview={handleSubmitForReview}
+            hasTitle={!!settings.title.trim()}
+            hasModules={curriculum.length > 0}
+            hasLessons={curriculum.some(m => m.lessons && m.lessons.length > 0)}
+            hasPricing={pricing.mode === 'free' || pricing.price > 0}
           />
         );
       case "preview":
@@ -923,7 +967,7 @@ const CourseBuilder: React.FC = () => {
             courseTitle={settings.title}
             courseSubtitle={settings.subtitle}
             courseDescription={settings.longDescription}
-            instructorName="Your Name"
+            instructorName={instructorName}
           />
         );
       default:

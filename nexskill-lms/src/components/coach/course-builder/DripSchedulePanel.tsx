@@ -128,8 +128,9 @@ const DripSchedulePanel: React.FC<DripSchedulePanelProps> = ({ modules, onChange
 
             <div className="mt-6">
                 <button
-                    onClick={onSave}
-                    className="w-full py-3 px-6 bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white font-semibold rounded-full hover:shadow-lg transition-all"
+                    onClick={onSave ?? undefined}
+                    disabled={!onSave}
+                    className="w-full py-3 px-6 bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white font-semibold rounded-full hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     Save drip schedule
                 </button>

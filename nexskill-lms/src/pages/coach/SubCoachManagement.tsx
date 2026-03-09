@@ -11,7 +11,6 @@ import NeonButton from '../../components/ui/NeonButton';
 interface Course {
   id: string;
   title: string;
-  code: string;
   enrolledStudents: number;
   status: 'published' | 'draft';
 }
@@ -21,10 +20,9 @@ interface FormattedAssignment {
   subCoachName: string;
   subCoachEmail: string;
   courseTitle: string;
-  courseCode: string;
   assignedDate: string;
   status: 'active' | 'pending' | 'inactive';
-  studentsCount: number; // Placeholder for now or separate count
+  studentsCount: number;
 }
 
 const SubCoachManagement: React.FC = () => {
@@ -57,9 +55,8 @@ const SubCoachManagement: React.FC = () => {
         const mappedCourses: Course[] = coursesData?.map((c: any) => ({
           id: c.id,
           title: c.title,
-          code: c.id.substring(0, 8).toUpperCase(), // Use first 8 chars of UUID as code
           status: c.visibility === 'public' ? 'published' : 'draft',
-          enrolledStudents: 0 // Fetch real count if needed
+          enrolledStudents: 0
         })) || [];
 
         setCourses(mappedCourses);
@@ -86,10 +83,9 @@ const SubCoachManagement: React.FC = () => {
           subCoachName: `${a.sub_coach_profile?.first_name || ''} ${a.sub_coach_profile?.last_name || ''}`.trim() || 'Unknown',
           subCoachEmail: a.sub_coach_profile?.email || '',
           courseTitle: a.course?.title || 'Unknown Course',
-          courseCode: a.course?.code || '---',
           assignedDate: new Date(a.created_at).toLocaleDateString(),
           status: a.status,
-          studentsCount: 0 // This would require another table 'sub_coach_student_allocations' which we might not have yet?
+          studentsCount: 0
         })) || [];
 
         setAssignments(formatted);
@@ -321,7 +317,6 @@ const SubCoachManagement: React.FC = () => {
                         </td>
                         <td className="px-6 py-4">
                           <div className="font-medium text-white">{assignment.courseTitle}</div>
-                          <div className="text-xs text-brand-neon">{assignment.courseCode}</div>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-400">
                           {assignment.assignedDate}
