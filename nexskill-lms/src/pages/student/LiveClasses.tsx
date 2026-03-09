@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
 import { useLiveSessions } from '../../hooks/useLiveSessions';
+import { supabase } from '../../lib/supabaseClient';
 import type { LiveSession } from '../../types/db';
 
 type TabType = 'upcoming' | 'completed' | 'recorded';
@@ -10,6 +11,24 @@ const LiveClasses: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('upcoming');
   const { upcomingSessions, completedSessions, recordedSessions, loading, error } = useLiveSessions();
+  const [enrollmentCounts, setEnrollmentCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const allSessions = [...upcomingSessions, ...completedSessions, ...recordedSessions];
+    const courseIds = [...new Set(allSessions.map(s => s.course_id))];
+    if (courseIds.length === 0) return;
+    supabase
+      .from('enrollments')
+      .select('course_id')
+      .in('course_id', courseIds)
+      .then(({ data }) => {
+        const counts: Record<string, number> = {};
+        (data || []).forEach((e: any) => {
+          counts[e.course_id] = (counts[e.course_id] || 0) + 1;
+        });
+        setEnrollmentCounts(counts);
+      });
+  }, [upcomingSessions, completedSessions, recordedSessions]);
 
   const getInstructorName = (session: LiveSession) => {
     if (session.coach) {
@@ -42,8 +61,6 @@ const LiveClasses: React.FC = () => {
   const formatTime = (dateStr: string) => {
     return new Date(dateStr).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   };
-
-  const getParticipantsFallback = () => 0;
 
   return (
     <StudentAppLayout>
@@ -137,7 +154,7 @@ const LiveClasses: React.FC = () => {
                         (new Date(liveClass.scheduled_at).getTime() - Date.now() < 30 * 60 * 1000 &&
                           new Date(liveClass.scheduled_at).getTime() > Date.now());
 
-                      const participants = liveClass.participants_count || getParticipantsFallback();
+                      const participants = enrollmentCounts[liveClass.course_id] || 0;
 
                       return (
                         <div

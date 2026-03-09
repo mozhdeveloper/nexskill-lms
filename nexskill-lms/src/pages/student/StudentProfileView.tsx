@@ -26,6 +26,7 @@ const StudentProfileView: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [completedCount, setCompletedCount] = useState(0);
   const [hoursLearned, setHoursLearned] = useState(0);
+  const [streakDays, setStreakDays] = useState(0);
 
   // Fetch profile data with interests and goals
   useEffect(() => {
@@ -96,12 +97,30 @@ const StudentProfileView: React.FC = () => {
         // Fetch real learning stats in parallel
         const [enrollmentsResult, progressResult] = await Promise.all([
           supabase.from('enrollments').select('course_id').eq('profile_id', user.id),
-          supabase.from('user_lesson_progress').select('lesson_id, is_completed').eq('user_id', user.id)
+          supabase.from('user_lesson_progress').select('lesson_id, is_completed, completed_at').eq('user_id', user.id)
         ]);
 
         const enrolledCourseIds = (enrollmentsResult.data || []).map((e: any) => e.course_id);
 
         const completedLessonIds = (progressResult.data || []).filter((p: any) => p.is_completed).map((p: any) => p.lesson_id);
+
+        // Calculate streak from completed_at dates
+        const completedDates = (progressResult.data || [])
+          .filter((p: any) => p.is_completed && p.completed_at)
+          .map((p: any) => new Date(p.completed_at).toDateString());
+        const uniqueDays = [...new Set(completedDates)].map(d => new Date(d)).sort((a, b) => b.getTime() - a.getTime());
+        let streak = 0;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        for (let i = 0; i < uniqueDays.length; i++) {
+          const expected = new Date(today);
+          expected.setDate(expected.getDate() - i);
+          expected.setHours(0, 0, 0, 0);
+          if (uniqueDays[i].getTime() === expected.getTime()) {
+            streak++;
+          } else break;
+        }
+        setStreakDays(streak);
 
         // Fetch duration info for completed lessons to calculate hours
         if (completedLessonIds.length > 0) {
@@ -196,7 +215,7 @@ const StudentProfileView: React.FC = () => {
     headline: profile.headline || 'Student',
     level: profile.current_skill_level || null,
     memberSince: new Date(profile.created_at).getFullYear().toString(),
-    streakDays: 12,
+    streakDays: streakDays,
     bio: profile.bio || "Tell us about yourself! Click 'Edit Profile' to get started.",
     interests: interests,
     goals: goals,

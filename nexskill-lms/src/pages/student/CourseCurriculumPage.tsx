@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
 import { useCourseCurriculum } from '../../hooks/useCourseCurriculum';
+import { supabase } from '../../lib/supabaseClient';
 import type { ModuleWithContent, ContentItem } from '../../hooks/useCourseCurriculum';
 
 /**
@@ -13,6 +14,21 @@ const CourseCurriculumPage: React.FC = () => {
     const navigate = useNavigate();
     const { course, modules, totalLessons, totalQuizzes, totalDurationMinutes, loading, error } = useCourseCurriculum(courseId);
     const [expandedModules, setExpandedModules] = useState<string[]>([]);
+    const [isEnrolled, setIsEnrolled] = useState<boolean | null>(null);
+
+    useEffect(() => {
+        if (!courseId) return;
+        supabase.auth.getUser().then(({ data: { user } }) => {
+            if (!user) { setIsEnrolled(false); return; }
+            supabase
+                .from('enrollments')
+                .select('profile_id')
+                .eq('profile_id', user.id)
+                .eq('course_id', courseId)
+                .maybeSingle()
+                .then(({ data }) => setIsEnrolled(!!data));
+        });
+    }, [courseId]);
 
     // Toggle module accordion
     const toggleModule = (moduleId: string) => {
@@ -84,6 +100,26 @@ const CourseCurriculumPage: React.FC = () => {
                             className="px-6 py-3 bg-gradient-to-r from-brand-primary to-brand-primary-light text-white font-medium rounded-full hover:shadow-lg transition-all"
                         >
                             Back to courses
+                        </button>
+                    </div>
+                </div>
+            </StudentAppLayout>
+        );
+    }
+
+    if (isEnrolled === false) {
+        return (
+            <StudentAppLayout>
+                <div className="flex-1 flex items-center justify-center p-8">
+                    <div className="text-center">
+                        <div className="text-6xl mb-4">🔒</div>
+                        <h2 className="text-2xl font-bold text-text-primary dark:text-dark-text-primary mb-2">Enrollment Required</h2>
+                        <p className="text-text-secondary dark:text-dark-text-secondary mb-6">You need to enroll in this course to view the curriculum.</p>
+                        <button
+                            onClick={() => navigate(`/student/courses/${courseId}`)}
+                            className="px-6 py-3 bg-gradient-to-r from-brand-primary to-brand-primary-light text-white font-medium rounded-full hover:shadow-lg transition-all"
+                        >
+                            View Course Details
                         </button>
                     </div>
                 </div>

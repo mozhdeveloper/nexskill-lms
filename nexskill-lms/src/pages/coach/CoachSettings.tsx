@@ -71,7 +71,7 @@ const CoachSettings: React.FC = () => {
   const [accountSettings, setAccountSettings] = useState({
     email: '',
     timezone: 'Pacific Time (PST)',
-    lastPasswordUpdate: 'Nov 15, 2025',
+    lastPasswordUpdate: 'Not available',
   });
 
   useEffect(() => {

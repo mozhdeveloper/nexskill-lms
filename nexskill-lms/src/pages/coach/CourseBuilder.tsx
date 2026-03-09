@@ -851,7 +851,22 @@ const CourseBuilder: React.FC = () => {
 
   const handleDeleteCourse = async () => {
     if (!courseId) return;
+    if (!window.confirm('Are you sure you want to delete this course? This action cannot be undone.')) return;
     try {
+      // Clean up related data before deleting the course
+      const { data: mods } = await supabase.from('modules').select('id').eq('course_id', courseId);
+      const modIds = (mods || []).map((m: any) => m.id);
+      if (modIds.length > 0) {
+        await supabase.from('module_content_items').delete().in('module_id', modIds);
+        await supabase.from('modules').delete().in('id', modIds);
+      }
+      await supabase.from('enrollments').delete().eq('course_id', courseId);
+      await supabase.from('reviews').delete().eq('course_id', courseId);
+      await supabase.from('course_learning_objectives').delete().eq('course_id', courseId);
+      await supabase.from('course_topics').delete().eq('course_id', courseId);
+      await supabase.from('course_inclusions').delete().eq('course_id', courseId);
+      await supabase.from('live_sessions').delete().eq('course_id', courseId);
+
       const { error } = await supabase.from('courses').delete().eq('id', courseId);
       if (error) throw error;
       navigate('/coach/courses');
