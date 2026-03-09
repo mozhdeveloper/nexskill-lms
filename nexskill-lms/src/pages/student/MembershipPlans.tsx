@@ -108,7 +108,7 @@ const MembershipPlans: React.FC = () => {
                 <div>
                   <p className="text-sm font-semibold text-[#304DB5] dark:text-blue-400 mb-1">Current Plan</p>
                   <p className="text-xl font-bold text-slate-900 dark:text-white">
-                    {currentPlan.name} · ${currentPlan.price}/{currentPlan.billingCycle}
+                    {currentPlan.name} · ₱{currentPlan.price.toLocaleString()}/{currentPlan.billingCycle}
                   </p>
                 </div>
               </div>

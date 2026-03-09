@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import GlobalTopBarControls from "../components/system/GlobalTopBarControls";
 import BrandLogo from "../components/brand/BrandLogo";
 import { LogOut, Menu, X } from "lucide-react";
+import { supabase } from "../lib/supabaseClient";
 
 interface StudentAppLayoutProps {
   children: React.ReactNode;
@@ -12,8 +13,30 @@ const StudentAppLayout: React.FC<StudentAppLayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userName, setUserName] = useState("Student User");
+  const [userInitial, setUserInitial] = useState("S");
 
-  const handleLogout = () => {
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("first_name, last_name")
+          .eq("id", user.id)
+          .single();
+        if (profile) {
+          const name = `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Student User";
+          setUserName(name);
+          setUserInitial((profile.first_name?.[0] || "S").toUpperCase());
+        }
+      }
+    };
+    fetchUser();
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     localStorage.removeItem("authToken");
     sessionStorage.clear();
     navigate("/login");
@@ -96,14 +119,14 @@ const StudentAppLayout: React.FC<StudentAppLayoutProps> = ({ children }) => {
         <div className="p-4 border-t border-[color:var(--border-base)]">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm font-semibold">
-              S
+              {userInitial}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-[color:var(--text-primary)] truncate">
-                Student User
+                {userName}
               </p>
               <p className="text-xs text-[color:var(--text-secondary)]">
-                Premium
+                Student
               </p>
             </div>
           </div>

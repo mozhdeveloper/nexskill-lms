@@ -104,7 +104,7 @@ const OrgLicensesPage: React.FC = () => {
             </div>
             <div className="bg-white rounded-2xl p-5 border border-[#E5E7EB] shadow-sm">
               <div className="text-2xl mb-1">💰</div>
-              <div className="text-2xl font-bold text-[#111827] mb-1">${monthlyCost.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-[#111827] mb-1">₱{monthlyCost.toLocaleString()}</div>
               <div className="text-sm text-[#5F6473]">Monthly Cost</div>
             </div>
           </div>
@@ -120,7 +120,7 @@ const OrgLicensesPage: React.FC = () => {
                       <span className="text-3xl">{getLicenseIcon(license.type)}</span>
                       <div>
                         <h3 className="text-lg font-bold text-[#111827] capitalize">{license.type} License</h3>
-                        <p className="text-sm text-[#5F6473]">${license.price}/user/month</p>
+                        <p className="text-sm text-[#5F6473]">₱{license.price}/user/month</p>
                       </div>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(license.status)}`}>
@@ -258,7 +258,7 @@ const OrgLicensesPage: React.FC = () => {
                       <div className="text-3xl mb-2">{getLicenseIcon(type)}</div>
                       <p className="font-bold text-[#111827] capitalize mb-1">{type}</p>
                       <p className="text-2xl font-bold text-orange-600">
-                        ${type === 'standard' ? '29' : type === 'premium' ? '49' : '99'}
+                        ₱{type === 'standard' ? '29' : type === 'premium' ? '49' : '99'}
                       </p>
                       <p className="text-xs text-[#5F6473]">per user/month</p>
                     </button>
@@ -295,15 +295,15 @@ const OrgLicensesPage: React.FC = () => {
               <div className="p-4 bg-orange-50 rounded-xl border border-orange-200">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[#5F6473]">Subtotal</span>
-                  <span className="font-semibold text-[#111827]">$290.00</span>
+                  <span className="font-semibold text-[#111827]">₱290.00</span>
                 </div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[#5F6473]">Tax</span>
-                  <span className="font-semibold text-[#111827]">$29.00</span>
+                  <span className="font-semibold text-[#111827]">₱29.00</span>
                 </div>
                 <div className="flex items-center justify-between pt-2 border-t border-orange-300">
                   <span className="font-bold text-[#111827]">Total</span>
-                  <span className="text-2xl font-bold text-orange-600">$319.00</span>
+                  <span className="text-2xl font-bold text-orange-600">₱319.00</span>
                 </div>
               </div>
 
@@ -358,7 +358,7 @@ const OrgLicensesPage: React.FC = () => {
 
               <div className="p-4 bg-orange-50 rounded-xl border border-orange-200">
                 <p className="text-sm text-[#5F6473] mb-1">Estimated Cost</p>
-                <p className="text-2xl font-bold text-orange-600">$290.00/month</p>
+                <p className="text-2xl font-bold text-orange-600">₱290.00/month</p>
               </div>
 
               <div className="flex gap-3 mt-6">

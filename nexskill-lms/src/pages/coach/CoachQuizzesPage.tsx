@@ -47,6 +47,9 @@ const CoachQuizzesPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [, setLoadingQuizzes] = useState(true);
+  const [coachCoursesList, setCoachCoursesList] = useState<{ id: string; title: string }[]>([]);
+  const [newQuizTitle, setNewQuizTitle] = useState('');
+  const [newQuizCourseId, setNewQuizCourseId] = useState('');
 
   useEffect(() => {
     const fetchQuizzes = async () => {
@@ -160,8 +163,63 @@ const CoachQuizzesPage: React.FC = () => {
   // No pending submissions from DB yet — placeholder for future file upload feature
   const [pendingSubmissions] = useState<PendingSubmission[]>([]);
 
-  const handleCreateQuiz = () => {
-    setShowCreateModal(false);
+  // Fetch coach's courses for the create modal
+  useEffect(() => {
+    const fetchCourses = async () => {
+      if (!user) return;
+      const { data } = await supabase.from('courses').select('id, title').eq('coach_id', user.id).order('title');
+      setCoachCoursesList(data || []);
+    };
+    fetchCourses();
+  }, [user]);
+
+  const handleCreateQuiz = async () => {
+    if (!newQuizTitle.trim() || !newQuizCourseId) return;
+    try {
+      // Create the quiz
+      const { data: newQuiz, error: quizError } = await supabase
+        .from('quizzes')
+        .insert({ title: newQuizTitle.trim(), passing_score: 70, is_published: false })
+        .select('id')
+        .single();
+      if (quizError || !newQuiz) throw quizError;
+
+      // Find the first module of the selected course to link the quiz
+      const { data: firstModule } = await supabase
+        .from('modules')
+        .select('id')
+        .eq('course_id', newQuizCourseId)
+        .order('position', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (firstModule) {
+        // Get max position in this module
+        const { data: maxPos } = await supabase
+          .from('module_content_items')
+          .select('position')
+          .eq('module_id', firstModule.id)
+          .order('position', { ascending: false })
+          .limit(1)
+          .single();
+
+        await supabase.from('module_content_items').insert({
+          module_id: firstModule.id,
+          content_type: 'quiz',
+          content_id: newQuiz.id,
+          position: (maxPos?.position ?? -1) + 1,
+        });
+      }
+
+      setShowCreateModal(false);
+      setNewQuizTitle('');
+      setNewQuizCourseId('');
+      // Navigate to course builder to edit the quiz
+      navigate(`/coach/courses/${newQuizCourseId}/edit`);
+    } catch (err) {
+      console.error('Error creating quiz:', err);
+      alert('Failed to create quiz. Please try again.');
+    }
   };
 
   const handleEditQuiz = (quiz: Quiz) => {
@@ -599,6 +657,8 @@ const CoachQuizzesPage: React.FC = () => {
                 </label>
                 <input
                   type="text"
+                  value={newQuizTitle}
+                  onChange={(e) => setNewQuizTitle(e.target.value)}
                   placeholder="e.g., JavaScript Fundamentals Quiz"
                   className="w-full px-4 py-2 bg-slate-50 dark:bg-gray-800 rounded-lg border border-slate-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
@@ -607,11 +667,15 @@ const CoachQuizzesPage: React.FC = () => {
                 <label className="block text-sm font-medium text-slate-700 dark:text-dark-text-primary mb-2">
                   Select Course
                 </label>
-                <select className="w-full px-4 py-2 bg-slate-50 dark:bg-gray-800 rounded-lg border border-slate-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option>JavaScript Mastery</option>
-                  <option>React Fundamentals</option>
-                  <option>Python for Data Science</option>
-                  <option>Web Development Bootcamp</option>
+                <select
+                  value={newQuizCourseId}
+                  onChange={(e) => setNewQuizCourseId(e.target.value)}
+                  className="w-full px-4 py-2 bg-slate-50 dark:bg-gray-800 rounded-lg border border-slate-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- Select a course --</option>
+                  {coachCoursesList.map((c) => (
+                    <option key={c.id} value={c.id}>{c.title}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -624,7 +688,8 @@ const CoachQuizzesPage: React.FC = () => {
               </button>
               <button
                 onClick={handleCreateQuiz}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                disabled={!newQuizTitle.trim() || !newQuizCourseId}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Create Quiz
               </button>

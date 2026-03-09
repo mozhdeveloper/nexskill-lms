@@ -119,7 +119,7 @@ const OrgBillingPage: React.FC = () => {
                   </button>
                 </div>
                 <div className="flex items-baseline gap-2 mb-4">
-                  <span className="text-4xl font-bold text-[#111827]">${currentPlan.price.toLocaleString()}</span>
+                  <span className="text-4xl font-bold text-[#111827]">₱{currentPlan.price.toLocaleString()}</span>
                   <span className="text-[#5F6473]">per month</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-[#5F6473]">
@@ -135,7 +135,7 @@ const OrgBillingPage: React.FC = () => {
                 <div className="bg-white rounded-2xl p-5 border border-[#E5E7EB] shadow-sm">
                   <div className="text-2xl mb-1">💳</div>
                   <div className="text-3xl font-bold text-[#111827] mb-1">
-                    ${(currentPlan.price * 12).toLocaleString()}
+                    ₱{(currentPlan.price * 12).toLocaleString()}
                   </div>
                   <div className="text-sm text-[#5F6473]">Annual Spend</div>
                 </div>
@@ -147,7 +147,7 @@ const OrgBillingPage: React.FC = () => {
                 <div className="bg-white rounded-2xl p-5 border border-[#E5E7EB] shadow-sm">
                   <div className="text-2xl mb-1">💰</div>
                   <div className="text-3xl font-bold text-[#111827] mb-1">
-                    ${invoices.reduce((sum, inv) => sum + inv.amount, 0).toLocaleString()}
+                    ₱{invoices.reduce((sum, inv) => sum + inv.amount, 0).toLocaleString()}
                   </div>
                   <div className="text-sm text-[#5F6473]">Total Spent</div>
                 </div>
@@ -177,7 +177,7 @@ const OrgBillingPage: React.FC = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-[#111827]">${invoice.amount.toLocaleString()}</p>
+                        <p className="font-bold text-[#111827]">₱{invoice.amount.toLocaleString()}</p>
                         <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(invoice.status)}`}>
                           {invoice.status}
                         </span>
@@ -229,7 +229,7 @@ const OrgBillingPage: React.FC = () => {
                           <span className="text-[#111827]">{invoice.description}</span>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="font-semibold text-[#111827]">${invoice.amount.toLocaleString()}</span>
+                          <span className="font-semibold text-[#111827]">₱{invoice.amount.toLocaleString()}</span>
                         </td>
                         <td className="px-6 py-4">
                           <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(invoice.status)}`}>
@@ -238,7 +238,7 @@ const OrgBillingPage: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <button
-                            onClick={() => alert(`📥 Downloading invoice #${invoice.id}\n\nInvoice Details:\nDate: ${invoice.date}\nAmount: $${invoice.amount.toLocaleString()}\nStatus: ${invoice.status}\n\nFormat: PDF\nDelivery: Instant`)}
+                            onClick={() => alert(`📥 Downloading invoice #${invoice.id}\n\nInvoice Details:\nDate: ${invoice.date}\nAmount: ₱${invoice.amount.toLocaleString()}\nStatus: ${invoice.status}\n\nFormat: PDF\nDelivery: Instant`)}
                             className="text-orange-600 hover:text-orange-700 font-medium text-sm"
                           >
                             Download

@@ -91,6 +91,7 @@ export const useCourse = (courseId: string | undefined) => {
             .from("modules")
             .select("id, title, position")
             .eq("course_id", courseId)
+            .eq("is_published", true)
             .order("position", { ascending: true });
 
           let curriculum: Module[] = [];
@@ -287,27 +288,79 @@ export const useCourse = (courseId: string | undefined) => {
             }))
             : [];
 
+          // Calculate real average rating from reviews
+          const avgRating = reviews.length > 0
+            ? Math.round((reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length) * 10) / 10
+            : 0;
+
+          // Count real enrolled students
+          const { count: enrolledCount } = await supabase
+            .from("enrollments")
+            .select("*", { count: "exact", head: true })
+            .eq("course_id", courseId);
+
+          // Fetch learning objectives from course_learning_objectives → learning_objectives
+          let whatYouLearn: string[] = [];
+          const { data: objectiveLinks } = await supabase
+            .from("course_learning_objectives")
+            .select("objective_id")
+            .eq("course_id", courseId);
+          if (objectiveLinks && objectiveLinks.length > 0) {
+            const objIds = objectiveLinks.map((o: any) => o.objective_id);
+            const { data: objectives } = await supabase
+              .from("learning_objectives")
+              .select("objective_text")
+              .in("id", objIds);
+            whatYouLearn = (objectives || []).map((o: any) => o.objective_text);
+          }
+
+          // Fetch tools from course_topics → topics
+          let courseTools: string[] = [];
+          const { data: topicLinks } = await supabase
+            .from("course_topics")
+            .select("topic_id")
+            .eq("course_id", courseId);
+          if (topicLinks && topicLinks.length > 0) {
+            const topicIds = topicLinks.map((t: any) => t.topic_id);
+            const { data: topics } = await supabase
+              .from("topics")
+              .select("name")
+              .in("id", topicIds);
+            courseTools = (topics || []).map((t: any) => t.name);
+          }
+
+          // Fetch course inclusions
+          let courseIncludes: string[] = [];
+          const { data: inclusionLinks } = await supabase
+            .from("course_inclusions")
+            .select("inclusion_id")
+            .eq("course_id", courseId);
+          if (inclusionLinks && inclusionLinks.length > 0) {
+            const inclIds = inclusionLinks.map((i: any) => i.inclusion_id);
+            const { data: inclusions } = await supabase
+              .from("inclusions")
+              .select("name")
+              .in("id", inclIds);
+            courseIncludes = (inclusions || []).map((i: any) => i.name);
+          }
+
           const mappedCourse: CourseDisplay = {
             id: courseData.id,
             title: courseData.title,
             category: categoryName,
             level: courseData.level || "Beginner",
-            rating: 4.8, // Calculate average
+            rating: avgRating,
             reviewCount: reviews.length,
-            studentsCount: 12450, // Count from enrollments
+            studentsCount: enrolledCount || 0,
             duration: `${courseData.duration_hours || 0}h`,
             price: Number(courseData.price) || 0,
             description:
               courseData.long_description ||
               courseData.short_description ||
               "No description available",
-            whatYouLearn: [
-              "Master key concepts",
-              "Build real-world projects",
-              "Get job-ready skills"
-            ], // These could be in `course_learning_objectives`
-            tools: ["VS Code", "Figma", "React"], // These could be in `course_topics`
-            includes: ["Lifetime access", "Certificate of completion"],
+            whatYouLearn: whatYouLearn.length > 0 ? whatYouLearn : undefined,
+            tools: courseTools.length > 0 ? courseTools : undefined,
+            includes: courseIncludes.length > 0 ? courseIncludes : ["Lifetime access", "Certificate of completion"],
             curriculum,
             reviews,
             coach: coachDetails,

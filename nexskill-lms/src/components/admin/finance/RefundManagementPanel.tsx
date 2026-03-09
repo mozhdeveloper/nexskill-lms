@@ -145,7 +145,7 @@ const RefundManagementPanel: React.FC<RefundManagementPanelProps> = ({
         </div>
         <div className="p-3 bg-gradient-to-br from-[#FEE2E2] to-white rounded-xl border border-[#FCA5A5]">
           <p className="text-xs text-[#991B1B] mb-1">Total Refunded</p>
-          <p className="text-sm font-bold text-[#111827]">${totalRefundedAmount.toLocaleString()}</p>
+          <p className="text-sm font-bold text-[#111827]">₱{totalRefundedAmount.toLocaleString()}</p>
         </div>
         <div className="p-3 bg-gradient-to-br from-[#FEF3C7] to-white rounded-xl border border-[#FCD34D]">
           <p className="text-xs text-[#92400E] mb-1">Refund Rate</p>
@@ -186,7 +186,7 @@ const RefundManagementPanel: React.FC<RefundManagementPanelProps> = ({
               {/* Amount & Transaction */}
               <div className="mb-2">
                 <div className="text-lg font-bold text-[#111827] mb-1">
-                  ${refund.amount.toFixed(2)}
+                  ₱{refund.amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                 </div>
                 <div className="text-xs text-[#5F6473]">
                   Txn: <span className="font-mono">{refund.transactionId}</span>

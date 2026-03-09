@@ -13,6 +13,11 @@ import type { Lesson } from '../../types/lesson';
 
 type LessonWithModule = Lesson & { moduleTitle?: string };
 
+interface FlatItem {
+  id: string;
+  type: 'lesson' | 'quiz';
+}
+
 const CoursePlayer: React.FC = () => {
   const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>();
   const navigate = useNavigate();
@@ -20,11 +25,13 @@ const CoursePlayer: React.FC = () => {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [showGraduation, setShowGraduation] = useState(false);
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
+  const [completedQuizIds, setCompletedQuizIds] = useState<string[]>([]);
   const [totalLessonsInCourse, setTotalLessonsInCourse] = useState(0);
   const [courseTitle, setCourseTitle] = useState('');
   const [currentLesson, setCurrentLesson] = useState<LessonWithModule | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [flatItemList, setFlatItemList] = useState<FlatItem[]>([]);
 
   useEffect(() => {
     const fetchLessonData = async () => {
@@ -76,26 +83,58 @@ const CoursePlayer: React.FC = () => {
         // Fetch completed lessons using user_lesson_progress
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          // Get all lesson ids for this course via modules → module_content_items
-          const { data: modItems } = await supabase
+          // Get all modules for this course
+          const { data: mods } = await supabase
             .from('modules')
-            .select('module_content_items(content_id)')
-            .eq('course_id', courseId);
+            .select('id, position')
+            .eq('course_id', courseId)
+            .eq('is_published', true)
+            .order('position', { ascending: true });
 
-          const lessonIds: string[] = (modItems || []).flatMap(
-            (m: any) => (m.module_content_items || []).map((ci: any) => ci.content_id)
-          );
+          const moduleIds = (mods || []).map((m: any) => m.id);
 
-          if (lessonIds.length > 0) {
+          if (moduleIds.length > 0) {
+            const { data: contentItems } = await supabase
+              .from('module_content_items')
+              .select('module_id, content_id, content_type, position')
+              .in('module_id', moduleIds)
+              .eq('is_published', true)
+              .order('position', { ascending: true });
+
+            // Build flat ordered item list (modules ordered by position, items within by position)
+            const moduleOrder = new Map((mods || []).map((m: any, i: number) => [m.id, i]));
+            const sorted = [...(contentItems || [])].sort((a, b) => {
+              const modDiff = (moduleOrder.get(a.module_id) ?? 0) - (moduleOrder.get(b.module_id) ?? 0);
+              return modDiff !== 0 ? modDiff : a.position - b.position;
+            });
+            setFlatItemList(sorted.map((ci) => ({ id: ci.content_id, type: ci.content_type as 'lesson' | 'quiz' })));
+
+            const lessonIds = sorted.filter((ci) => ci.content_type === 'lesson').map((ci) => ci.content_id);
+            const quizIdsInCourse = sorted.filter((ci) => ci.content_type === 'quiz').map((ci) => ci.content_id);
+
             setTotalLessonsInCourse(lessonIds.length);
-            const { data: progressRows } = await supabase
-              .from('user_lesson_progress')
-              .select('lesson_id')
-              .eq('user_id', user.id)
-              .eq('is_completed', true)
-              .in('lesson_id', lessonIds);
 
-            setCompletedLessons((progressRows || []).map((r: any) => r.lesson_id));
+            // Fetch lesson completion
+            if (lessonIds.length > 0) {
+              const { data: progressRows } = await supabase
+                .from('user_lesson_progress')
+                .select('lesson_id')
+                .eq('user_id', user.id)
+                .eq('is_completed', true)
+                .in('lesson_id', lessonIds);
+              setCompletedLessons((progressRows || []).map((r: any) => r.lesson_id));
+            }
+
+            // Fetch quiz completion
+            if (quizIdsInCourse.length > 0) {
+              const { data: quizRows } = await supabase
+                .from('quiz_attempts')
+                .select('quiz_id')
+                .eq('user_id', user.id)
+                .eq('passed', true)
+                .in('quiz_id', quizIdsInCourse);
+              setCompletedQuizIds([...new Set((quizRows || []).map((r: any) => r.quiz_id))]);
+            }
           }
         }
       } catch (err) {
@@ -115,7 +154,26 @@ const CoursePlayer: React.FC = () => {
     : 0;
 
   const handleSelectLesson = (newLessonId: string) => {
-    navigate(`/student/courses/${courseId}/lessons/${newLessonId}`);
+    // Check if this is a quiz or a lesson
+    const item = flatItemList.find((i) => i.id === newLessonId);
+    if (item?.type === 'quiz') {
+      navigate(`/student/courses/${courseId}/quizzes/${newLessonId}/take`);
+    } else {
+      navigate(`/student/courses/${courseId}/lessons/${newLessonId}`);
+    }
+  };
+
+  // Next / Previous navigation helpers
+  const currentIndex = flatItemList.findIndex((i) => i.id === lessonId);
+  const prevItem = currentIndex > 0 ? flatItemList[currentIndex - 1] : null;
+  const nextItem = currentIndex >= 0 && currentIndex < flatItemList.length - 1 ? flatItemList[currentIndex + 1] : null;
+
+  const navigateToItem = (item: FlatItem) => {
+    if (item.type === 'quiz') {
+      navigate(`/student/courses/${courseId}/quizzes/${item.id}/take`);
+    } else {
+      navigate(`/student/courses/${courseId}/lessons/${item.id}`);
+    }
   };
 
   const handleMarkComplete = async () => {
@@ -247,6 +305,8 @@ const CoursePlayer: React.FC = () => {
               courseId={courseId || ''}
               activeLessonId={lessonId || ''}
               onSelectLesson={handleSelectLesson}
+              completedLessonIds={completedLessons}
+              completedQuizIds={completedQuizIds}
             />
           </aside>
 
@@ -255,6 +315,26 @@ const CoursePlayer: React.FC = () => {
             {/* Render content blocks (lessons store all content as content_blocks jsonb) */}
             <div className="bg-white dark:bg-dark-background-card rounded-2xl p-6 shadow-md border border-gray-100 dark:border-gray-700">
               <ContentBlockRenderer contentBlocks={currentLesson.content_blocks || []} />
+            </div>
+
+            {/* Next / Previous Navigation */}
+            <div className="flex items-center justify-between mt-4">
+              {prevItem ? (
+                <button
+                  onClick={() => navigateToItem(prevItem)}
+                  className="px-5 py-2.5 text-sm font-medium text-text-secondary dark:text-dark-text-secondary border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
+                >
+                  ← Previous {prevItem.type === 'quiz' ? 'Quiz' : 'Lesson'}
+                </button>
+              ) : <div />}
+              {nextItem ? (
+                <button
+                  onClick={() => navigateToItem(nextItem)}
+                  className="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-brand-primary to-brand-primary-light rounded-full shadow-button-primary hover:shadow-lg hover:scale-[1.02] transition-all"
+                >
+                  Next {nextItem.type === 'quiz' ? 'Quiz' : 'Lesson'} →
+                </button>
+              ) : <div />}
             </div>
           </div>
 

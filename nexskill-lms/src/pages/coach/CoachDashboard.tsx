@@ -149,7 +149,7 @@ const CoachDashboard: React.FC = () => {
   };
 
   const handleSessionClick = (_sessionId: string) => {
-    navigate(`/coach/sessions`);
+    navigate('/coach/coaching-tools');
   };
 
   const handleAIShortcut = (_label: string) => {

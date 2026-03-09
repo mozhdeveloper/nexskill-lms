@@ -146,7 +146,7 @@ const BookingTypesPanel: React.FC<BookingTypesPanelProps> = ({ bookingTypes, onC
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-[#111827] mb-2">
-                      Price ($)
+                      Price (₱)
                     </label>
                     <input
                       type="number"
@@ -230,7 +230,7 @@ const BookingTypesPanel: React.FC<BookingTypesPanelProps> = ({ bookingTypes, onC
                     <div>
                       <p className="text-[#9CA3B5] text-xs mb-1">Price</p>
                       <p className="font-medium text-[#111827]">
-                        {bookingType.price === 0 ? 'Free' : `$${bookingType.price}`}
+                        {bookingType.price === 0 ? 'Free' : `₱${bookingType.price.toLocaleString()}`}
                       </p>
                     </div>
                     <div>

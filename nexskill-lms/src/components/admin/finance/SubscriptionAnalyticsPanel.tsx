@@ -26,13 +26,13 @@ const SubscriptionAnalyticsPanel: React.FC<SubscriptionAnalyticsPanelProps> = ({
         <div className="p-3 bg-gradient-to-br from-[#DBEAFE] to-white rounded-xl border border-[#93C5FD]">
           <p className="text-xs text-[#1E40AF] mb-1">MRR</p>
           <p className="text-xl font-bold text-[#111827]">
-            ${(analytics.mrr / 1000).toFixed(1)}K
+            ₱{(analytics.mrr / 1000).toFixed(1)}K
           </p>
         </div>
         <div className="p-3 bg-gradient-to-br from-[#E0E7FF] to-white rounded-xl border border-[#C7D2FE]">
           <p className="text-xs text-[#3730A3] mb-1">ARR</p>
           <p className="text-xl font-bold text-[#111827]">
-            ${(analytics.arr / 1000).toFixed(0)}K
+            ₱{(analytics.arr / 1000).toFixed(0)}K
           </p>
         </div>
         <div className="p-3 bg-gradient-to-br from-[#D1FAE5] to-white rounded-xl border border-[#6EE7B7]">
@@ -63,7 +63,7 @@ const SubscriptionAnalyticsPanel: React.FC<SubscriptionAnalyticsPanelProps> = ({
                         : 'bg-gradient-to-t from-[#93C5FD] to-[#BFDBFE]'
                     }`}
                     style={{ height: `${heightPercent}%` }}
-                    title={`${month.monthLabel}: $${month.value.toLocaleString()}`}
+                    title={`${month.monthLabel}: ₱${month.value.toLocaleString()}`}
                   />
                 </div>
                 <p className="text-[10px] text-[#9CA3B5] font-medium">{month.monthLabel}</p>
@@ -100,7 +100,7 @@ const SubscriptionAnalyticsPanel: React.FC<SubscriptionAnalyticsPanelProps> = ({
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-bold text-[#111827]">
-                      ${(plan.mrr / 1000).toFixed(1)}K
+                      ₱{(plan.mrr / 1000).toFixed(1)}K
                     </div>
                     <div className="text-xs text-[#9CA3B5]">{mrrContribution}% of MRR</div>
                   </div>

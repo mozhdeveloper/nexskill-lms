@@ -43,7 +43,7 @@ const MembershipChangeFlow: React.FC<MembershipChangeFlowProps> = ({
           </div>
           <h3 className="text-xl font-bold text-slate-900 mb-1">{currentPlan.name}</h3>
           <p className="text-2xl font-bold text-slate-700">
-            ${currentPlan.price}
+            ₱{currentPlan.price.toLocaleString()}
             <span className="text-sm font-normal text-slate-600"> / {currentPlan.billingCycle}</span>
           </p>
         </div>
@@ -65,7 +65,7 @@ const MembershipChangeFlow: React.FC<MembershipChangeFlowProps> = ({
           </div>
           <h3 className="text-xl font-bold text-slate-900 mb-1">{targetPlan.name}</h3>
           <p className="text-2xl font-bold text-[#304DB5]">
-            ${targetPlan.price}
+            ₱{targetPlan.price.toLocaleString()}
             <span className="text-sm font-normal text-slate-600"> / {targetPlan.billingCycle}</span>
           </p>
         </div>
@@ -81,7 +81,7 @@ const MembershipChangeFlow: React.FC<MembershipChangeFlowProps> = ({
                 isUpgrade ? 'text-orange-600' : 'text-green-600'
               }`}
             >
-              {isUpgrade ? '+' : ''}${priceDelta.toFixed(2)}
+              {isUpgrade ? '+' : ''}₱{priceDelta.toFixed(2)}
             </span>
           </div>
           <p className="text-xs text-slate-600">

@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import GlobalTopBarControls from "../components/system/GlobalTopBarControls";
 import BrandLogo from "../components/brand/BrandLogo";
 import { LogOut, Menu, X } from "lucide-react";
+import { supabase } from "../lib/supabaseClient";
 
 interface CoachAppLayoutProps {
     children: React.ReactNode;
@@ -12,8 +13,30 @@ const CoachAppLayout: React.FC<CoachAppLayoutProps> = ({ children }) => {
     const location = useLocation();
     const navigate = useNavigate();
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [userName, setUserName] = useState("Coach User");
+    const [userInitial, setUserInitial] = useState("C");
 
-    const handleLogout = () => {
+    useEffect(() => {
+        const fetchUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profile } = await supabase
+                    .from("profiles")
+                    .select("first_name, last_name")
+                    .eq("id", user.id)
+                    .single();
+                if (profile) {
+                    const name = `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Coach User";
+                    setUserName(name);
+                    setUserInitial((profile.first_name?.[0] || "C").toUpperCase());
+                }
+            }
+        };
+        fetchUser();
+    }, []);
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
         localStorage.removeItem("authToken");
         sessionStorage.clear();
         navigate("/login");
@@ -95,14 +118,14 @@ const CoachAppLayout: React.FC<CoachAppLayoutProps> = ({ children }) => {
                 <div className="p-4 border-t border-[color:var(--border-base)]">
                     <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[color:var(--color-brand-neon)] to-[color:var(--color-brand-electric)] flex items-center justify-center text-white text-sm font-semibold shadow-lg">
-                            C
+                            {userInitial}
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-[color:var(--text-primary)] truncate">
-                                Coach User
+                                {userName}
                             </p>
                             <p className="text-xs text-[color:var(--text-secondary)]">
-                                Instructor
+                                Coach
                             </p>
                         </div>
                     </div>
