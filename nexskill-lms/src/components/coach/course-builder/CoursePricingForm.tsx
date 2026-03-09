@@ -13,15 +13,26 @@ interface PricingData {
 interface CoursePricingFormProps {
   pricing: PricingData;
   onChange: (pricing: PricingData) => void;
+  onSave?: () => Promise<void>;
 }
 
-const CoursePricingForm: React.FC<CoursePricingFormProps> = ({ pricing, onChange }) => {
+const CoursePricingForm: React.FC<CoursePricingFormProps> = ({ pricing, onChange, onSave }) => {
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-    console.log('Pricing saved:', pricing);
+  const handleSave = async () => {
+    if (onSave) {
+      setSaving(true);
+      try {
+        await onSave();
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      } catch {
+        alert('Failed to save pricing');
+      } finally {
+        setSaving(false);
+      }
+    }
   };
 
   return (
@@ -189,9 +200,10 @@ const CoursePricingForm: React.FC<CoursePricingFormProps> = ({ pricing, onChange
         <div className="pt-4">
           <button
             onClick={handleSave}
-            className="w-full py-3 px-6 bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white font-semibold rounded-full hover:shadow-lg transition-all"
+            disabled={saving}
+            className="w-full py-3 px-6 bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white font-semibold rounded-full hover:shadow-lg transition-all disabled:opacity-50"
           >
-            {saved ? '✓ Saved' : 'Save pricing'}
+            {saving ? 'Saving...' : saved ? '✓ Saved' : 'Save pricing'}
           </button>
         </div>
       </div>

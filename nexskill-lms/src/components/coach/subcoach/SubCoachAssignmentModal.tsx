@@ -6,7 +6,6 @@ import { useUser } from '../../../context/UserContext';
 interface Course {
   id: string;
   title: string;
-  code: string;
   enrolledStudents: number;
   status: 'published' | 'draft';
 }
@@ -74,8 +73,7 @@ const SubCoachAssignmentModal: React.FC<SubCoachAssignmentModalProps> = ({
     if (!courseSearchQuery) return availableCourses;
     return availableCourses.filter(
       (c) =>
-        c.title.toLowerCase().includes(courseSearchQuery.toLowerCase()) ||
-        c.code.toLowerCase().includes(courseSearchQuery.toLowerCase())
+        c.title.toLowerCase().includes(courseSearchQuery.toLowerCase())
     );
   }, [availableCourses, courseSearchQuery]);
 
@@ -326,7 +324,6 @@ const SubCoachAssignmentModal: React.FC<SubCoachAssignmentModalProps> = ({
       subCoachEmail: selectedSubCoach.email,
       courseId: selectedCourse.id,
       courseTitle: selectedCourse.title,
-      courseCode: selectedCourse.code,
       assignedDate: new Date().toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
@@ -406,7 +403,7 @@ const SubCoachAssignmentModal: React.FC<SubCoachAssignmentModalProps> = ({
                     <div className="text-left">
                       <p className="font-medium text-slate-900">{selectedCourse.title}</p>
                       <p className="text-sm text-slate-500">
-                        {selectedCourse.code} • {selectedCourse.enrolledStudents} students
+                        {selectedCourse.enrolledStudents} students
                       </p>
                     </div>
                   ) : (
@@ -449,7 +446,7 @@ const SubCoachAssignmentModal: React.FC<SubCoachAssignmentModalProps> = ({
                           <div>
                             <p className="font-medium text-slate-900">{course.title}</p>
                             <p className="text-sm text-slate-500">
-                              {course.code} • {course.enrolledStudents} students
+                              {course.enrolledStudents} students
                             </p>
                           </div>
                           {selectedCourse?.id === course.id && (
@@ -522,7 +519,7 @@ const SubCoachAssignmentModal: React.FC<SubCoachAssignmentModalProps> = ({
                         >
                           <div>
                             <p className="font-medium text-slate-900">{course.title}</p>
-                            <p className="text-sm text-slate-500">{course.code}</p>
+                            <p className="text-sm text-slate-500">{course.title}</p>
                           </div>
                           <div
                             className={`w-5 h-5 rounded border-2 flex items-center justify-center ${requiredCourseIds.includes(course.id)

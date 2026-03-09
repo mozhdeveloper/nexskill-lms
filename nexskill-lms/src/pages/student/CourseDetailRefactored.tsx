@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import StudentAppLayout from "../../layouts/StudentAppLayout";
+import { supabase } from "../../lib/supabaseClient";
 import { useCourse } from "../../hooks/useCourse";
 import { useEnrollment } from "../../hooks/useEnrollment";
 import CourseDetailContent from "../../components/courses/CourseDetailContent";
@@ -41,16 +42,39 @@ const CourseDetailRefactored: React.FC = () => {
     unenroll,
   } = useEnrollment(courseId);
 
+  // Wishlist state
+  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    const checkWishlist = async () => {
+      if (!courseId) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('student_wishlist')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('course_id', courseId)
+        .maybeSingle();
+      if (data) setIsWishlisted(true);
+    };
+    checkWishlist();
+  }, [courseId]);
+
   // Simple event handlers that delegate to hooks
+  const showFeedback = (type: 'success' | 'error', text: string) => {
+    setFeedbackMessage({ type, text });
+    setTimeout(() => setFeedbackMessage(null), 4000);
+  };
+
   const handleEnroll = async () => {
     const result = await enroll();
 
     if (result.success) {
-      alert(
-        `✅ Successfully enrolled in ${course?.title}!\n\n🎉 Welcome to the course! You can now access the course circle and connect with other students.`,
-      );
+      showFeedback('success', `Successfully enrolled in ${course?.title}!`);
     } else {
-      alert(`❌ Failed to enroll: ${result.error}`);
+      showFeedback('error', `Failed to enroll: ${result.error}`);
     }
   };
 
@@ -69,18 +93,26 @@ const CourseDetailRefactored: React.FC = () => {
     const result = await unenroll();
 
     if (result.success) {
-      alert(
-        `✓ You have been unenrolled from ${course?.title}\n\nYou can re-enroll at any time from the course catalog.`,
-      );
+      showFeedback('success', `You have been unenrolled from ${course?.title}.`);
     } else {
-      alert(`❌ Failed to unenroll: ${result.error}`);
+      showFeedback('error', `Failed to unenroll: ${result.error}`);
     }
   };
 
-  const handleAddToWishlist = () => {
-    alert(
-      `❤️ Added to wishlist!\n\n${course?.title} has been saved to your wishlist.`,
-    );
+  const handleAddToWishlist = async () => {
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser || !course) return;
+      if (isWishlisted) {
+        await supabase.from('student_wishlist').delete().match({ user_id: authUser.id, course_id: course.id });
+        setIsWishlisted(false);
+      } else {
+        await supabase.from('student_wishlist').insert({ user_id: authUser.id, course_id: course.id });
+        setIsWishlisted(true);
+      }
+    } catch (err) {
+      console.error('Error updating wishlist:', err);
+    }
   };
 
   // Loading state
@@ -146,6 +178,12 @@ const CourseDetailRefactored: React.FC = () => {
   // Main render - clean and focused
   return (
     <StudentAppLayout>
+      {/* Feedback banner */}
+      {feedbackMessage && (
+        <div className={`px-8 py-3 text-sm font-medium ${feedbackMessage.type === 'success' ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300'}`}>
+          {feedbackMessage.text}
+        </div>
+      )}
       {/* Header */}
       <div className="px-8 py-6 border-b border-[#EDF0FB] dark:border-gray-700">
         <button

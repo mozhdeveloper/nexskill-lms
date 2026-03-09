@@ -72,8 +72,6 @@ export interface Lesson {
     completion_criteria?: CompletionCriteria;
 }
 
-import type { ContentItem } from './content-item';
-
 export interface Module {
     id: string;
     course_id?: string;

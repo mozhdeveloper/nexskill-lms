@@ -28,9 +28,8 @@ const DiscussionBoard: React.FC = () => {
     { id: 'unanswered', label: 'Unanswered' },
   ];
 
-  const handleNewPost = (content: string) => {
-    console.log('New post:', content);
-    alert('✅ Discussion posted!\\n\\n🎉 Your post has been published to the community.');    // In a real app, this would create a new thread
+  const handleNewPost = (_content: string) => {
+    // No discussion_threads table yet — feature coming soon
   };
 
   const handleThreadClick = (threadId: string) => {
@@ -45,6 +44,15 @@ const DiscussionBoard: React.FC = () => {
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Community discussions</h1>
             <p className="text-slate-600 dark:text-slate-400">Ask questions, share insights, and learn with others.</p>
+          </div>
+
+          {/* Coming Soon Banner */}
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+            <span className="text-xl flex-shrink-0">🚀</span>
+            <div>
+              <p className="font-semibold text-amber-800">Community Discussions — Coming Soon</p>
+              <p className="text-sm text-amber-700">We're building a discussion board for you to connect with fellow learners. Stay tuned!</p>
+            </div>
           </div>
 
           {/* Filter chips */}

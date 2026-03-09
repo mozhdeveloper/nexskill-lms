@@ -43,17 +43,31 @@ const StudentAccountSettings: React.FC = () => {
         setAccountSettings(prev => ({ ...prev, email: data.user!.email! }));
       }
     });
+
+    // Load saved preferences from localStorage
+    try {
+      const saved = localStorage.getItem('nexskill_student_prefs');
+      if (saved) {
+        const prefs = JSON.parse(saved);
+        if (prefs.languagePrefs) setLanguagePrefs(prefs.languagePrefs);
+        if (prefs.notificationSettings) setNotificationSettings(prefs.notificationSettings);
+      }
+    } catch {
+      // Invalid JSON — use defaults
+    }
   }, []);
 
   const handleSave = () => {
-    console.log('Saving all settings:', {
-      interestsGoals,
-      languagePrefs,
-      notificationSettings,
-      accountSettings,
-    });
-    setShowSuccessMessage(true);
-    setTimeout(() => setShowSuccessMessage(false), 3000);
+    try {
+      localStorage.setItem('nexskill_student_prefs', JSON.stringify({
+        languagePrefs,
+        notificationSettings,
+      }));
+      setShowSuccessMessage(true);
+      setTimeout(() => setShowSuccessMessage(false), 3000);
+    } catch {
+      // localStorage quota exceeded — ignore silently
+    }
   };
 
   return (

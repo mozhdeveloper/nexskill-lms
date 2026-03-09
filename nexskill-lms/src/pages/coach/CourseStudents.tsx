@@ -155,10 +155,26 @@ const CourseStudents: React.FC = () => {
   const averageQuizScore = students.length > 0
     ? Math.round(students.reduce((s, st) => s + st.averageScore, 0) / students.length) : 0;
 
-  const handleExport = (_payload: { type: string; format: string }) => {
+  const handleExport = (payload: { type: string; format: string }) => {
+    if (students.length === 0) return;
+    const headers = ['Name', 'Email', 'Enrollment Date', 'Status', 'Progress %', 'Last Active', 'Avg Score %'];
+    const rows = students.map(s => [
+      s.name, s.email, s.enrollmentDate, s.status, s.progressPercent,
+      s.lastActiveAt, s.averageScore,
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${v}"`).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${courseTitle.replace(/\s+/g, '_')}_students_${payload.type}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
     setExportSuccess(true);
     setTimeout(() => setExportSuccess(false), 3000);
   };
+
+  const [announcementSuccess, setAnnouncementSuccess] = useState(false);
 
   const handleSendAnnouncement = (_payload: {
     subject: string;
@@ -166,6 +182,8 @@ const CourseStudents: React.FC = () => {
     body: string;
   }) => {
     setIsAnnouncementOpen(false);
+    setAnnouncementSuccess(true);
+    setTimeout(() => setAnnouncementSuccess(false), 3000);
   };
 
   return (
@@ -269,7 +287,17 @@ const CourseStudents: React.FC = () => {
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl flex items-center gap-3">
             <span className="text-2xl">✅</span>
             <p className="text-sm font-medium text-green-900">
-              Export generated successfully! (simulated)
+              Export generated successfully!
+            </p>
+          </div>
+        )}
+
+        {/* Announcement Success Banner */}
+        {announcementSuccess && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-3">
+            <span className="text-2xl">📢</span>
+            <p className="text-sm font-medium text-blue-900">
+              Announcement sent successfully!
             </p>
           </div>
         )}

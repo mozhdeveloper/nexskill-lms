@@ -44,7 +44,7 @@ const CoursePreviewPane: React.FC<CoursePreviewPaneProps> = ({
                 <div className="prose prose-lg dark:prose-invert max-w-none">
                     <h3>About this course</h3>
                     <div className="whitespace-pre-wrap text-slate-600 dark:text-dark-text-secondary">
-                        {courseDescription || "No description addded yet."}
+                        {courseDescription || "No description added yet."}
                     </div>
                 </div>
 

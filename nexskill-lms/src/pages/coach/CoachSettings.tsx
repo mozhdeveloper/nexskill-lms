@@ -10,6 +10,25 @@ import ThemeToggle from '../../components/system/ThemeToggle';
 
 type TabType = 'account' | 'preferences' | 'notifications' | 'privacy' | 'accessibility';
 
+const SETTINGS_STORAGE_KEY = 'nexskill_coach_settings';
+
+interface StoredSettings {
+  interestsGoals: { interests: string[]; goals: string[]; level: string };
+  languagePrefs: { primaryLanguage: string; showSubtitles: boolean };
+  notificationSettings: Record<string, boolean>;
+  privacySettings: Record<string, any>;
+  accessibilitySettings: Record<string, any>;
+}
+
+const loadStoredSettings = (): Partial<StoredSettings> => {
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
 const CoachSettings: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('account');
@@ -19,27 +38,35 @@ const CoachSettings: React.FC = () => {
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
-  // State for all settings
-  const [interestsGoals, setInterestsGoals] = useState({
-    interests: ['Coaching', 'Mentoring', 'Business'],
-    goals: ['Help students succeed', 'Build coaching skills'],
-    level: 'Advanced',
-  });
+  const stored = loadStoredSettings();
 
-  const [languagePrefs, setLanguagePrefs] = useState({
-    primaryLanguage: 'English',
-    showSubtitles: true,
-  });
+  // State for all settings — load from localStorage if available
+  const [interestsGoals, setInterestsGoals] = useState(
+    stored.interestsGoals ?? {
+      interests: ['Coaching', 'Mentoring', 'Business'],
+      goals: ['Help students succeed', 'Build coaching skills'],
+      level: 'Advanced',
+    }
+  );
 
-  const [notificationSettings, setNotificationSettings] = useState({
-    emailNotifications: true,
-    inAppNotifications: true,
-    mobilePush: false,
-    learningProgress: true,
-    courseRecommendations: true,
-    aiCoachNudges: true,
-    billingAlerts: true,
-  });
+  const [languagePrefs, setLanguagePrefs] = useState(
+    stored.languagePrefs ?? {
+      primaryLanguage: 'English',
+      showSubtitles: true,
+    }
+  );
+
+  const [notificationSettings, setNotificationSettings] = useState(
+    stored.notificationSettings ?? {
+      emailNotifications: true,
+      inAppNotifications: true,
+      mobilePush: false,
+      learningProgress: true,
+      courseRecommendations: true,
+      aiCoachNudges: true,
+      billingAlerts: true,
+    }
+  );
 
   const [accountSettings, setAccountSettings] = useState({
     email: '',
@@ -55,48 +82,62 @@ const CoachSettings: React.FC = () => {
     });
   }, []);
 
-  const [privacySettings, setPrivacySettings] = useState({
-    profileVisibility: 'public',
-    showProgress: true,
-    showCertificates: true,
-    allowMessages: true,
-    shareDataForImprovement: true,
-  });
+  const [privacySettings, setPrivacySettings] = useState(
+    stored.privacySettings ?? {
+      profileVisibility: 'public',
+      showProgress: true,
+      showCertificates: true,
+      allowMessages: true,
+      shareDataForImprovement: true,
+    }
+  );
 
-  const [accessibilitySettings, setAccessibilitySettings] = useState({
-    fontSize: 'medium',
-    highContrast: false,
-    reducedMotion: false,
-    screenReaderOptimized: false,
-    keyboardNavigation: true,
-  });
+  const [accessibilitySettings, setAccessibilitySettings] = useState(
+    stored.accessibilitySettings ?? {
+      fontSize: 'medium',
+      highContrast: false,
+      reducedMotion: false,
+      screenReaderOptimized: false,
+      keyboardNavigation: true,
+    }
+  );
 
   const handleSave = () => {
-    console.log('Saving settings:', {
+    const settingsToStore: StoredSettings = {
       interestsGoals,
       languagePrefs,
       notificationSettings,
-      accountSettings,
       privacySettings,
       accessibilitySettings,
-    });
-    alert('✅ Settings saved successfully!\n\nAll your preferences have been updated.');
+    };
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settingsToStore));
     setShowSuccessMessage(true);
     setTimeout(() => setShowSuccessMessage(false), 3000);
   };
 
   const handleDeleteAccount = () => {
     if (deleteConfirmText === 'DELETE') {
-      alert('⚠️ Account deletion initiated\n\nYour account and all data will be permanently deleted within 24 hours.');
+      alert('Account deletion is not yet available.\n\nPlease contact support@nexskill.com to request account deletion.');
       setShowDeleteModal(false);
-      navigate('/auth/login');
+      setDeleteConfirmText('');
     } else {
-      alert('❌ Please type DELETE to confirm account deletion.');
+      alert('Please type DELETE to confirm.');
     }
   };
 
   const handleDownloadData = () => {
-    alert('📥 Data export started\n\nYour data archive will be ready in a few minutes. We\'ll send you a download link via email.');
+    const exportData = {
+      email: accountSettings.email,
+      exportedAt: new Date().toISOString(),
+      settings: loadStoredSettings(),
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nexskill_data_export_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
     setShowDownloadModal(false);
   };
 

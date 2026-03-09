@@ -57,14 +57,14 @@ const LiveClasses: React.FC = () => {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate('/student/courses')}
+              onClick={() => navigate('/student/schedule')}
               className="px-4 py-2 text-sm font-medium text-text-secondary hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
             >
               📅 Browse Schedule
             </button>
             <button
-              onClick={() => alert('🔍 Filter Options\n\nFilter by: Category, Date Range, Instructor, Duration.')}
-              className="px-4 py-2 text-sm font-medium text-brand-primary hover:bg-blue-50 border border-brand-primary rounded-lg transition-colors"
+              className="px-4 py-2 text-sm font-medium text-brand-primary hover:bg-blue-50 border border-brand-primary rounded-lg transition-colors opacity-50 cursor-not-allowed"
+              disabled
             >
               🔍 Filter
             </button>
@@ -202,10 +202,10 @@ const LiveClasses: React.FC = () => {
                                   </button>
                                 ) : (
                                   <button
-                                    onClick={() => alert(`📅 Added to calendar!\n\n${liveClass.title}\n${formatDate(liveClass.scheduled_at)}`)}
+                                    onClick={() => navigate(`/student/live-class/${liveClass.id}`)}
                                     className="px-6 py-2.5 bg-white border-2 border-brand-primary text-brand-primary text-sm font-semibold rounded-full hover:bg-blue-50 transition-all"
                                   >
-                                    📅 Add to Calendar
+                                    📅 View Details
                                   </button>
                                 )}
                                 <button
@@ -254,7 +254,7 @@ const LiveClasses: React.FC = () => {
                             <div className="flex items-center gap-3">
                               {liveClass.recording_url ? (
                                 <button
-                                  onClick={() => alert(`📹 Opening video player...`)}
+                                  onClick={() => window.open(liveClass.recording_url!, '_blank')}
                                   className="px-6 py-2 bg-brand-primary text-white text-sm font-medium rounded-full hover:bg-blue-700 transition-colors"
                                 >
                                   📹 Watch Recording
@@ -264,8 +264,8 @@ const LiveClasses: React.FC = () => {
                               )}
 
                               <button
-                                onClick={() => 0} // Placeholder
-                                className="px-6 py-2 text-sm font-medium text-text-secondary hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                                className="px-6 py-2 text-sm font-medium text-text-secondary rounded-full opacity-50 cursor-not-allowed"
+                                disabled
                               >
                                 📥 Download Resources
                               </button>
@@ -289,7 +289,7 @@ const LiveClasses: React.FC = () => {
                       <div
                         key={recording.id}
                         className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-[#EDF0FB] dark:border-slate-700 overflow-hidden hover:shadow-md transition-all cursor-pointer"
-                        onClick={() => alert(`📹 Opening ${recording.title}`)}
+                        onClick={() => recording.recording_url && window.open(recording.recording_url, '_blank')}
                       >
                         <div className={`h-40 bg-gradient-to-br ${getThumbnailGradient(recording.id)} flex items-center justify-center`}>
                           <div className="text-white text-5xl">▶️</div>

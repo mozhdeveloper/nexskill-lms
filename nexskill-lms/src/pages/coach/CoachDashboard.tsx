@@ -153,7 +153,7 @@ const CoachDashboard: React.FC = () => {
   };
 
   const handleAIShortcut = (_label: string) => {
-    // AI shortcuts — future feature
+    navigate('/coach/ai-tools');
   };
 
   const maxRevenue = Math.max(...revenueData.lastSixMonths.map((m) => m.amount));
@@ -190,6 +190,11 @@ const CoachDashboard: React.FC = () => {
             {/* Revenue Overview - Spans 2 columns */}
             <div className="lg:col-span-2 glass-card rounded-[24px] p-8">
               <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-6">Revenue</h2>
+
+              {/* Payment integration notice */}
+              <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl">
+                <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">💳 Payment integration coming soon. Revenue tracking will be available once payments are enabled.</p>
+              </div>
 
               {/* Main KPI */}
               <div className="mb-6">

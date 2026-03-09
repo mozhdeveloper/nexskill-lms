@@ -34,6 +34,14 @@ const EarningsDashboard: React.FC = () => {
   return (
     <CoachAppLayout>
       <div className="p-8 space-y-8">
+        {/* Coming Soon Notice */}
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-2xl p-4 flex items-center gap-3">
+          <span className="text-xl">💳</span>
+          <p className="text-sm text-amber-800 dark:text-amber-300 font-medium">
+            Payment integration coming soon. Revenue tracking, payouts, and transaction history will be available once payments are enabled.
+          </p>
+        </div>
+
         {/* Header with KPIs and Filters */}
         <EarningsOverviewHeader
           summary={summary}

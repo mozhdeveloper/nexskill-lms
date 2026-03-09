@@ -1,16 +1,13 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import PublicSystemLayout from '../../layouts/PublicSystemLayout';
 
 const Error500Page: React.FC = () => {
-  const navigate = useNavigate();
-
   const handleRetry = () => {
     window.location.reload();
   };
 
   const handleGoToDashboard = () => {
-    navigate('/');
+    window.location.href = '/';
   };
 
   return (

@@ -55,6 +55,7 @@ import CoachMessagesPage from "./pages/coach/CoachMessagesPage";
 import CoachStudentsPage from "./pages/coach/CoachStudentsPage";
 import CoachQuizzesPage from "./pages/coach/CoachQuizzesPage";
 import SubCoachManagement from "./pages/coach/SubCoachManagement";
+import CoachSettings from "./pages/coach/CoachSettings";
 import AdminLogin from "./pages/auth/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import UsersManagementPage from "./pages/admin/UsersManagementPage";
@@ -140,8 +141,8 @@ function App() {
     <UiPreferencesProvider>
       <AuthProvider>
         <UserProvider>
-          <ErrorBoundary>
-            <BrowserRouter>
+          <BrowserRouter>
+            <ErrorBoundary>
               <Routes>
                 {/* Root Route */}
                 <Route path="/" element={<LandingPage />} />
@@ -266,6 +267,7 @@ function App() {
                   path="/coach/subcoach-management"
                   element={<SubCoachManagement />}
                 />
+                <Route path="/coach/settings" element={<CoachSettings />} />
 
                 {/* Sub-Coach Routes */}
                 <Route
@@ -539,8 +541,8 @@ function App() {
                 {/* Catch-all route for 404 */}
                 <Route path="*" element={<Error404Page />} />
               </Routes>
-            </BrowserRouter>
-          </ErrorBoundary>
+            </ErrorBoundary>
+          </BrowserRouter>
           <CookieConsentBanner />
         </UserProvider>
       </AuthProvider>

@@ -227,7 +227,7 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
         const textBlocks = blocks.filter((b) => b.type === "text");
         if (textBlocks.length > 0) {
             const totalWords = textBlocks.reduce((sum, block) => {
-                const text = block.content.replace(/<[^>]*>/g, ""); // Strip HTML
+                const text = (block.content || '').replace(/<[^>]*>/g, ""); // Strip HTML
                 const words = text
                     .trim()
                     .split(/\s+/)

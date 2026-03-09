@@ -85,13 +85,8 @@ const CoachingBooking: React.FC = () => {
   };
 
   const handleConfirmBooking = () => {
-    setIsProcessing(true);
-    // Simulate payment processing
-    setTimeout(() => {
-      setIsProcessing(false);
-      alert('Booking confirmed! You will receive a confirmation email shortly.');
-      navigate('/student/coaching/sessions');
-    }, 2000);
+    // No coaching_bookings table yet — feature coming soon
+    navigate('/student/coaching/sessions');
   };
 
   const selectedDay = availableDays.find((day) => day.date === selectedDate);
@@ -117,6 +112,15 @@ const CoachingBooking: React.FC = () => {
             <p className="text-lg text-slate-600">
               with {coach.name} • {coach.title}
             </p>
+          </div>
+
+          {/* Coming Soon Banner */}
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+            <span className="text-xl flex-shrink-0">🚀</span>
+            <div>
+              <p className="font-semibold text-amber-800">Session Booking — Coming Soon</p>
+              <p className="text-sm text-amber-700">1:1 coaching session booking is not yet available. We're working on adding coach availability and scheduling.</p>
+            </div>
           </div>
 
           {/* Main content */}
