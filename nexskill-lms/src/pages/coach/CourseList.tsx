@@ -132,6 +132,20 @@ const CourseList: React.FC = () => {
     if (!courseToDelete) return;
 
     try {
+      // Clean up related data before deleting the course
+      const { data: mods } = await supabase.from('modules').select('id').eq('course_id', courseToDelete.id);
+      const modIds = (mods || []).map(m => m.id);
+      if (modIds.length > 0) {
+        await supabase.from('module_content_items').delete().in('module_id', modIds);
+        await supabase.from('modules').delete().in('id', modIds);
+      }
+      await supabase.from('enrollments').delete().eq('course_id', courseToDelete.id);
+      await supabase.from('reviews').delete().eq('course_id', courseToDelete.id);
+      await supabase.from('course_learning_objectives').delete().eq('course_id', courseToDelete.id);
+      await supabase.from('course_topics').delete().eq('course_id', courseToDelete.id);
+      await supabase.from('course_inclusions').delete().eq('course_id', courseToDelete.id);
+      await supabase.from('live_sessions').delete().eq('course_id', courseToDelete.id);
+
       const { error } = await supabase
         .from('courses')
         .delete()

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useUser } from '../../context/UserContext';
+import { supabase } from '../../lib/supabaseClient';
 import BrandLockup from '../../components/brand/BrandLockup';
 
 const SignUp: React.FC = () => {
@@ -92,7 +93,7 @@ const SignUp: React.FC = () => {
         // Assuming typical signUp(email, password, first, last, username, role, middle, ext) structure
         // specific to this user's codebase update.
 
-        const { error } = await signUp(
+        const { data, error } = await signUp(
           formData.email,
           formData.password,
           formData.firstName,
@@ -107,6 +108,22 @@ const SignUp: React.FC = () => {
           setSubmitError(error.message);
           return;
         }
+
+        // Create profiles row so UserContext can determine the role
+        const newUser = data?.user;
+        if (newUser) {
+          await supabase.from('profiles').upsert({
+            id: newUser.id,
+            email: formData.email,
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            middle_name: formData.middleName || null,
+            name_extension: formData.nameExtension || null,
+            username: formData.username,
+            role: 'student',
+          });
+        }
+
         const defaultRoute = await getDefaultRoute();
         navigate(defaultRoute);
       } catch (err) {

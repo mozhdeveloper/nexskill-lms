@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import GlobalTopBarControls from '../components/system/GlobalTopBarControls';
 import BrandLogo from '../components/brand/BrandLogo';
 import { LogOut, Menu, X } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
 
 interface SupportStaffAppLayoutProps {
   children: React.ReactNode;
@@ -13,7 +14,8 @@ const SupportStaffAppLayout: React.FC<SupportStaffAppLayoutProps> = ({ children 
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     localStorage.removeItem('authToken');
     sessionStorage.clear();
     navigate('/login');

@@ -107,21 +107,34 @@ const CoachStudentsPage: React.FC = () => {
 
         // Get lesson content items from those modules
         let lessonIds: string[] = [];
+        let lessonContentItems: { content_id: string; module_id: string }[] = [];
         if (moduleIds.length > 0) {
           const { data: contentItems } = await supabase
             .from('module_content_items')
             .select('content_id, module_id')
             .in('module_id', moduleIds)
             .eq('content_type', 'lesson');
-          lessonIds = (contentItems || []).map(ci => ci.content_id);
+          lessonContentItems = contentItems || [];
+          lessonIds = lessonContentItems.map(ci => ci.content_id);
+        }
+
+        // Build per-course lesson sets for certificate calculation
+        const moduleIdToCourseId: Record<string, string> = {};
+        (modules || []).forEach((m: any) => { moduleIdToCourseId[m.id] = m.course_id; });
+        const lessonsByCourse: Record<string, Set<string>> = {};
+        for (const ci of lessonContentItems) {
+          const cid = moduleIdToCourseId[ci.module_id];
+          if (!cid) continue;
+          if (!lessonsByCourse[cid]) lessonsByCourse[cid] = new Set();
+          lessonsByCourse[cid].add(ci.content_id);
         }
 
         // Get user_lesson_progress for these students and lessons
-        let progressRows: { user_id: string; is_completed: boolean; time_spent_seconds: number }[] = [];
+        let progressRows: { user_id: string; lesson_id: string; is_completed: boolean; time_spent_seconds: number }[] = [];
         if (lessonIds.length > 0 && studentIds.length > 0) {
           const { data } = await supabase
             .from('user_lesson_progress')
-            .select('user_id, is_completed, time_spent_seconds')
+            .select('user_id, lesson_id, is_completed, time_spent_seconds')
             .in('user_id', studentIds)
             .in('lesson_id', lessonIds);
           progressRows = data || [];
@@ -153,12 +166,15 @@ const CoachStudentsPage: React.FC = () => {
 
         // Pre-aggregate per student
         const totalLessonsCount = lessonIds.length;
-        const progressByStudent: Record<string, { completed: number; timeSeconds: number }> = {};
+        const progressByStudent: Record<string, { completed: number; timeSeconds: number; completedLessons: Set<string> }> = {};
         for (const row of progressRows) {
           if (!progressByStudent[row.user_id]) {
-            progressByStudent[row.user_id] = { completed: 0, timeSeconds: 0 };
+            progressByStudent[row.user_id] = { completed: 0, timeSeconds: 0, completedLessons: new Set() };
           }
-          if (row.is_completed) progressByStudent[row.user_id].completed++;
+          if (row.is_completed) {
+            progressByStudent[row.user_id].completed++;
+            progressByStudent[row.user_id].completedLessons.add(row.lesson_id);
+          }
           progressByStudent[row.user_id].timeSeconds += (row.time_spent_seconds || 0);
         }
 
@@ -222,7 +238,13 @@ const CoachStudentsPage: React.FC = () => {
             joinedDate: earliestEnrollment ? earliestEnrollment.toLocaleDateString() : 'N/A',
             status: computedStatus,
             totalTimeSpent: sp ? `${Math.round(sp.timeSeconds / 3600)}h` : '0h',
-            certificatesEarned: 0,
+            certificatesEarned: sp ? Object.entries(lessonsByCourse).filter(([, lessons]) => {
+              if (lessons.size === 0) return false;
+              for (const lid of lessons) {
+                if (!sp.completedLessons.has(lid)) return false;
+              }
+              return true;
+            }).length : 0,
           };
         }) || [];
 

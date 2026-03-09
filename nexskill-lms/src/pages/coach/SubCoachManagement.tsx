@@ -50,13 +50,24 @@ const SubCoachManagement: React.FC = () => {
 
         if (coursesError) throw coursesError;
 
-        // Mock enrollment count for courses or fetch aggregate
-        // For now, simpler map
+        // Fetch real enrollment counts per course
+        const cIds = (coursesData || []).map((c: any) => c.id);
+        let enrollCounts: Record<string, number> = {};
+        if (cIds.length > 0) {
+          const { data: enrollData } = await supabase
+            .from('enrollments')
+            .select('course_id')
+            .in('course_id', cIds);
+          (enrollData || []).forEach((e: any) => {
+            enrollCounts[e.course_id] = (enrollCounts[e.course_id] || 0) + 1;
+          });
+        }
+
         const mappedCourses: Course[] = coursesData?.map((c: any) => ({
           id: c.id,
           title: c.title,
           status: c.visibility === 'public' ? 'published' : 'draft',
-          enrolledStudents: 0
+          enrolledStudents: enrollCounts[c.id] || 0
         })) || [];
 
         setCourses(mappedCourses);

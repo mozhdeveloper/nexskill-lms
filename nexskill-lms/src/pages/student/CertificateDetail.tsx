@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
 import CertificateViewer from '../../components/certificates/CertificateViewer';
 import CertificateShareBar from '../../components/certificates/CertificateShareBar';
@@ -23,6 +25,7 @@ const CertificateDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [downloadStatus, setDownloadStatus] = useState<string | null>(null);
+  const certRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchCert = async () => {
@@ -98,12 +101,29 @@ const CertificateDetail: React.FC = () => {
     fetchCert();
   }, [certificateId]);
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
+    if (!certRef.current || !cert) return;
     setDownloadStatus('downloading');
-    setTimeout(() => {
+    try {
+      const canvas = await html2canvas(certRef.current, {
+        scale: 3,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const pdfW = pdf.internal.pageSize.getWidth();
+      const pdfH = pdf.internal.pageSize.getHeight();
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfW, pdfH);
+      const fileName = `NexSkill_Certificate_${cert.studentName.replace(/\s+/g, '_')}_${cert.courseTitle.replace(/\s+/g, '_')}.pdf`;
+      pdf.save(fileName);
       setDownloadStatus('success');
       setTimeout(() => setDownloadStatus(null), 3000);
-    }, 1500);
+    } catch (err) {
+      console.error('PDF generation failed:', err);
+      setDownloadStatus(null);
+      alert('Failed to generate PDF. Please try again.');
+    }
   };
 
   const handleViewVerification = () => {
@@ -179,6 +199,7 @@ const CertificateDetail: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Certificate Viewer */}
           <div className="lg:col-span-2">
+            <div ref={certRef}>
             <CertificateViewer
               certificate={{
                 courseTitle: cert.courseTitle,
@@ -188,6 +209,7 @@ const CertificateDetail: React.FC = () => {
                 certificateType: cert.certificateType,
               }}
             />
+            </div>
           </div>
 
           {/* Right Column - Actions */}
