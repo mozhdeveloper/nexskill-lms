@@ -59,7 +59,7 @@ const getDefaultAnswerConfig = (type: QuestionType): AnswerConfig => {
                 instructions: "",
             };
         default: {
-            const _exhaustive: never = type;
+            void (type as never);
             return {
                 options: [
                     { id: generateId(), text: "", is_correct: false },

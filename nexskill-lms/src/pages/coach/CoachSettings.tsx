@@ -15,7 +15,15 @@ const SETTINGS_STORAGE_KEY = 'nexskill_coach_settings';
 interface StoredSettings {
   interestsGoals: { interests: string[]; goals: string[]; level: string };
   languagePrefs: { primaryLanguage: string; showSubtitles: boolean };
-  notificationSettings: Record<string, boolean>;
+  notificationSettings: {
+    emailNotifications: boolean;
+    inAppNotifications: boolean;
+    mobilePush: boolean;
+    learningProgress: boolean;
+    courseRecommendations: boolean;
+    aiCoachNudges: boolean;
+    billingAlerts: boolean;
+  };
   privacySettings: Record<string, any>;
   accessibilitySettings: Record<string, any>;
 }

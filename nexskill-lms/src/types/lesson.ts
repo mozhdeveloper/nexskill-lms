@@ -83,7 +83,7 @@ export interface Module {
     drip_mode?: "immediate" | "days-after-enrollment" | "specific-date" | "after-previous";
     drip_days?: number;
     drip_date?: string;
-    lessons: ContentItem[];
+    lessons: import('./content-item').ContentItem[];
     created_at?: string;
     updated_at?: string;
     course_goals?: any[]; // Allow for joined goals

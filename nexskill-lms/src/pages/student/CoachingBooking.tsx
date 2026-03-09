@@ -17,6 +17,7 @@ const CoachingBooking: React.FC = () => {
   const [loadingCoach, setLoadingCoach] = useState(true);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedSlot, setSelectedSlot] = useState('');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
@@ -85,6 +86,7 @@ const CoachingBooking: React.FC = () => {
   };
 
   const handleConfirmBooking = () => {
+    setIsProcessing(true);
     // No coaching_bookings table yet — feature coming soon
     navigate('/student/coaching/sessions');
   };
