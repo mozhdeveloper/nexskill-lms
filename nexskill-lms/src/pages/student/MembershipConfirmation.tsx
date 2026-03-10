@@ -9,19 +9,18 @@ const MembershipConfirmation: React.FC = () => {
 
   // Get state from navigation
   const state = (location.state as any) || {};
-  const { type, planName, price, billingCycle, currentPlanName } = state;
+  const { type, planName, price, billingCycle, currentPlanName, transactionId, expiresAt } = state;
 
   const isChange = type === 'change';
   const isCancel = type === 'cancel';
 
-  // Dummy payment summary for plan changes
   const paymentSummary = isChange
     ? {
         planName: planName || 'Pro',
-        price: price || 29,
+        price: price || 0,
         billingCycle: billingCycle || 'month',
-        paymentMethod: 'Visa •••• 4242',
-        transactionId: `TXN-${Date.now().toString(36).toUpperCase()}`,
+        paymentMethod: 'Card',
+        transactionId: transactionId ? transactionId.slice(0, 8).toUpperCase() : '—',
         date: new Date().toLocaleDateString('en-US', {
           year: 'numeric',
           month: 'long',
@@ -88,7 +87,7 @@ const MembershipConfirmation: React.FC = () => {
                   </h1>
                   <p className="text-lg text-slate-600">
                     You'll retain access to {currentPlanName} features until{' '}
-                    <span className="font-semibold">January 4, 2026</span>
+                    <span className="font-semibold">{expiresAt ? new Date(expiresAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'the end of your billing period'}</span>
                   </p>
                 </>
               )}

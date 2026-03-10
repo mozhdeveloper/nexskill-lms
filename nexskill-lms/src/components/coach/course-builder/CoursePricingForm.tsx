@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PLATFORM_FEE_PERCENT, computeFees } from '../../../config/platformFees';
 
 type PricingMode = 'free' | 'one-time' | 'subscription';
 
@@ -194,6 +195,27 @@ const CoursePricingForm: React.FC<CoursePricingFormProps> = ({ pricing, onChange
                 If set, the sale price will be shown with strikethrough on the base price
               </p>
             </div>
+
+            {/* Platform fee breakdown */}
+            {pricing.price > 0 && (
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Earnings breakdown</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-600 dark:text-slate-400">Course price</span>
+                    <span className="font-medium text-slate-900 dark:text-white">₱{pricing.price.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-600 dark:text-slate-400">Platform fee ({PLATFORM_FEE_PERCENT}%)</span>
+                    <span className="font-medium text-red-600">−₱{computeFees(pricing.price).platformFee.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-blue-200 dark:border-blue-700">
+                    <span className="font-semibold text-slate-900 dark:text-white">You earn per sale</span>
+                    <span className="font-bold text-green-600">₱{computeFees(pricing.price).coachEarnings.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
 

@@ -38,15 +38,15 @@ const BookingPaymentForm: React.FC<BookingPaymentFormProps> = ({
       <div className="mb-6 p-4 bg-slate-50 rounded-xl">
         <div className="flex justify-between items-center mb-2">
           <span className="text-slate-600">Session price</span>
-          <span className="font-semibold text-slate-900">${price}</span>
+          <span className="font-semibold text-slate-900">₱{price}</span>
         </div>
         <div className="flex justify-between items-center mb-2">
-          <span className="text-green-600 text-sm">Coaching credit</span>
-          <span className="font-semibold text-green-600">-${creditAmount}</span>
+          <span className="text-green-600 text-sm">Membership coaching credit</span>
+          <span className="font-semibold text-green-600">-₱{creditAmount}</span>
         </div>
         <div className="pt-2 border-t border-slate-200 flex justify-between items-center">
           <span className="font-semibold text-slate-900">Total</span>
-          <span className="font-bold text-2xl text-slate-900">${finalPrice}</span>
+          <span className="font-bold text-2xl text-slate-900">₱{finalPrice}</span>
         </div>
       </div>
 
@@ -65,7 +65,7 @@ const BookingPaymentForm: React.FC<BookingPaymentFormProps> = ({
             />
             <div className="flex-1">
               <div className="font-medium text-slate-900">Use coaching credit</div>
-              <div className="text-sm text-slate-600">You have ${creditAmount} available</div>
+              <div className="text-sm text-slate-600">You have ₱{creditAmount} available</div>
             </div>
             <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
               Free

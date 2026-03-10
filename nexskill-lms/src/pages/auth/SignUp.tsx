@@ -43,6 +43,7 @@ const SignUp: React.FC = () => {
 
     // Optional fields
     if (fieldName === 'nameExtension') return false;
+    if (fieldName === 'middleName') return false;
     if (fieldName === 'agreeToTerms') return false; // Handled separately or usually checkbox logic
 
     const value = formData[fieldName];
@@ -67,12 +68,14 @@ const SignUp: React.FC = () => {
   const validateForm = () => {
     // Strict required check
     if (!formData.firstName.trim()) return false;
-    if (!formData.middleName.trim()) return false; // MIDDLE NAME REQUIRED
+    // middleName is optional
     if (!formData.lastName.trim()) return false;
     if (!formData.username.trim()) return false;
     if (!formData.email.trim()) return false;
     if (!/\S+@\S+\.\S+/.test(formData.email)) return false;
     if (!formData.password || formData.password.length < 8) return false;
+    if (!/[A-Z]/.test(formData.password)) return false;
+    if (!/[0-9]/.test(formData.password)) return false;
     if (formData.password !== formData.confirmPassword) return false;
     if (!formData.agreeToTerms) return false;
     return true;
@@ -111,6 +114,7 @@ const SignUp: React.FC = () => {
 
         // Create profiles row so UserContext can determine the role
         const newUser = data?.user;
+        const hasSession = !!(data as any)?.session;
         if (newUser) {
           await supabase.from('profiles').upsert({
             id: newUser.id,
@@ -124,8 +128,14 @@ const SignUp: React.FC = () => {
           });
         }
 
-        const defaultRoute = await getDefaultRoute();
-        navigate(defaultRoute);
+        if (!hasSession && newUser) {
+          // Supabase email confirmation required — go to verification page
+          sessionStorage.setItem('pendingVerificationEmail', formData.email);
+          navigate('/email-verification');
+        } else {
+          const defaultRoute = await getDefaultRoute();
+          navigate(defaultRoute);
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'An unexpected error occurred during signup';
         setSubmitError(message);
@@ -139,6 +149,8 @@ const SignUp: React.FC = () => {
         setSubmitError("You must agree to the Terms & Privacy Policy");
       } else if (formData.password !== formData.confirmPassword) {
         setSubmitError("Passwords do not match");
+      } else if (formData.password.length < 8 || !/[A-Z]/.test(formData.password) || !/[0-9]/.test(formData.password)) {
+        setSubmitError("Password must be at least 8 characters with an uppercase letter and a number");
       } else {
         setSubmitError("Please fill in all required fields");
       }
@@ -217,7 +229,7 @@ const SignUp: React.FC = () => {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Middle Name</label>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Middle Name <span className="normal-case text-gray-600">(Optional)</span></label>
                 <input
                   name="middleName"
                   value={formData.middleName}
@@ -315,6 +327,31 @@ const SignUp: React.FC = () => {
                   {showConfirmPassword ? "Hide" : "Show"}
                 </button>
               </div>
+            </div>
+
+            {/* Password Requirements */}
+            <div className="p-4 bg-white/5 border border-white/10 rounded-xl">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Password must contain:</p>
+              <ul className="space-y-1 text-xs text-gray-500">
+                <li className="flex items-center gap-2">
+                  <span className={formData.password.length >= 8 ? 'text-brand-neon' : 'text-gray-600'}>
+                    {formData.password.length >= 8 ? '✓' : '○'}
+                  </span>
+                  At least 8 characters
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className={/[A-Z]/.test(formData.password) ? 'text-brand-neon' : 'text-gray-600'}>
+                    {/[A-Z]/.test(formData.password) ? '✓' : '○'}
+                  </span>
+                  One uppercase letter
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className={/[0-9]/.test(formData.password) ? 'text-brand-neon' : 'text-gray-600'}>
+                    {/[0-9]/.test(formData.password) ? '✓' : '○'}
+                  </span>
+                  One number
+                </li>
+              </ul>
             </div>
 
             <label className="flex items-center gap-4 cursor-pointer group py-2">

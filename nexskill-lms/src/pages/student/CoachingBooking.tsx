@@ -6,23 +6,57 @@ import BookingConfirmationCard from '../../components/coaching/BookingConfirmati
 import BookingPaymentForm from '../../components/coaching/BookingPaymentForm';
 import { supabase } from '../../lib/supabaseClient';
 
-// No coach_availability table yet — empty slot list
-const availableDays: any[] = [];
+const SESSION_PRICE = 500; // ₱500 per hour session
+const SLOT_HOURS = ['9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM'];
+
+function generateAvailableDays(bookedSet: Set<string>) {
+  const days = [];
+  const today = new Date();
+  let cursor = new Date(today);
+  cursor.setDate(cursor.getDate() + 1); // start from tomorrow
+
+  while (days.length < 14) {
+    const dow = cursor.getDay();
+    if (dow !== 0 && dow !== 6) { // skip weekends
+      const dateStr = cursor.toISOString().split('T')[0];
+      const label = cursor.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      const weekday = cursor.toLocaleDateString('en-US', { weekday: 'short' });
+      days.push({
+        date: dateStr,
+        label,
+        weekday,
+        dayNumber: cursor.getDate(),
+        slots: SLOT_HOURS.map((time) => ({
+          time,
+          available: !bookedSet.has(`${dateStr}|${time}`),
+        })),
+      });
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return days;
+}
 
 const CoachingBooking: React.FC = () => {
   const { coachId } = useParams<{ coachId: string }>();
   const navigate = useNavigate();
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const [coach, setCoach] = useState<{ name: string; title: string } | null>(null);
   const [loadingCoach, setLoadingCoach] = useState(true);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedSlot, setSelectedSlot] = useState('');
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isProcessing, setIsProcessing] = useState(false);
+  const [availableDays, setAvailableDays] = useState<any[]>([]);
+  const [bookingSuccess, setBookingSuccess] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id || null));
+  }, []);
 
   useEffect(() => {
     if (!coachId) { setLoadingCoach(false); return; }
-    const fetchCoach = async () => {
+    const fetchCoachAndAvailability = async () => {
       try {
         const { data: profile } = await supabase
           .from('profiles')
@@ -41,13 +75,25 @@ const CoachingBooking: React.FC = () => {
           name: `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim(),
           title: cp?.job_title ?? 'Coach',
         });
+
+        // Fetch existing bookings for this coach to mark slots unavailable
+        const { data: bookings } = await supabase
+          .from('coaching_bookings')
+          .select('session_date, session_time')
+          .eq('coach_id', coachId)
+          .in('status', ['pending', 'confirmed']);
+
+        const bookedSet = new Set<string>(
+          (bookings || []).map((b: any) => `${b.session_date}|${b.session_time}`)
+        );
+        setAvailableDays(generateAvailableDays(bookedSet));
       } catch {
-        // profile not found
+        setAvailableDays(generateAvailableDays(new Set()));
       } finally {
         setLoadingCoach(false);
       }
     };
-    fetchCoach();
+    fetchCoachAndAvailability();
   }, [coachId]);
 
   if (loadingCoach) {
@@ -85,11 +131,71 @@ const CoachingBooking: React.FC = () => {
     setSelectedSlot(slot);
   };
 
-  const handleConfirmBooking = () => {
+  const handleConfirmBooking = async () => {
+    if (!currentUserId || !coachId || !selectedDate || !selectedSlot) return;
     setIsProcessing(true);
-    // No coaching_bookings table yet — feature coming soon
-    navigate('/student/coaching/sessions');
+    try {
+      const { data: booking, error: bookErr } = await supabase
+        .from('coaching_bookings')
+        .insert({
+          student_id: currentUserId,
+          coach_id: coachId,
+          session_date: selectedDate,
+          session_time: selectedSlot,
+          duration_minutes: 60,
+          status: 'pending',
+          amount: SESSION_PRICE,
+        })
+        .select('id')
+        .single();
+
+      if (bookErr) throw bookErr;
+
+      // Record transaction (no payment API — mark as succeeded for MVP)
+      await supabase.from('transactions').insert({
+        user_id: currentUserId,
+        type: 'coaching_session',
+        amount: SESSION_PRICE,
+        currency: 'PHP',
+        status: 'succeeded',
+        description: `Coaching session with ${coach?.name} on ${selectedDate} at ${selectedSlot}`,
+        reference_id: booking.id,
+        payment_method: 'card',
+      });
+
+      setBookingSuccess(true);
+    } catch (err) {
+      console.error('Booking failed:', err);
+      alert('Failed to book session. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
+
+  if (bookingSuccess) {
+    return (
+      <StudentAppLayout>
+        <div className="min-h-screen bg-gradient-to-br from-[#E7F0FF] via-[#F9F0FF] to-[#E3F4FF] flex items-center justify-center p-6">
+          <div className="bg-white rounded-3xl shadow-xl p-12 max-w-md w-full text-center">
+            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center">
+              <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-bold text-slate-900 mb-2">Session booked!</h1>
+            <p className="text-slate-600 mb-2">with <strong>{coach?.name}</strong></p>
+            <p className="text-slate-600 mb-8">{selectedDate} at {selectedSlot}</p>
+            <button
+              onClick={() => navigate('/student/coaching/sessions')}
+              className="w-full py-3 bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white font-semibold rounded-full hover:shadow-lg transition-all"
+            >
+              View my sessions
+            </button>
+          </div>
+        </div>
+      </StudentAppLayout>
+    );
+  }
 
   const selectedDay = availableDays.find((day) => day.date === selectedDate);
 
@@ -116,15 +222,6 @@ const CoachingBooking: React.FC = () => {
             </p>
           </div>
 
-          {/* Coming Soon Banner */}
-          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
-            <span className="text-xl flex-shrink-0">🚀</span>
-            <div>
-              <p className="font-semibold text-amber-800">Session Booking — Coming Soon</p>
-              <p className="text-sm text-amber-700">1:1 coaching session booking is not yet available. We're working on adding coach availability and scheduling.</p>
-            </div>
-          </div>
-
           {/* Main content */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Left column: Time slot picker */}
@@ -149,7 +246,7 @@ const CoachingBooking: React.FC = () => {
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-600">Price</span>
-                  <span className="font-semibold text-slate-900">$45</span>
+                  <span className="font-semibold text-slate-900">₱{SESSION_PRICE}</span>
                 </div>
               </div>
             </div>
@@ -168,7 +265,7 @@ const CoachingBooking: React.FC = () => {
                   />
 
                   <BookingPaymentForm
-                    price={45}
+                    price={SESSION_PRICE}
                     onConfirm={handleConfirmBooking}
                     isProcessing={isProcessing}
                   />

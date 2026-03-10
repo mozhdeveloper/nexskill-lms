@@ -89,6 +89,7 @@ const CourseList: React.FC = () => {
               enrolledStudents: enrollCountByCourse[course.id] || 0,
               moduleCount,
               lessonCount,
+              price: Number(course.price) || 0,
               rating: ratingByCourse[course.id]
                 ? Math.round((ratingByCourse[course.id].total / ratingByCourse[course.id].count) * 10) / 10
                 : 0,

@@ -9,6 +9,7 @@ import CourseEnrollmentCard from "../../components/courses/CourseEnrollmentCard"
 import CourseCurriculumTab from "../../components/courses/tabs/CourseCurriculumTab";
 import CourseReviewsTab from "../../components/courses/tabs/CourseReviewsTab";
 import CourseCoachTab from "../../components/courses/tabs/CourseCoachTab";
+import PaymentSimulationModal from "../../components/courses/PaymentSimulationModal";
 
 /**
  * CourseDetail Page - Clean component focused on presentation
@@ -45,6 +46,7 @@ const CourseDetailRefactored: React.FC = () => {
   // Wishlist state
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   // Progress tracking state
   const [completedLessonIds, setCompletedLessonIds] = useState<Set<string>>(new Set());
@@ -123,8 +125,18 @@ const CourseDetailRefactored: React.FC = () => {
     setTimeout(() => setFeedbackMessage(null), 4000);
   };
 
-  const handleEnroll = async () => {
-    const result = await enroll();
+  const handleEnrollClick = () => {
+    const price = course?.price ?? 0;
+    if (price > 0) {
+      setShowPaymentModal(true);
+    } else {
+      handleEnrollConfirm();
+    }
+  };
+
+  const handleEnrollConfirm = async () => {
+    const result = await enroll(course?.price ?? 0);
+    setShowPaymentModal(false);
 
     if (result.success) {
       showFeedback('success', `Successfully enrolled in ${course?.title}!`);
@@ -320,9 +332,17 @@ const CourseDetailRefactored: React.FC = () => {
                     />
                   </div>
                   {pct === 100 && (
-                    <p className="text-sm text-green-600 dark:text-green-400 font-medium mt-1">
-                      🎉 Course completed! View your certificate.
-                    </p>
+                    <div className="flex items-center gap-3 mt-2">
+                      <span className="text-sm text-green-600 dark:text-green-400 font-medium">
+                        🎉 Course completed!
+                      </span>
+                      <button
+                        onClick={() => navigate(`/student/certificates/${courseId}`)}
+                        className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg shadow transition-colors"
+                      >
+                        🏆 View Certificate
+                      </button>
+                    </div>
                   )}
                 </div>
               );
@@ -398,13 +418,24 @@ const CourseDetailRefactored: React.FC = () => {
               isEnrolled={isEnrolled}
               checking={checking}
               enrolling={enrolling}
-              onEnroll={handleEnroll}
+              onEnroll={handleEnrollClick}
               onUnenroll={handleUnenroll}
               onAddToWishlist={handleAddToWishlist}
             />
           </div>
         </div>
       </div>
+
+      {/* Payment Simulation Modal */}
+      {showPaymentModal && course && (
+        <PaymentSimulationModal
+          courseTitle={course.title}
+          price={course.price}
+          onConfirm={handleEnrollConfirm}
+          onCancel={() => setShowPaymentModal(false)}
+          isProcessing={enrolling}
+        />
+      )}
     </StudentAppLayout>
   );
 };

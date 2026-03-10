@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { supabase } from '../../lib/supabaseClient';
 import StudentAuthLayout from '../../layouts/StudentAuthLayout';
 
 const ForgotPassword: React.FC = () => {
-  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Basic validation
@@ -22,11 +23,25 @@ const ForgotPassword: React.FC = () => {
       return;
     }
 
-    // Dummy submission - navigate to reset password
-    setIsSubmitted(true);
-    setTimeout(() => {
-      navigate('/reset-password');
-    }, 2000);
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (resetError) {
+        setError(resetError.message);
+        return;
+      }
+
+      setIsSubmitted(true);
+    } catch (err) {
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -75,9 +90,10 @@ const ForgotPassword: React.FC = () => {
               {/* Submit Button */}
               <button
                 type="submit"
-                className="w-full py-3 px-6 bg-gradient-to-r from-brand-neon to-brand-electric text-black font-bold rounded-full shadow-[0_0_20px_rgba(57,255,20,0.3)] hover:shadow-[0_0_30px_rgba(57,255,20,0.5)] hover:scale-[1.02] active:scale-[0.98] transition-all"
+                disabled={isLoading}
+                className="w-full py-3 px-6 bg-gradient-to-r from-brand-neon to-brand-electric text-black font-bold rounded-full shadow-[0_0_20px_rgba(57,255,20,0.3)] hover:shadow-[0_0_30px_rgba(57,255,20,0.5)] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Send reset link
+                {isLoading ? 'Sending...' : 'Send reset link'}
               </button>
             </form>
 

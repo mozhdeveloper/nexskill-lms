@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 
 interface MembershipCancelPanelProps {
   onCancelConfirmed: () => void;
+  expiresAt?: string | null;
 }
 
-const MembershipCancelPanel: React.FC<MembershipCancelPanelProps> = ({ onCancelConfirmed }) => {
+const MembershipCancelPanel: React.FC<MembershipCancelPanelProps> = ({ onCancelConfirmed, expiresAt }) => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [reason, setReason] = useState('');
 
@@ -71,7 +72,7 @@ const MembershipCancelPanel: React.FC<MembershipCancelPanelProps> = ({ onCancelC
               <div>
                 <p className="text-sm font-semibold text-slate-900">When access ends</p>
                 <p className="text-sm text-slate-600">
-                  You'll retain access until the end of your current billing period (January 4, 2026).
+                  You'll retain access until the end of your current billing period{expiresAt ? ` (${new Date(expiresAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })})` : ''}.
                 </p>
               </div>
             </div>

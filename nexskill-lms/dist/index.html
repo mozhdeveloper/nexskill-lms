@@ -4,7 +4,11 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NexSkill</title>
+    <title>NexSkill — Master Your Skill. Build Your Future.</title>
+    <!-- Fonts: Sora (headings), Instrument Serif (drama), Fira Code (data), Inter (body) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <script>
       (function() {
         try {
@@ -12,9 +16,9 @@
           const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
           
           if (!localTheme) {
-            // Requirement 1: Force Default Dark Mode on very first visit
-            localStorage.setItem('ui-theme', 'dark');
-            document.documentElement.classList.add('dark');
+            // Default to light mode on first visit
+            localStorage.setItem('ui-theme', 'light');
+            document.documentElement.classList.remove('dark');
           } else {
             if (localTheme === 'dark') {
               document.documentElement.classList.add('dark');
@@ -27,8 +31,8 @@
         }
       })();
     </script>
-    <script type="module" crossorigin src="/assets/index-CWLvZzbM.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-D--rW0Hr.css">
+    <script type="module" crossorigin src="/assets/index-CpaIktnZ.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BhM5iTzt.css">
   </head>
   <body>
     <div id="root"></div>

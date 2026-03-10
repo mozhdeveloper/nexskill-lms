@@ -56,6 +56,7 @@ import CoachStudentsPage from "./pages/coach/CoachStudentsPage";
 import CoachQuizzesPage from "./pages/coach/CoachQuizzesPage";
 import SubCoachManagement from "./pages/coach/SubCoachManagement";
 import CoachSettings from "./pages/coach/CoachSettings";
+import CoachCertificatesPage from "./pages/coach/CoachCertificatesPage";
 import AdminLogin from "./pages/auth/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import UsersManagementPage from "./pages/admin/UsersManagementPage";
@@ -267,6 +268,7 @@ function App() {
                   path="/coach/subcoach-management"
                   element={<SubCoachManagement />}
                 />
+                <Route path="/coach/certificates" element={<CoachCertificatesPage />} />
                 <Route path="/coach/settings" element={<CoachSettings />} />
 
                 {/* Sub-Coach Routes */}

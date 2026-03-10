@@ -9,6 +9,7 @@ interface Course {
   moduleCount: number;
   lessonCount: number;
   rating: number;
+  price: number;
   lastUpdated: string;
   adminFeedback?: {
     content: string;
@@ -70,6 +71,7 @@ const CourseTable: React.FC<CourseTableProps> = ({ courses, onEdit, onPreview, o
                 <th className="text-left py-4 px-6 text-sm font-semibold text-slate-700 dark:text-dark-text-primary">Status</th>
                 <th className="text-left py-4 px-6 text-sm font-semibold text-slate-700 dark:text-dark-text-primary">Modules / Lessons</th>
                 <th className="text-left py-4 px-6 text-sm font-semibold text-slate-700 dark:text-dark-text-primary">Students</th>
+                <th className="text-left py-4 px-6 text-sm font-semibold text-slate-700 dark:text-dark-text-primary">Price</th>
                 <th className="text-left py-4 px-6 text-sm font-semibold text-slate-700 dark:text-dark-text-primary">Rating</th>
                 <th className="text-left py-4 px-6 text-sm font-semibold text-slate-700 dark:text-dark-text-primary">Last updated</th>
                 <th className="text-right py-4 px-6 text-sm font-semibold text-slate-700 dark:text-dark-text-primary">Actions</th>
@@ -109,6 +111,11 @@ const CourseTable: React.FC<CourseTableProps> = ({ courses, onEdit, onPreview, o
                   </td>
                   <td className="py-4 px-6">
                     <span className="text-sm text-slate-700">{course.enrolledStudents}</span>
+                  </td>
+                  <td className="py-4 px-6">
+                    <span className="text-sm font-medium text-slate-700 dark:text-dark-text-primary">
+                      {course.price > 0 ? `₱${course.price.toLocaleString()}` : 'Free'}
+                    </span>
                   </td>
                   <td className="py-4 px-6">
                     <div className="flex items-center gap-1">

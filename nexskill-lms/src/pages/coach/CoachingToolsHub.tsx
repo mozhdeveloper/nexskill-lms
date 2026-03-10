@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import CoachAppLayout from '../../layouts/CoachAppLayout';
+import { supabase } from '../../lib/supabaseClient';
+import { useAuth } from '../../context/AuthContext';
 import AvailabilityCalendarPanel from '../../components/coaching/tools/AvailabilityCalendarPanel';
 import BookingTypesPanel from '../../components/coaching/tools/BookingTypesPanel';
 import SessionLogTable from '../../components/coaching/tools/SessionLogTable';
@@ -33,7 +35,72 @@ interface BookingType {
 }
 
 const CoachingToolsHub: React.FC = () => {
+  const { user } = useAuth();
   const [activeTool, setActiveTool] = useState<ActiveTool>('availability');
+
+  // KPI stats from database
+  const [kpiStats, setKpiStats] = useState({
+    totalSessions: 0,
+    upcoming: 0,
+    activeStudents: 0,
+    avgRating: 0,
+    reviewCount: 0,
+  });
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchKpis = async () => {
+      try {
+        const now = new Date().toISOString();
+        const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString();
+        const weekFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+        const [
+          { count: totalSessions },
+          { count: upcoming },
+          { data: studentData },
+          { data: reviewData },
+        ] = await Promise.all([
+          supabase.from('coaching_bookings').select('*', { count: 'exact', head: true })
+            .eq('coach_id', user.id)
+            .in('status', ['completed', 'confirmed'])
+            .gte('created_at', yearStart),
+          supabase.from('coaching_bookings').select('*', { count: 'exact', head: true })
+            .eq('coach_id', user.id)
+            .in('status', ['pending', 'confirmed'])
+            .gte('session_date', now.split('T')[0])
+            .lte('session_date', weekFromNow),
+          supabase.from('coaching_bookings').select('student_id')
+            .eq('coach_id', user.id)
+            .in('status', ['pending', 'confirmed']),
+          supabase.from('courses').select('id')
+            .eq('coach_id', user.id)
+            .then(async ({ data: courses }) => {
+              if (!courses?.length) return { data: [] };
+              const courseIds = courses.map(c => c.id);
+              return supabase.from('reviews').select('rating').in('course_id', courseIds);
+            }),
+        ]);
+
+        const uniqueStudents = new Set(studentData?.map(s => s.student_id) ?? []);
+        const ratings = reviewData ?? [];
+        const avgRating = ratings.length > 0
+          ? ratings.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / ratings.length
+          : 0;
+
+        setKpiStats({
+          totalSessions: totalSessions ?? 0,
+          upcoming: upcoming ?? 0,
+          activeStudents: uniqueStudents.size,
+          avgRating: Math.round(avgRating * 10) / 10,
+          reviewCount: ratings.length,
+        });
+      } catch (err) {
+        console.error('Error fetching coaching KPIs:', err);
+      }
+    };
+    fetchKpis();
+  }, [user]);
 
   // Local UI state for components
   const [availabilityConfig, setAvailabilityConfig] = useState<DayAvailability[]>([
@@ -151,7 +218,7 @@ const CoachingToolsHub: React.FC = () => {
                 />
               </svg>
             </div>
-            <p className="text-4xl font-bold">0</p>
+            <p className="text-4xl font-bold">{kpiStats.totalSessions}</p>
             <p className="text-xs opacity-80 mt-1">This year</p>
           </div>
 
@@ -172,7 +239,7 @@ const CoachingToolsHub: React.FC = () => {
                 />
               </svg>
             </div>
-            <p className="text-4xl font-bold text-[#111827]">0</p>
+            <p className="text-4xl font-bold text-[#111827]">{kpiStats.upcoming}</p>
             <p className="text-xs text-[#9CA3B5] mt-1">Next 7 days</p>
           </div>
 
@@ -193,7 +260,7 @@ const CoachingToolsHub: React.FC = () => {
                 />
               </svg>
             </div>
-            <p className="text-4xl font-bold text-[#111827]">0</p>
+            <p className="text-4xl font-bold text-[#111827]">{kpiStats.activeStudents}</p>
             <p className="text-xs text-[#9CA3B5] mt-1">Currently coaching</p>
           </div>
 
@@ -208,8 +275,8 @@ const CoachingToolsHub: React.FC = () => {
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
               </svg>
             </div>
-            <p className="text-4xl font-bold text-[#111827]">—</p>
-            <p className="text-xs text-[#9CA3B5] mt-1">From 0 reviews</p>
+            <p className="text-4xl font-bold text-[#111827]">{kpiStats.avgRating > 0 ? kpiStats.avgRating : '—'}</p>
+            <p className="text-xs text-[#9CA3B5] mt-1">From {kpiStats.reviewCount} review{kpiStats.reviewCount !== 1 ? 's' : ''}</p>
           </div>
         </div>
 

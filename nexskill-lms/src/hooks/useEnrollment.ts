@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../context/AuthContext";
+import { computeFees } from "../config/platformFees";
 
 export const useEnrollment = (courseId: string | undefined) => {
   const { user } = useAuth();
@@ -37,8 +38,8 @@ export const useEnrollment = (courseId: string | undefined) => {
     checkEnrollment();
   }, [user, courseId]);
 
-  // Enroll in course
-  const enroll = useCallback(async (): Promise<{
+  // Enroll in course (creates a transaction record for paid courses)
+  const enroll = useCallback(async (coursePrice?: number): Promise<{
     success: boolean;
     error?: string;
   }> => {
@@ -56,6 +57,35 @@ export const useEnrollment = (courseId: string | undefined) => {
 
       if (error) {
         return { success: false, error: error.message };
+      }
+
+      // Create a transaction record for paid courses
+      if (coursePrice && coursePrice > 0) {
+        const { platformFee, coachEarnings } = computeFees(coursePrice);
+
+        // Fetch coach_id from the course
+        const { data: courseData } = await supabase
+          .from("courses")
+          .select("coach_id")
+          .eq("id", courseId)
+          .single();
+
+        const { error: txnError } = await supabase.from("transactions").insert({
+          user_id: user.id,
+          type: "course_purchase",
+          amount: coursePrice,
+          currency: "PHP",
+          status: "succeeded",
+          description: `Course enrollment`,
+          reference_id: courseId,
+          payment_method: "card",
+          platform_fee: platformFee,
+          coach_earnings: coachEarnings,
+          coach_id: courseData?.coach_id ?? null,
+        });
+        if (txnError) {
+          console.error("Transaction record failed (enrollment still succeeded):", txnError);
+        }
       }
 
       setIsEnrolled(true);

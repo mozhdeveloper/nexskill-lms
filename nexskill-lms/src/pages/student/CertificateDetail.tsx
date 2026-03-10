@@ -242,7 +242,10 @@ const CertificateDetail: React.FC = () => {
             </div>
 
             {/* Share Section */}
-            <CertificateShareBar certificateId={cert.courseId} />
+            <CertificateShareBar
+              certificateId={cert.courseId}
+              shareUrl={`${window.location.origin}/certificates/verify/${cert.profileId}_${cert.courseId}`}
+            />
 
             {/* Blockchain Verification */}
             <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">

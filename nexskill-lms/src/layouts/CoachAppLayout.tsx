@@ -50,6 +50,7 @@ const CoachAppLayout: React.FC<CoachAppLayoutProps> = ({ children }) => {
         { path: "/coach/coaching-tools", label: "Coaching Tools" },
         { path: "/coach/students", label: "Students" },
         { path: "/coach/subcoach-management", label: "Sub-Coaches" },
+        { path: "/coach/certificates", label: "Certificates" },
         { path: "/coach/earnings", label: "Earnings" },
         { path: "/coach/messages", label: "Messages" },
         { path: "/coach/profile", label: "Profile" },

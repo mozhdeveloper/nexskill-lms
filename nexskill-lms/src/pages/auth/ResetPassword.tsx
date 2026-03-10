@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabaseClient';
 import StudentAuthLayout from '../../layouts/StudentAuthLayout';
 
 const ResetPassword: React.FC = () => {
@@ -10,6 +11,8 @@ const ResetPassword: React.FC = () => {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -21,6 +24,7 @@ const ResetPassword: React.FC = () => {
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
+    setSubmitError('');
   };
 
   const validateForm = () => {
@@ -30,6 +34,10 @@ const ResetPassword: React.FC = () => {
       newErrors.newPassword = 'Password is required';
     } else if (formData.newPassword.length < 8) {
       newErrors.newPassword = 'Password must be at least 8 characters';
+    } else if (!/[A-Z]/.test(formData.newPassword)) {
+      newErrors.newPassword = 'Password must contain an uppercase letter';
+    } else if (!/[0-9]/.test(formData.newPassword)) {
+      newErrors.newPassword = 'Password must contain a number';
     }
 
     if (formData.newPassword !== formData.confirmPassword) {
@@ -40,11 +48,29 @@ const ResetPassword: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validateForm()) {
-      // Dummy reset - navigate to login
-      navigate('/login');
+    if (!validateForm()) return;
+
+    setIsLoading(true);
+    setSubmitError('');
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: formData.newPassword,
+      });
+
+      if (error) {
+        setSubmitError(error.message);
+        return;
+      }
+
+      // Password updated successfully — redirect to login
+      navigate('/login', { state: { message: 'Password reset successfully. Please log in.' } });
+    } catch (err) {
+      setSubmitError('Something went wrong. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -151,12 +177,20 @@ const ResetPassword: React.FC = () => {
             </ul>
           </div>
 
+          {/* Submit Error */}
+          {submitError && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-2xl text-sm">
+              {submitError}
+            </div>
+          )}
+
           {/* Submit Button */}
           <button
             type="submit"
-            className="w-full py-3 px-6 bg-gradient-to-r from-brand-primary to-brand-primary-light text-white font-medium rounded-full shadow-button-primary hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all"
+            disabled={isLoading}
+            className="w-full py-3 px-6 bg-gradient-to-r from-brand-primary to-brand-primary-light text-white font-medium rounded-full shadow-button-primary hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Reset password
+            {isLoading ? 'Resetting...' : 'Reset password'}
           </button>
         </form>
 

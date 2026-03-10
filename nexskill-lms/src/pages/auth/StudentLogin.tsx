@@ -92,7 +92,7 @@ const StudentLogin: React.FC = () => {
 
             if (authUser) {
                 // Ensure profile exists with correct role
-                const { data: profileData } = await supabase
+                let { data: profileData } = await supabase
                     .from('profiles')
                     .select('role')
                     .eq('id', authUser.id)
@@ -108,6 +108,10 @@ const StudentLogin: React.FC = () => {
                         username: 'alex_doe',
                         role: 'student',
                     });
+                    // Re-fetch so we use the real data
+                    const { data: refetched } = await supabase
+                        .from('profiles').select('role').eq('id', authUser.id).single();
+                    profileData = refetched;
                 }
 
                 const role = mapStringToRole(profileData?.role ?? 'student');

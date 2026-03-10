@@ -3,21 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import CoachAppLayout from '../../layouts/CoachAppLayout';
 import { useUser } from '../../context/UserContext';
 import { supabase } from '../../lib/supabaseClient';
-
-// Revenue placeholder — no earnings table exists yet
-const revenueData = {
-  currentMonth: 0,
-  totalAllTime: 0,
-  monthOverMonth: 0,
-  lastSixMonths: [
-    { month: 'Jul', amount: 0 },
-    { month: 'Aug', amount: 0 },
-    { month: 'Sep', amount: 0 },
-    { month: 'Oct', amount: 0 },
-    { month: 'Nov', amount: 0 },
-    { month: 'Dec', amount: 0 },
-  ],
-};
+import { computeFees } from '../../config/platformFees';
 
 
 
@@ -46,6 +32,12 @@ const CoachDashboard: React.FC = () => {
   const [coursePerfs, setCoursePerfs] = useState<CoursePerf[]>([]);
   const [avgRating, setAvgRating] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [revenueData, setRevenueData] = useState({
+    currentMonth: 0,
+    totalAllTime: 0,
+    monthOverMonth: 0,
+    lastSixMonths: [] as { month: string; amount: number }[],
+  });
 
   useEffect(() => {
     if (!currentUser) return;
@@ -134,6 +126,53 @@ const CoachDashboard: React.FC = () => {
         if (sessionError) throw sessionError;
         setUpcomingSessions(sessions || []);
 
+        // 5. Revenue — fetch transactions linked to this coach's courses
+        if (courseIds.length > 0) {
+          const { data: txns } = await supabase
+            .from('transactions')
+            .select('amount, created_at')
+            .eq('type', 'course_purchase')
+            .eq('status', 'succeeded')
+            .in('reference_id', courseIds);
+
+          const allTxns = txns || [];
+          const now = new Date();
+          const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+          const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+          let totalAll = 0;
+          let totalCurrent = 0;
+          let totalPrev = 0;
+          const monthBuckets: Record<string, number> = {};
+
+          // Prepare last 6 month keys
+          for (let i = 5; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            monthBuckets[key] = 0;
+          }
+
+          allTxns.forEach((t: { amount: number; created_at: string }) => {
+            const net = computeFees(t.amount).coachEarnings;
+            totalAll += net;
+            const txDate = new Date(t.created_at);
+            if (txDate >= currentMonthStart) totalCurrent += net;
+            if (txDate >= prevMonthStart && txDate < currentMonthStart) totalPrev += net;
+            const key = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}`;
+            if (key in monthBuckets) monthBuckets[key] += net;
+          });
+
+          const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const lastSix = Object.entries(monthBuckets).map(([key, amount]) => {
+            const [, m] = key.split('-');
+            return { month: monthNames[parseInt(m, 10) - 1], amount };
+          });
+
+          const mom = totalPrev > 0 ? Math.round(((totalCurrent - totalPrev) / totalPrev) * 100) : totalCurrent > 0 ? 100 : 0;
+
+          setRevenueData({ currentMonth: totalCurrent, totalAllTime: totalAll, monthOverMonth: mom, lastSixMonths: lastSix });
+        }
+
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -156,7 +195,9 @@ const CoachDashboard: React.FC = () => {
     navigate('/coach/ai-tools');
   };
 
-  const maxRevenue = Math.max(...revenueData.lastSixMonths.map((m) => m.amount));
+  const maxRevenue = revenueData.lastSixMonths.length > 0
+    ? Math.max(...revenueData.lastSixMonths.map((m) => m.amount), 1)
+    : 1;
 
   return (
     <CoachAppLayout>
@@ -191,15 +232,10 @@ const CoachDashboard: React.FC = () => {
             <div className="lg:col-span-2 glass-card rounded-[24px] p-8">
               <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-6">Revenue</h2>
 
-              {/* Payment integration notice */}
-              <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl">
-                <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">💳 Payment integration coming soon. Revenue tracking will be available once payments are enabled.</p>
-              </div>
-
               {/* Main KPI */}
               <div className="mb-6">
                 <div className="text-5xl font-bold text-gradient mb-2 inline-block">
-                  ${revenueData.currentMonth.toLocaleString()}
+                  ₱{revenueData.currentMonth.toLocaleString()}
                 </div>
                 <p className="text-lg text-[color:var(--text-secondary)]">This month</p>
               </div>
@@ -209,7 +245,7 @@ const CoachDashboard: React.FC = () => {
                 <div className="p-4 bg-[color:var(--bg-secondary)] rounded-xl border border-[color:var(--border-base)]">
                   <p className="text-sm text-[color:var(--text-secondary)] mb-1">Total all-time</p>
                   <p className="text-2xl font-bold text-[color:var(--text-primary)]">
-                    ${revenueData.totalAllTime.toLocaleString()}
+                    ₱{revenueData.totalAllTime.toLocaleString()}
                   </p>
                 </div>
                 <div className="p-4 bg-[color:var(--color-brand-neon)]/10 rounded-xl border border-[color:var(--color-brand-neon)]/20">
@@ -227,8 +263,8 @@ const CoachDashboard: React.FC = () => {
                       <div className="w-full flex items-end justify-center h-24">
                         <div
                           className="w-full bg-gradient-to-t from-[color:var(--color-brand-electric)] to-[color:var(--color-brand-neon)] rounded-t-lg transition-all hover:opacity-80 shadow-[0_0_10px_rgba(34,197,94,0.3)]"
-                          style={{ height: `${(item.amount / maxRevenue) * 100}%` }}
-                          title={`$${item.amount}`}
+                          style={{ height: `${maxRevenue > 0 ? (item.amount / maxRevenue) * 100 : 0}%` }}
+                          title={`₱${item.amount}`}
                         />
                       </div>
                       <span className="text-xs text-[color:var(--text-secondary)] font-medium">{item.month}</span>

@@ -31,15 +31,19 @@ const CertificateShareBar: React.FC<CertificateShareBarProps> = ({
     console.log(`Share on ${type}:`, shareUrls[type]);
 
     if (type === 'link') {
-      // Simulate copying to clipboard
       navigator.clipboard?.writeText(shareUrls.link).catch(() => {
-        console.log('Clipboard API not available, simulating copy');
+        // Fallback: create a temporary input element
+        const input = document.createElement('input');
+        input.value = shareUrls.link;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
       });
       setLastAction('Link copied!');
     } else {
-      setLastAction(`Shared on ${type}!`);
-      // In real implementation, would open share dialog
-      // window.open(shareUrls[type], '_blank', 'width=600,height=400');
+      window.open(shareUrls[type], '_blank', 'width=600,height=400,noopener,noreferrer');
+      setLastAction(`Opened ${type} share!`);
     }
 
     setTimeout(() => setLastAction(null), 3000);

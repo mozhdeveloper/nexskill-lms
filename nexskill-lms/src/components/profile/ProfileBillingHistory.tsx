@@ -5,7 +5,7 @@ interface Transaction {
   date: string;
   description: string;
   amount: number;
-  status: 'Paid' | 'Refunded';
+  status: 'Paid' | 'Pending' | 'Failed' | 'Refunded';
 }
 
 interface ProfileBillingHistoryProps {
@@ -14,7 +14,13 @@ interface ProfileBillingHistoryProps {
 
 const ProfileBillingHistory: React.FC<ProfileBillingHistoryProps> = ({ transactions }) => {
   const getStatusColor = (status: string) => {
-    return status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-700';
+    switch (status) {
+      case 'Paid': return 'bg-green-100 text-green-700';
+      case 'Pending': return 'bg-yellow-100 text-yellow-700';
+      case 'Failed': return 'bg-red-100 text-red-700';
+      case 'Refunded': return 'bg-slate-100 text-slate-700';
+      default: return 'bg-slate-100 text-slate-700';
+    }
   };
 
   return (

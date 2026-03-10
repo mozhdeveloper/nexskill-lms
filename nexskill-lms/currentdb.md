@@ -21,6 +21,28 @@ CREATE TABLE public.categories (
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT categories_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.certificate_templates (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  course_id uuid NOT NULL UNIQUE,
+  coach_id uuid NOT NULL,
+  certificate_title text NOT NULL DEFAULT 'Certificate of Completion'::text,
+  certificate_description text DEFAULT 'Has successfully completed all requirements for'::text,
+  issuer_name text,
+  issuer_title text DEFAULT 'Course Instructor'::text,
+  organization_name text DEFAULT 'NexSkill LMS'::text,
+  signature_url text,
+  logo_url text,
+  border_color text DEFAULT '#304DB5'::text,
+  accent_color text DEFAULT '#5E7BFF'::text,
+  show_seal boolean DEFAULT true,
+  seal_text text DEFAULT 'VERIFIED'::text,
+  custom_message text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT certificate_templates_pkey PRIMARY KEY (id),
+  CONSTRAINT certificate_templates_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.courses(id),
+  CONSTRAINT certificate_templates_coach_id_fkey FOREIGN KEY (coach_id) REFERENCES public.profiles(id)
+);
 CREATE TABLE public.coach_profiles (
   id uuid NOT NULL,
   job_title text,
@@ -35,6 +57,23 @@ CREATE TABLE public.coach_profiles (
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT coach_profiles_pkey PRIMARY KEY (id),
   CONSTRAINT coach_profiles_id_fkey FOREIGN KEY (id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.coaching_bookings (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  student_id uuid NOT NULL,
+  coach_id uuid NOT NULL,
+  session_date date NOT NULL,
+  session_time text NOT NULL,
+  duration_minutes integer NOT NULL DEFAULT 60,
+  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'confirmed'::text, 'completed'::text, 'cancelled'::text])),
+  notes text,
+  meeting_link text,
+  amount numeric NOT NULL DEFAULT 0,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT coaching_bookings_pkey PRIMARY KEY (id),
+  CONSTRAINT coaching_bookings_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.profiles(id),
+  CONSTRAINT coaching_bookings_coach_id_fkey FOREIGN KEY (coach_id) REFERENCES public.profiles(id)
 );
 CREATE TABLE public.conversations (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -105,6 +144,33 @@ CREATE TABLE public.courses (
   CONSTRAINT courses_pkey PRIMARY KEY (id),
   CONSTRAINT courses_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id),
   CONSTRAINT courses_coach_id_fkey FOREIGN KEY (coach_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.discussion_replies (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  thread_id uuid NOT NULL,
+  author_id uuid NOT NULL,
+  content text NOT NULL,
+  reaction_count integer NOT NULL DEFAULT 0,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT discussion_replies_pkey PRIMARY KEY (id),
+  CONSTRAINT discussion_replies_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.discussion_threads(id),
+  CONSTRAINT discussion_replies_author_id_fkey FOREIGN KEY (author_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.discussion_threads (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  author_id uuid NOT NULL,
+  title text NOT NULL,
+  content text NOT NULL,
+  course_id uuid,
+  reply_count integer NOT NULL DEFAULT 0,
+  reaction_count integer NOT NULL DEFAULT 0,
+  is_pinned boolean NOT NULL DEFAULT false,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT discussion_threads_pkey PRIMARY KEY (id),
+  CONSTRAINT discussion_threads_author_id_fkey FOREIGN KEY (author_id) REFERENCES public.profiles(id),
+  CONSTRAINT discussion_threads_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.courses(id)
 );
 CREATE TABLE public.enrollments (
   profile_id uuid NOT NULL,
@@ -423,6 +489,21 @@ CREATE TABLE public.topics (
   name text NOT NULL UNIQUE,
   CONSTRAINT topics_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.transactions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  type text NOT NULL CHECK (type = ANY (ARRAY['course_purchase'::text, 'membership'::text, 'coaching_session'::text])),
+  amount numeric NOT NULL DEFAULT 0,
+  currency text NOT NULL DEFAULT 'PHP'::text,
+  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'succeeded'::text, 'failed'::text, 'refunded'::text])),
+  description text,
+  reference_id uuid,
+  payment_method text DEFAULT 'card'::text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT transactions_pkey PRIMARY KEY (id),
+  CONSTRAINT transactions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
+);
 CREATE TABLE public.user_lesson_progress (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
@@ -435,6 +516,18 @@ CREATE TABLE public.user_lesson_progress (
   CONSTRAINT user_lesson_progress_pkey PRIMARY KEY (id),
   CONSTRAINT user_lesson_progress_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
   CONSTRAINT user_lesson_progress_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(id)
+);
+CREATE TABLE public.user_memberships (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL UNIQUE,
+  tier text NOT NULL DEFAULT 'free'::text CHECK (tier = ANY (ARRAY['free'::text, 'pro'::text, 'elite'::text])),
+  started_at timestamp with time zone NOT NULL DEFAULT now(),
+  expires_at timestamp with time zone,
+  cancelled_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT user_memberships_pkey PRIMARY KEY (id),
+  CONSTRAINT user_memberships_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
 );
 CREATE TABLE public.user_module_progress (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),

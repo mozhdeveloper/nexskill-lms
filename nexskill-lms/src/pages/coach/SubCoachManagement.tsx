@@ -233,30 +233,30 @@ const SubCoachManagement: React.FC = () => {
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <GlassCard className="p-6 flex items-center gap-4">
-            <div className="p-4 rounded-full bg-blue-500/20 text-blue-400">
+            <div className="p-4 rounded-full bg-blue-500/20 text-blue-600 dark:text-blue-400">
               <ShieldCheck className="w-8 h-8" />
             </div>
             <div>
-              <div className="text-3xl font-bold text-white">{stats.totalSubCoaches}</div>
-              <div className="text-sm text-gray-400">Total Sub-Coaches</div>
+              <div className="text-3xl font-bold text-slate-900 dark:text-white">{stats.totalSubCoaches}</div>
+              <div className="text-sm text-slate-500 dark:text-gray-400">Total Sub-Coaches</div>
             </div>
           </GlassCard>
           <GlassCard className="p-6 flex items-center gap-4">
-            <div className="p-4 rounded-full bg-green-500/20 text-green-400">
+            <div className="p-4 rounded-full bg-green-500/20 text-green-600 dark:text-green-400">
               <Award className="w-8 h-8" />
             </div>
             <div>
-              <div className="text-3xl font-bold text-white">{stats.activeAssignments}</div>
-              <div className="text-sm text-gray-400">Active Assignments</div>
+              <div className="text-3xl font-bold text-slate-900 dark:text-white">{stats.activeAssignments}</div>
+              <div className="text-sm text-slate-500 dark:text-gray-400">Active Assignments</div>
             </div>
           </GlassCard>
           <GlassCard className="p-6 flex items-center gap-4">
-            <div className="p-4 rounded-full bg-yellow-500/20 text-yellow-400">
+            <div className="p-4 rounded-full bg-yellow-500/20 text-yellow-600 dark:text-yellow-400">
               <BookOpen className="w-8 h-8" />
             </div>
             <div>
-              <div className="text-3xl font-bold text-white">{stats.pendingAssignments}</div>
-              <div className="text-sm text-gray-400">Pending Assignments</div>
+              <div className="text-3xl font-bold text-slate-900 dark:text-white">{stats.pendingAssignments}</div>
+              <div className="text-sm text-slate-500 dark:text-gray-400">Pending Assignments</div>
             </div>
           </GlassCard>
         </div>
@@ -265,19 +265,19 @@ const SubCoachManagement: React.FC = () => {
         <div className="space-y-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-gray-500" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by name or course..."
-                className="w-full pl-12 pr-4 py-3 bg-[var(--bg-secondary)] border border-white/10 rounded-xl text-white focus:outline-none focus:border-brand-electric focus:ring-1 focus:ring-brand-electric transition-colors"
+                className="w-full pl-12 pr-4 py-3 bg-white dark:bg-[var(--bg-secondary)] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-brand-electric focus:ring-1 focus:ring-brand-electric transition-colors"
               />
             </div>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value as any)}
-              className="px-4 py-3 bg-[var(--bg-secondary)] border border-white/10 rounded-xl text-white focus:outline-none focus:border-brand-electric"
+              className="px-4 py-3 bg-white dark:bg-[var(--bg-secondary)] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-brand-electric"
             >
               <option value="all">All Status</option>
               <option value="active">Active</option>
@@ -288,54 +288,54 @@ const SubCoachManagement: React.FC = () => {
 
           <GlassCard className="overflow-hidden min-h-[400px]">
             {isLoading ? (
-              <div className="h-full flex flex-col items-center justify-center p-12 text-gray-400">
+              <div className="h-full flex flex-col items-center justify-center p-12 text-slate-500 dark:text-gray-400">
                 <Loader2 className="w-8 h-8 animate-spin text-brand-electric mb-4" />
                 <p>Loading assignments...</p>
               </div>
             ) : filteredAssignments.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center p-12 text-gray-400">
-                <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
+              <div className="h-full flex flex-col items-center justify-center p-12 text-slate-500 dark:text-gray-400">
+                <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center mb-4">
                   <Users className="w-8 h-8 opacity-50" />
                 </div>
-                <h3 className="text-lg font-semibold text-white mb-2">No assignments found</h3>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">No assignments found</h3>
                 <p className="text-sm">Try adjusting filters or create a new assignment.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-white/5 border-b border-white/10">
+                  <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10">
                     <tr>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Sub-Coach</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Course</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Assigned Date</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-gray-400 uppercase tracking-wider">Sub-Coach</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-gray-400 uppercase tracking-wider">Course</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-gray-400 uppercase tracking-wider">Assigned Date</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5">
+                  <tbody className="divide-y divide-slate-200 dark:divide-white/5">
                     {filteredAssignments.map((assignment) => (
-                      <tr key={assignment.id} className="hover:bg-white/5 transition-colors group">
+                      <tr key={assignment.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-electric to-brand-purple flex items-center justify-center text-white font-bold border border-white/10 text-sm">
                               {assignment.subCoachName.charAt(0)}
                             </div>
                             <div>
-                              <div className="font-semibold text-white">{assignment.subCoachName}</div>
-                              <div className="text-xs text-gray-500">{assignment.subCoachEmail}</div>
+                              <div className="font-semibold text-slate-900 dark:text-white">{assignment.subCoachName}</div>
+                              <div className="text-xs text-slate-500 dark:text-gray-500">{assignment.subCoachEmail}</div>
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="font-medium text-white">{assignment.courseTitle}</div>
+                          <div className="font-medium text-slate-900 dark:text-white">{assignment.courseTitle}</div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-400">
+                        <td className="px-6 py-4 text-sm text-slate-600 dark:text-gray-400">
                           {assignment.assignedDate}
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium border ${assignment.status === 'active' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                            assignment.status === 'pending' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' :
-                              'bg-gray-500/10 text-gray-400 border-gray-500/20'
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium border ${assignment.status === 'active' ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-500/10 dark:text-green-400 dark:border-green-500/20' :
+                            assignment.status === 'pending' ? 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-yellow-500/10 dark:text-yellow-400 dark:border-yellow-500/20' :
+                              'bg-slate-100 text-slate-700 border-slate-200 dark:bg-gray-500/10 dark:text-gray-400 dark:border-gray-500/20'
                             }`}>
                             {assignment.status.toUpperCase()}
                           </span>
@@ -343,19 +343,19 @@ const SubCoachManagement: React.FC = () => {
                         <td className="px-6 py-4 text-right relative">
                           <button
                             onClick={() => setShowActionsMenu(showActionsMenu === assignment.id ? null : assignment.id)}
-                            className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors"
+                            className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-lg text-slate-400 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white transition-colors"
                           >
                             <MoreVertical className="w-4 h-4" />
                           </button>
 
                           {showActionsMenu === assignment.id && (
-                            <div className="absolute right-10 top-0 mt-2 w-48 bg-[#1a1f2e] border border-white/20 rounded-xl shadow-xl py-2 z-10">
-                              <button className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-white/10 flex items-center gap-2">
+                            <div className="absolute right-10 top-0 mt-2 w-48 bg-white dark:bg-[#1a1f2e] border border-slate-200 dark:border-white/20 rounded-xl shadow-xl py-2 z-10">
+                              <button className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-white/10 flex items-center gap-2">
                                 <Eye className="w-4 h-4" /> View Details
                               </button>
                               <button
                                 onClick={() => handleRemoveAssignment(assignment.id)}
-                                className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-white/10 flex items-center gap-2"
+                                className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-slate-100 dark:text-red-400 dark:hover:bg-white/10 flex items-center gap-2"
                               >
                                 <Trash2 className="w-4 h-4" /> Remove
                               </button>

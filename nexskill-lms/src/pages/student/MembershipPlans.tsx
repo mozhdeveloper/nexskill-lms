@@ -1,79 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
+import { supabase } from '../../lib/supabaseClient';
 import MembershipPlanCard from '../../components/membership/MembershipPlanCard';
 import MembershipFeatureCompare from '../../components/membership/MembershipFeatureCompare';
-
-// Plan definitions — static config
-const PLANS = [
-  {
-    id: 'free',
-    name: 'Free',
-    price: 0,
-    billingCycle: 'month',
-    description: 'Perfect for exploring NexSkill and trying out courses.',
-    bestFor: 'Casual learners and those getting started',
-    features: [
-      'Access to all free courses',
-      'Community discussions',
-      'Limited AI Coach (10 queries/month)',
-      'Basic progress tracking',
-    ],
-    isMostPopular: false,
-  },
-  {
-    id: 'pro',
-    name: 'Pro',
-    price: 29,
-    billingCycle: 'month',
-    description: 'Unlock premium courses and advanced learning tools.',
-    bestFor: 'Dedicated learners building new skills',
-    features: [
-      'Everything in Free, plus:',
-      'Full access to premium courses',
-      'Unlimited AI Coach access',
-      '2 coaching credits per month',
-      'Course certificates',
-      'Live classes access',
-      'Download courses offline',
-    ],
-    isMostPopular: true,
-    badgeLabel: 'Most Popular',
-  },
-  {
-    id: 'elite',
-    name: 'Elite',
-    price: 79,
-    billingCycle: 'month',
-    description: 'Premium experience with career services and priority support.',
-    bestFor: 'Serious professionals and career changers',
-    features: [
-      'Everything in Pro, plus:',
-      '10 coaching credits per month',
-      'Blockchain-verified certificates',
-      'Priority support (24h response)',
-      'Career services & job placement',
-      'Resume reviews & interview prep',
-      'Exclusive masterclasses',
-    ],
-    isMostPopular: false,
-  },
-];
+import { PLANS_LIST } from '../../config/membershipPlans';
 
 const MembershipPlans: React.FC = () => {
   const navigate = useNavigate();
-  // membership_tier column not yet in DB — default to 'free'
-  const [currentTier] = useState<string>('free');
+  const [currentTier, setCurrentTier] = useState<string>('free');
 
   useEffect(() => {
-    // membership_tier column not yet in DB — stays on 'free' default
+    const fetchTier = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('user_memberships')
+        .select('tier')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (data?.tier) setCurrentTier(data.tier);
+    };
+    fetchTier();
   }, []);
 
-  const membershipPlans = PLANS.map(p => ({ ...p, isCurrent: p.id === currentTier }));
+  const membershipPlans = PLANS_LIST.map(p => ({ ...p, isCurrent: p.id === currentTier, isMostPopular: p.isMostPopular ?? false }));
   const currentPlan = membershipPlans.find(p => p.isCurrent);
 
   const handleSelectPlan = (planId: string) => {
-    // Membership features not yet available — no membership tables in DB
     navigate('/student/membership/manage', { state: { targetPlanId: planId } });
   };
 
@@ -84,15 +38,6 @@ const MembershipPlans: React.FC = () => {
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-3">Membership plans</h1>
           <p className="text-lg text-slate-600 dark:text-slate-400">Choose the plan that matches your learning goals</p>
-        </div>
-
-        {/* Coming Soon Banner */}
-        <div className="mb-8 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
-          <span className="text-xl flex-shrink-0">🚀</span>
-          <div>
-            <p className="font-semibold text-amber-800">Membership Plans — Coming Soon</p>
-            <p className="text-sm text-amber-700">Paid membership tiers are not yet available. All features are currently free while we build out this experience.</p>
-          </div>
         </div>
 
         {/* Current Plan Banner */}

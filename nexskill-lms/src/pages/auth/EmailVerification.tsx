@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StudentAuthLayout from '../../layouts/StudentAuthLayout';
+import { supabase } from '../../lib/supabaseClient';
 
 const EmailVerification: React.FC = () => {
   const navigate = useNavigate();
   const [verificationCode, setVerificationCode] = useState(['', '', '', '', '', '']);
   const [isResending, setIsResending] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Dummy email for display
-  const userEmail = 'user@example.com';
+  const userEmail = sessionStorage.getItem('pendingVerificationEmail') || '';
 
   const handleCodeChange = (index: number, value: string) => {
     if (value.length > 1) return; // Only allow single digit
@@ -31,22 +33,42 @@ const EmailVerification: React.FC = () => {
     }
   };
 
-  const handleVerify = (e: React.FormEvent) => {
+  const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    const code = verificationCode.join('');
-    if (code.length === 6) {
-      // Dummy verification - navigate to onboarding
+    const token = verificationCode.join('');
+    if (token.length !== 6) return;
+
+    setIsVerifying(true);
+    setError(null);
+
+    const { error: otpError } = await supabase.auth.verifyOtp({
+      email: userEmail,
+      token,
+      type: 'signup',
+    });
+
+    if (otpError) {
+      setError(otpError.message);
+      setIsVerifying(false);
+    } else {
+      sessionStorage.removeItem('pendingVerificationEmail');
       navigate('/student/onboarding-preferences');
     }
   };
 
-  const handleResendCode = () => {
+  const handleResendCode = async () => {
+    if (!userEmail) return;
     setIsResending(true);
-    // Simulate resend delay
-    setTimeout(() => {
-      setIsResending(false);
-      alert('Verification code resent!');
-    }, 2000);
+    const { error: resendError } = await supabase.auth.resend({
+      email: userEmail,
+      type: 'signup',
+    });
+    setIsResending(false);
+    if (resendError) {
+      alert(resendError.message);
+    } else {
+      alert('Verification code resent! Check your inbox.');
+    }
   };
 
   return (
@@ -86,13 +108,20 @@ const EmailVerification: React.FC = () => {
             ))}
           </div>
 
+          {/* Error message */}
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
           {/* Verify Button */}
           <button
             type="submit"
-            disabled={verificationCode.join('').length !== 6}
+            disabled={verificationCode.join('').length !== 6 || isVerifying}
             className="w-full py-3 px-6 bg-gradient-to-r from-brand-primary to-brand-primary-light text-white font-medium rounded-full shadow-button-primary hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
-            Verify email
+            {isVerifying ? 'Verifying...' : 'Verify email'}
           </button>
         </form>
 

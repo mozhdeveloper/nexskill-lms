@@ -331,8 +331,8 @@ const CoachStudentsPage: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">My Students</h1>
-            <p className="text-gray-400">Track progress and engagement for your enrolled students</p>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">My Students</h1>
+            <p className="text-slate-600 dark:text-gray-400">Track progress and engagement for your enrolled students</p>
           </div>
           <div className="flex gap-3">
             <NeonButton
@@ -360,9 +360,9 @@ const CoachStudentsPage: React.FC = () => {
             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
               <Users className="w-16 h-16 text-brand-electric" />
             </div>
-            <div className="text-sm text-gray-400 mb-1">Total Students</div>
-            <div className="text-3xl font-bold text-white mb-2">{isLoading ? '...' : totalStudents}</div>
-            <div className="text-xs text-brand-neon flex items-center gap-1">
+            <div className="text-sm text-slate-600 dark:text-gray-400 mb-1">Total Students</div>
+            <div className="text-3xl font-bold text-slate-900 dark:text-white mb-2">{isLoading ? '...' : totalStudents}</div>
+            <div className="text-xs text-emerald-600 dark:text-brand-neon flex items-center gap-1">
               <TrendingUp className="w-3 h-3" /> +12% this month
             </div>
           </GlassCard>
@@ -371,9 +371,9 @@ const CoachStudentsPage: React.FC = () => {
             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
               <UserCheck className="w-16 h-16 text-green-500" />
             </div>
-            <div className="text-sm text-gray-400 mb-1">Active Students</div>
-            <div className="text-3xl font-bold text-white mb-2">{isLoading ? '...' : activeStudents}</div>
-            <div className="text-xs text-gray-400">
+            <div className="text-sm text-slate-600 dark:text-gray-400 mb-1">Active Students</div>
+            <div className="text-3xl font-bold text-slate-900 dark:text-white mb-2">{isLoading ? '...' : activeStudents}</div>
+            <div className="text-xs text-slate-500 dark:text-gray-400">
               {(activeStudents / (totalStudents || 1) * 100).toFixed(0)}% engagement rate
             </div>
           </GlassCard>
@@ -382,9 +382,9 @@ const CoachStudentsPage: React.FC = () => {
             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
               <BarChart3 className="w-16 h-16 text-purple-500" />
             </div>
-            <div className="text-sm text-gray-400 mb-1">Avg. Progress</div>
-            <div className="text-3xl font-bold text-white mb-2">{isLoading ? '...' : avgProgress}%</div>
-            <div className="w-full bg-gray-700 h-1 rounded-full mt-2">
+            <div className="text-sm text-slate-600 dark:text-gray-400 mb-1">Avg. Progress</div>
+            <div className="text-3xl font-bold text-slate-900 dark:text-white mb-2">{isLoading ? '...' : avgProgress}%</div>
+            <div className="w-full bg-slate-200 dark:bg-gray-700 h-1 rounded-full mt-2">
               <div className="bg-purple-500 h-1 rounded-full" style={{ width: `${avgProgress}%` }}></div>
             </div>
           </GlassCard>
@@ -393,9 +393,9 @@ const CoachStudentsPage: React.FC = () => {
             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
               <Award className="w-16 h-16 text-yellow-500" />
             </div>
-            <div className="text-sm text-gray-400 mb-1">Avg. Score</div>
-            <div className="text-3xl font-bold text-white mb-2">{isLoading ? '...' : avgScore}%</div>
-            <div className="text-xs text-yellow-500 flex items-center gap-1">
+            <div className="text-sm text-slate-600 dark:text-gray-400 mb-1">Avg. Score</div>
+            <div className="text-3xl font-bold text-slate-900 dark:text-white mb-2">{isLoading ? '...' : avgScore}%</div>
+            <div className="text-xs text-amber-600 dark:text-yellow-500 flex items-center gap-1">
               Top 10% performance
             </div>
           </GlassCard>
@@ -405,19 +405,19 @@ const CoachStudentsPage: React.FC = () => {
         <div className="space-y-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 dark:text-gray-500" />
               <input
                 type="text"
                 placeholder="Search students..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 bg-[var(--bg-secondary)] border border-white/10 rounded-xl text-white focus:outline-none focus:border-brand-electric focus:ring-1 focus:ring-brand-electric transition-colors"
+                className="w-full pl-12 pr-4 py-3 bg-white dark:bg-[var(--bg-secondary)] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-brand-electric focus:ring-1 focus:ring-brand-electric transition-colors"
               />
             </div>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value as any)}
-              className="px-4 py-3 bg-[var(--bg-secondary)] border border-white/10 rounded-xl text-white focus:outline-none focus:border-brand-electric"
+              className="px-4 py-3 bg-white dark:bg-[var(--bg-secondary)] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-brand-electric"
             >
               <option value="all">All Status</option>
               <option value="active">Active</option>
@@ -428,38 +428,38 @@ const CoachStudentsPage: React.FC = () => {
 
           <GlassCard className="overflow-hidden">
             {isLoading ? (
-              <div className="p-12 text-center text-gray-400 flex flex-col items-center">
+              <div className="p-12 text-center text-slate-500 dark:text-gray-400 flex flex-col items-center">
                 <Loader2 className="w-8 h-8 animate-spin text-brand-electric mb-2" />
                 <p>Loading student data...</p>
               </div>
             ) : filteredStudents.length === 0 ? (
-              <div className="p-12 text-center text-gray-400">
+              <div className="p-12 text-center text-slate-500 dark:text-gray-400">
                 <p>No students found matching your criteria.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-white/5 border-b border-white/10">
+                  <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10">
                     <tr>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Student</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Progress</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Avg Score</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Last Active</th>
-                      <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-gray-400 uppercase tracking-wider">Student</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-gray-400 uppercase tracking-wider">Progress</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-gray-400 uppercase tracking-wider">Avg Score</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-gray-400 uppercase tracking-wider">Last Active</th>
+                      <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5">
+                  <tbody className="divide-y divide-slate-200 dark:divide-white/5">
                     {filteredStudents.map(student => (
-                      <tr key={student.id} className="hover:bg-white/5 transition-colors group">
+                      <tr key={student.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-electric to-brand-purple flex items-center justify-center text-white font-bold border border-white/10 text-sm">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-electric to-brand-purple flex items-center justify-center text-white font-bold border border-white/10 text-sm shadow-sm">
                               {student.name.substring(0, 2).toUpperCase()}
                             </div>
                             <div>
-                              <div className="font-semibold text-white">{student.name}</div>
-                              <div className="text-xs text-gray-500">{student.email}</div>
+                              <div className="font-semibold text-slate-900 dark:text-white">{student.name}</div>
+                              <div className="text-xs text-slate-500 dark:text-gray-500">{student.email}</div>
                             </div>
                           </div>
                         </td>
@@ -469,29 +469,29 @@ const CoachStudentsPage: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`font-mono font-medium ${student.averageScore > 80 ? 'text-green-400' :
-                            student.averageScore > 60 ? 'text-yellow-400' : 'text-red-400'
+                          <span className={`font-mono font-medium ${student.averageScore > 80 ? 'text-green-600 dark:text-green-400' :
+                            student.averageScore > 60 ? 'text-amber-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'
                             }`}>
                             {student.averageScore}%
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium border ${student.status === 'active' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                            student.status === 'completed' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                              'bg-gray-500/10 text-gray-400 border-gray-500/20'
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium border ${student.status === 'active' ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-500/10 dark:text-green-400 dark:border-green-500/20' :
+                            student.status === 'completed' ? 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20' :
+                              'bg-slate-100 text-slate-700 border-slate-200 dark:bg-gray-500/10 dark:text-gray-400 dark:border-gray-500/20'
                             }`}>
                             {student.status.charAt(0).toUpperCase() + student.status.slice(1)}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-400">
+                        <td className="px-6 py-4 text-sm text-slate-600 dark:text-gray-400">
                           {student.lastActive}
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleMessageStudent(student)} className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors" title="Message">
+                            <button onClick={() => handleMessageStudent(student)} className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-lg text-slate-400 hover:text-brand-electric dark:text-gray-400 dark:hover:text-white transition-colors" title="Message">
                               <Mail className="w-4 h-4" />
                             </button>
-                            <button onClick={() => handleViewProgress(student)} className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors" title="View Details">
+                            <button onClick={() => handleViewProgress(student)} className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-lg text-slate-400 hover:text-brand-electric dark:text-gray-400 dark:hover:text-white transition-colors" title="View Details">
                               <BarChart3 className="w-4 h-4" />
                             </button>
                           </div>

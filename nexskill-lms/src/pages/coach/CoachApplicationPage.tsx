@@ -168,15 +168,17 @@ const CoachApplicationPage: React.FC = () => {
             if (authError) throw authError;
             if (!data?.user) throw new Error("Failed to create account");
             const userId = data.user.id;
-            const { error: profileError } = await supabase.from('profiles').update({
+            const { error: profileError } = await supabase.from('profiles').upsert({
+                id: userId,
                 role: 'unassigned',
+                email: formData.email,
                 username: formData.username,
                 middle_name: formData.middleName,
                 first_name: formData.firstName,
                 last_name: formData.lastName,
                 name_extension: formData.nameExtension
-            }).eq('id', userId);
-            if (profileError) console.error("Profile update error:", profileError);
+            });
+            if (profileError) throw profileError;
             const toolsArray = formData.tools.split(',').map(t => t.trim()).filter(t => t.length > 0);
             const { error: coachError } = await supabase.from('coach_profiles').insert({
                 id: userId,

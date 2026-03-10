@@ -3,48 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
 import MembershipChangeFlow from '../../components/membership/MembershipChangeFlow';
 import MembershipCancelPanel from '../../components/membership/MembershipCancelPanel';
-
-// Tier pricing config (same as in MembershipPlans)
-const allPlans = {
-  free: {
-    id: 'free',
-    name: 'Free',
-    price: 0,
-    billingCycle: 'month',
-    features: [
-      'Access to all free courses',
-      'Community discussions',
-      'Limited AI Coach',
-      'Basic progress tracking',
-    ],
-  },
-  pro: {
-    id: 'pro',
-    name: 'Pro',
-    price: 29,
-    billingCycle: 'month',
-    features: [
-      'Full access to premium courses',
-      'Unlimited AI Coach access',
-      '2 coaching credits per month',
-      'Course certificates',
-      'Live classes access',
-    ],
-  },
-  elite: {
-    id: 'elite',
-    name: 'Elite',
-    price: 79,
-    billingCycle: 'month',
-    features: [
-      '10 coaching credits per month',
-      'Blockchain-verified certificates',
-      'Priority support',
-      'Career services & job placement',
-      'Exclusive masterclasses',
-    ],
-  },
-};
+import { supabase } from '../../lib/supabaseClient';
+import { getPlan } from '../../config/membershipPlans';
 
 const MembershipManage: React.FC = () => {
   const navigate = useNavigate();
@@ -53,24 +13,59 @@ const MembershipManage: React.FC = () => {
   // Get target plan from router state, or default to 'elite'
   const targetPlanId = (location.state as any)?.targetPlanId || 'elite';
 
-  const [currentTier] = useState<string>('free');
+  const [currentTier, setCurrentTier] = useState<string>('free');
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
+
   useEffect(() => {
-    // membership_tier column not yet in DB — default to 'free'
-    // When the column is added, uncomment the Supabase query below
-    // supabase.auth.getUser().then(async ({ data }) => {
-    //   if (!data?.user) return;
-    //   const { data: sp } = await supabase
-    //     .from('student_profiles').select('membership_tier')
-    //     .eq('user_id', data.user.id).maybeSingle();
-    //   if (sp?.membership_tier) setCurrentTier(sp.membership_tier);
-    // });
+    const fetchTier = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('user_memberships')
+        .select('tier, expires_at')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (data?.tier) setCurrentTier(data.tier);
+      if (data?.expires_at) setExpiresAt(data.expires_at);
+    };
+    fetchTier();
   }, []);
 
-  const currentPlan = allPlans[currentTier as keyof typeof allPlans] || allPlans.free;
-  const targetPlan = allPlans[targetPlanId as keyof typeof allPlans] || allPlans.elite;
+  const currentPlan = getPlan(currentTier);
+  const targetPlan = getPlan(targetPlanId);
 
-  const handleConfirmChange = () => {
-    // Membership features not yet available — no membership tables in DB
+  const handleConfirmChange = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // Upsert user_memberships
+    const expiresAt = targetPlan.price > 0
+      ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      : null;
+    const { data: membership, error: mErr } = await supabase
+      .from('user_memberships')
+      .upsert({ user_id: user.id, tier: targetPlan.id, started_at: new Date().toISOString(), expires_at: expiresAt }, { onConflict: 'user_id' })
+      .select('id')
+      .single();
+    if (mErr) { alert('Failed to update membership. Please try again.'); console.error(mErr); return; }
+
+    // Insert transaction
+    const { data: txn, error: tErr } = await supabase
+      .from('transactions')
+      .insert({
+        user_id: user.id,
+        type: 'membership',
+        amount: targetPlan.price,
+        currency: 'PHP',
+        status: 'succeeded',
+        description: `Membership: ${targetPlan.name} plan`,
+        reference_id: membership.id,
+        payment_method: 'card',
+      })
+      .select('id')
+      .single();
+    if (tErr) { alert('Membership updated but billing record failed. Contact support.'); console.error(tErr); return; }
+
     navigate('/student/membership/confirmation', {
       state: {
         type: 'change',
@@ -78,6 +73,7 @@ const MembershipManage: React.FC = () => {
         planName: targetPlan.name,
         price: targetPlan.price,
         billingCycle: targetPlan.billingCycle,
+        transactionId: txn.id,
       },
     });
   };
@@ -86,13 +82,16 @@ const MembershipManage: React.FC = () => {
     navigate('/student/membership');
   };
 
-  const handleCancelConfirmed = () => {
-    // Membership features not yet available — no membership tables in DB
+  const handleCancelConfirmed = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase
+        .from('user_memberships')
+        .update({ tier: 'free', cancelled_at: new Date().toISOString(), expires_at: null })
+        .eq('user_id', user.id);
+    }
     navigate('/student/membership/confirmation', {
-      state: {
-        type: 'cancel',
-        currentPlanName: currentPlan.name,
-      },
+      state: { type: 'cancel', currentPlanName: currentPlan.name, expiresAt },
     });
   };
 
@@ -114,16 +113,7 @@ const MembershipManage: React.FC = () => {
           <p className="text-lg text-slate-600">Change your plan or cancel your subscription</p>
         </div>
 
-        {/* Coming Soon Banner */}
-        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
-          <span className="text-xl flex-shrink-0">🚀</span>
-          <div>
-            <p className="font-semibold text-amber-800">Membership Management — Coming Soon</p>
-            <p className="text-sm text-amber-700">Plan upgrades and billing are not yet available. All features are currently free.</p>
-          </div>
-        </div>
-
-        {/* Main Layout */}
+          {/* Main Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Column - Plan Change Flow */}
           <div>
@@ -137,7 +127,7 @@ const MembershipManage: React.FC = () => {
 
           {/* Right Column - Cancel Panel */}
           <div>
-            <MembershipCancelPanel onCancelConfirmed={handleCancelConfirmed} />
+            <MembershipCancelPanel onCancelConfirmed={handleCancelConfirmed} expiresAt={expiresAt} />
           </div>
         </div>
 
