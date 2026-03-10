@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import StudentAppLayout from "../../layouts/StudentAppLayout";
 import CourseFilterBar from "../../components/courses/CourseFilterBar";
@@ -6,6 +6,7 @@ import CourseCategorySidebar from "../../components/courses/CourseCategorySideba
 import CourseGridItem from "../../components/courses/CourseGridItem";
 import { useCourses } from '../../hooks/useCourses';
 import { useEnrolledCourses } from '../../hooks/useEnrolledCourses';
+import { supabase } from '../../lib/supabaseClient';
 
 // Categories for the filter sidebar
 const categories = [
@@ -37,6 +38,35 @@ const CourseCatalog: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedLevel, setSelectedLevel] = useState("All");
   const [sortOption, setSortOption] = useState("Most popular");
+  const [courseStats, setCourseStats] = useState<Record<string, { rating: number; studentsCount: number }>>({});
+
+  // Fetch real ratings and enrollment counts for all visible courses
+  useEffect(() => {
+    const ids = dbCourses.map(c => c.id);
+    if (ids.length === 0) return;
+    const fetchStats = async () => {
+      const [{ data: enrollments }, { data: reviews }] = await Promise.all([
+        supabase.from('enrollments').select('course_id').in('course_id', ids),
+        supabase.from('reviews').select('course_id, rating').in('course_id', ids),
+      ]);
+      const stats: Record<string, { rating: number; studentsCount: number }> = {};
+      (enrollments || []).forEach((e: { course_id: string }) => {
+        if (!stats[e.course_id]) stats[e.course_id] = { rating: 0, studentsCount: 0 };
+        stats[e.course_id].studentsCount++;
+      });
+      const ratingBuckets: Record<string, number[]> = {};
+      (reviews || []).forEach((r: { course_id: string; rating: number }) => {
+        if (!ratingBuckets[r.course_id]) ratingBuckets[r.course_id] = [];
+        ratingBuckets[r.course_id].push(r.rating);
+      });
+      Object.entries(ratingBuckets).forEach(([courseId, ratings]) => {
+        if (!stats[courseId]) stats[courseId] = { rating: 0, studentsCount: 0 };
+        stats[courseId].rating = Math.round((ratings.reduce((s, v) => s + v, 0) / ratings.length) * 10) / 10;
+      });
+      setCourseStats(stats);
+    };
+    fetchStats();
+  }, [dbCourses]);
 
   // Determine which source data to use
   const sourceCourses = activeTab === 'browse' ? dbCourses : enrolledCourses;
@@ -49,8 +79,8 @@ const CourseCatalog: React.FC = () => {
       title: course.title,
       category: (course as any).category?.name || 'Uncategorized', // Handle joined data
       level: course.level || 'Beginner',
-      rating: 0,
-      studentsCount: 0,
+      rating: courseStats[course.id]?.rating ?? 0,
+      studentsCount: courseStats[course.id]?.studentsCount ?? 0,
       duration: formatDuration(course.duration_hours || 0),
       price: course.price || 0,
       originalPrice: undefined,
@@ -59,7 +89,7 @@ const CourseCatalog: React.FC = () => {
       thumbnail: 'gradient-blue-purple', // Could vary based on ID
       shortDescription: course.short_description || '',
     }));
-  }, [sourceCourses]);
+  }, [sourceCourses, courseStats]);
 
   // Filter and sort courses
   const filteredCourses = useMemo(() => {

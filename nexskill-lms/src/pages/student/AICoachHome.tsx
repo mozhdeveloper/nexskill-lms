@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
 import AIChatPanel from '../../components/ai/AIChatPanel';
 import AIProgressRecommendations from '../../components/ai/AIProgressRecommendations';
@@ -8,11 +8,64 @@ import AIMilestoneNotifications from '../../components/ai/AIMilestoneNotificatio
 import AIPersonalizedStudyPlan from '../../components/ai/AIPersonalizedStudyPlan';
 import { useEnrolledCourses } from '../../hooks/useEnrolledCourses';
 import { useCourseProgress } from '../../hooks/useCourseProgress';
+import { useUser } from '../../context/UserContext';
+import { supabase } from '../../lib/supabaseClient';
 
 const AICoachHome: React.FC = () => {
+  const { profile } = useUser();
   const { courses: enrolledCourses } = useEnrolledCourses();
   const courseIds = useMemo(() => enrolledCourses.map(c => c.id), [enrolledCourses]);
   const { totalLessons, totalCompleted, totalTimeSeconds, overallPercent } = useCourseProgress(courseIds);
+
+  const [streakDays, setStreakDays] = useState(0);
+  const [averageQuizScore, setAverageQuizScore] = useState(0);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    const fetchStats = async () => {
+      // Average quiz score across all attempts
+      const { data: attempts } = await supabase
+        .from('quiz_attempts')
+        .select('score, max_score')
+        .eq('user_id', profile.id);
+      if (attempts && attempts.length > 0) {
+        const valid = attempts.filter((a: { score: number; max_score: number }) => a.max_score > 0);
+        if (valid.length > 0) {
+          const avg = valid.reduce((s: number, a: { score: number; max_score: number }) =>
+            s + Math.round((a.score / a.max_score) * 100), 0) / valid.length;
+          setAverageQuizScore(Math.round(avg));
+        }
+      }
+
+      // Streak: count consecutive days (ending today) with at least one completed lesson
+      const { data: progress } = await supabase
+        .from('user_lesson_progress')
+        .select('completed_at')
+        .eq('user_id', profile.id)
+        .eq('is_completed', true)
+        .not('completed_at', 'is', null);
+      if (progress && progress.length > 0) {
+        const days = new Set<string>(
+          progress.map((p: { completed_at: string }) =>
+            new Date(p.completed_at).toISOString().slice(0, 10)
+          )
+        );
+        let streak = 0;
+        const today = new Date();
+        for (let i = 0; i < 365; i++) {
+          const d = new Date(today);
+          d.setDate(today.getDate() - i);
+          if (days.has(d.toISOString().slice(0, 10))) {
+            streak++;
+          } else {
+            break;
+          }
+        }
+        setStreakDays(streak);
+      }
+    };
+    fetchStats();
+  }, [profile?.id]);
 
   const currentCourse = enrolledCourses[0]?.title ?? 'your course';
   const studentProgress = {
@@ -20,9 +73,9 @@ const AICoachHome: React.FC = () => {
     completedLessons: totalCompleted,
     totalLessons: totalLessons,
     weeklyHours: Math.round((totalTimeSeconds / 3600) * 10) / 10,
-    streakDays: 0,
+    streakDays,
     upcomingDeadlines: 0,
-    averageQuizScore: 0,
+    averageQuizScore,
     currentCourse,
     completionPercentage: Math.round(overallPercent),
   };

@@ -148,21 +148,6 @@ const LiveClassRoom: React.FC = () => {
                 {classData.description || 'No description provided.'}
               </p>
             </div>
-
-            {/* Topics Covered - Mock/Placeholder since DB doesn't have it */}
-            <div className="bg-white dark:bg-dark-background-card rounded-xl p-6 border border-[#EDF0FB] dark:border-gray-700 transition-colors">
-              <h3 className="text-xl font-bold text-text-primary dark:text-dark-text-primary mb-4">You'll Learn</h3>
-              <ul className="space-y-3">
-                <li className="flex items-start gap-3">
-                  <span className="text-brand-primary mt-1">✓</span>
-                  <span className="text-text-primary dark:text-dark-text-primary">Key concepts and practical applications</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="text-brand-primary mt-1">✓</span>
-                  <span className="text-text-primary dark:text-dark-text-primary">Live Q&A with {instructorName}</span>
-                </li>
-              </ul>
-            </div>
           </div>
 
           {/* Sidebar */}
