@@ -37,7 +37,6 @@ interface Coach {
   studentsCount: number;
   coursesCount: number;
   rating: number;
-  ratingIsHardcoded?: boolean;
 }
 
 export interface CourseDisplay {
@@ -183,41 +182,27 @@ export const useCourse = (courseId: string | undefined) => {
 
           // 3. Fetch Coach Extra Details
           let coachDetails: Coach | null = null;
-          console.log("[useCourse] Course coach_id:", courseData.coach_id);
-
           if (courseData.coach_id) {
-            // First get basic profile
-            const { data: coachProfile, error: profileError } = await supabase
+            const { data: coachProfile } = await supabase
               .from("profiles")
               .select("id, first_name, last_name, email, role")
               .eq("id", courseData.coach_id)
               .single();
 
-            console.log("[useCourse] Coach profile result:", coachProfile, "Error:", profileError);
-
             if (coachProfile) {
-              // Get extended coach profile (may not exist)
-              const { data: coachProfileExt, error: coachExtError } = await supabase
+              const { data: coachProfileExt } = await supabase
                 .from("coach_profiles")
                 .select("*")
                 .eq("id", courseData.coach_id)
                 .maybeSingle();
 
-              console.log("[useCourse] Coach extended profile:", coachProfileExt, "Error:", coachExtError);
-
-              // Fetch real course count for this coach
-              const { count: coursesCount } = await supabase
+              const { count: coursesCount, data: coachCourses } = await supabase
                 .from("courses")
-                .select("*", { count: "exact", head: true })
-                .eq("coach_id", courseData.coach_id);
-
-              // Fetch real student count (enrollments across all coach's courses)
-              const { data: coachCourses } = await supabase
-                .from("courses")
-                .select("id")
+                .select("id", { count: "exact" })
                 .eq("coach_id", courseData.coach_id);
 
               let studentsCount = 0;
+              let coachAvgRating = 0;
               if (coachCourses && coachCourses.length > 0) {
                 const courseIds = coachCourses.map(c => c.id);
                 const { count: enrollmentCount } = await supabase
@@ -225,6 +210,17 @@ export const useCourse = (courseId: string | undefined) => {
                   .select("*", { count: "exact", head: true })
                   .in("course_id", courseIds);
                 studentsCount = enrollmentCount || 0;
+
+                // Real coach rating: avg of all reviews across their courses
+                const { data: coachReviews } = await supabase
+                  .from("reviews")
+                  .select("rating")
+                  .in("course_id", courseIds);
+                if (coachReviews && coachReviews.length > 0) {
+                  coachAvgRating = Math.round(
+                    (coachReviews.reduce((sum, r) => sum + r.rating, 0) / coachReviews.length) * 10
+                  ) / 10;
+                }
               }
 
               coachDetails = {
@@ -238,17 +234,11 @@ export const useCourse = (courseId: string | undefined) => {
                 tools: coachProfileExt?.tools || [],
                 linkedinUrl: coachProfileExt?.linkedin_url || undefined,
                 portfolioUrl: coachProfileExt?.portfolio_url || undefined,
-                studentsCount: studentsCount,
+                studentsCount,
                 coursesCount: coursesCount || 0,
-                rating: 4.9,
-                ratingIsHardcoded: true,
+                rating: coachAvgRating,
               };
-            } else {
-              // Profile not found but coach_id exists - create minimal coach from ID
-              console.warn("[useCourse] Coach profile not found for ID:", courseData.coach_id);
             }
-          } else {
-            console.log("[useCourse] Course has no coach_id assigned");
           }
 
           // 3b. Fetch Category name

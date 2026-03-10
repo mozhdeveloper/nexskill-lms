@@ -72,11 +72,11 @@ const CourseStudents: React.FC = () => {
         }
 
         // 5. Lesson progress per student
-        let progressRows: { user_id: string; is_completed: boolean }[] = [];
+        let progressRows: { user_id: string; is_completed: boolean; updated_at?: string }[] = [];
         if (lessonIds.length) {
           const { data } = await supabase
             .from('user_lesson_progress')
-            .select('user_id, is_completed')
+            .select('user_id, is_completed, updated_at')
             .in('user_id', studentIds)
             .in('lesson_id', lessonIds);
           progressRows = data || [];
@@ -116,9 +116,17 @@ const CourseStudents: React.FC = () => {
             ? Math.round(aRows.reduce((s, r) => s + (r.max_score > 0 ? (r.score / r.max_score) * 100 : 0), 0) / aRows.length)
             : 0;
 
-          const lastActive = new Date(p.updated_at || new Date());
+          // Use most recent lesson progress update as true last activity
+          const studentProgress = pRows.filter(r => r.updated_at);
+          const lastProgressDate = studentProgress.length > 0
+            ? new Date(studentProgress.sort((a, b) =>
+                new Date(b.updated_at!).getTime() - new Date(a.updated_at!).getTime()
+              )[0].updated_at!)
+            : null;
+          const lastActive = lastProgressDate || new Date(enr?.enrolled_at || new Date());
           const diffDays = Math.floor((Date.now() - lastActive.getTime()) / 86400000);
-          const lastActiveStr = diffDays === 0 ? 'Today'
+          const lastActiveStr = !lastProgressDate ? 'No activity'
+            : diffDays === 0 ? 'Today'
             : diffDays === 1 ? '1 day ago'
             : diffDays < 7 ? `${diffDays} days ago`
             : lastActive.toLocaleDateString();

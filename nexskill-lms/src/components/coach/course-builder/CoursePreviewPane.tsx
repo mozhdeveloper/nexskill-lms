@@ -6,6 +6,7 @@ interface CoursePreviewPaneProps {
     courseDescription?: string;
     instructorName?: string;
     learningObjectives?: string[];
+    updatedAt?: string;
 }
 
 const CoursePreviewPane: React.FC<CoursePreviewPaneProps> = ({
@@ -13,7 +14,8 @@ const CoursePreviewPane: React.FC<CoursePreviewPaneProps> = ({
     courseSubtitle,
     courseDescription,
     instructorName = "Instructor",
-    learningObjectives
+    learningObjectives,
+    updatedAt
 }) => {
     return (
         <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-lg border border-slate-100 dark:border-gray-700 overflow-hidden">
@@ -34,7 +36,7 @@ const CoursePreviewPane: React.FC<CoursePreviewPaneProps> = ({
                             <span>Created by {instructorName}</span>
                         </div>
                         <span>•</span>
-                        <span>Last updated {new Date().toLocaleDateString()}</span>
+                        {updatedAt && <span>Last updated {new Date(updatedAt).toLocaleDateString()}</span>}
                     </div>
                 </div>
             </div>

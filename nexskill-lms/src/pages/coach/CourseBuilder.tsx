@@ -75,6 +75,8 @@ const CourseBuilder: React.FC = () => {
   const [adminFeedback, setAdminFeedback] = useState<string>("");
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [instructorName, setInstructorName] = useState<string>("Instructor");
+  const [courseUpdatedAt, setCourseUpdatedAt] = useState<string | undefined>(undefined);
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
   // Settings state
   const [settings, setSettings] = useState<CourseSettings>({
@@ -135,6 +137,7 @@ const CourseBuilder: React.FC = () => {
 
         setCourseStatus(courseData.verification_status === 'approved' ? "published" : "draft");
         setVerificationStatus(courseData.verification_status || "draft");
+        setCourseUpdatedAt(courseData.updated_at);
 
         // Initialize pricing from DB
         const dbPrice = courseData.price ?? 0;
@@ -231,6 +234,13 @@ const CourseBuilder: React.FC = () => {
     };
     fetchCourse();
   }, [courseId]);
+
+  // Auto-dismiss toast
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   // Clean up timeout on component unmount
   useEffect(() => {
@@ -409,7 +419,7 @@ const CourseBuilder: React.FC = () => {
     try {
       resolvedModuleId = await resolveModuleId(moduleId);
     } catch (error) {
-      alert(`Error resolving module: ${(error as Error).message}`);
+      setToast({ msg: `Error resolving module: ${(error as Error).message}`, type: 'error' });
       return;
     }
 
@@ -427,7 +437,7 @@ const CourseBuilder: React.FC = () => {
         });
 
       if (unlinkError) {
-        alert(`Error unlinking ${itemName}: ${unlinkError.message}`);
+        setToast({ msg: `Error unlinking ${itemName}: ${unlinkError.message}`, type: 'error' });
         return;
       }
 
@@ -435,7 +445,7 @@ const CourseBuilder: React.FC = () => {
       const { error: deletionError } = await supabase.from(table).delete().eq("id", contentId);
 
       if (deletionError) {
-        alert(`Error deleting ${itemName}: ${deletionError.message}`);
+        setToast({ msg: `Error deleting ${itemName}: ${deletionError.message}`, type: 'error' });
         return;
       }
 
@@ -450,7 +460,7 @@ const CourseBuilder: React.FC = () => {
       });
       setCurriculum(updatedCurriculum);
     } catch (err) {
-      alert(`An unexpected error occurred while deleting the ${itemName}`);
+      setToast({ msg: `An unexpected error occurred while deleting the ${itemName}`, type: 'error' });
     }
   };
 
@@ -459,7 +469,7 @@ const CourseBuilder: React.FC = () => {
     try {
       resolvedModuleId = await resolveModuleId(moduleId);
     } catch (error) {
-      alert(`Error resolving module: ${(error as Error).message}`);
+      setToast({ msg: `Error resolving module: ${(error as Error).message}`, type: 'error' });
       return;
     }
 
@@ -477,7 +487,7 @@ const CourseBuilder: React.FC = () => {
       ]);
 
       if (lessonError) {
-        alert(`Error adding lesson: ${lessonError.message}`);
+        setToast({ msg: `Error adding lesson: ${lessonError.message}`, type: 'error' });
         return;
       }
 
@@ -502,7 +512,7 @@ const CourseBuilder: React.FC = () => {
 
       if (linkError) {
         await supabase.from("lessons").delete().eq("id", lessonId);
-        alert(`Error linking lesson: ${linkError.message}`);
+        setToast({ msg: `Error linking lesson: ${linkError.message}`, type: 'error' });
         return;
       }
 
@@ -515,7 +525,7 @@ const CourseBuilder: React.FC = () => {
       });
       setCurriculum(updatedCurriculum);
     } catch (err) {
-      alert("An unexpected error occurred while adding the lesson");
+      setToast({ msg: 'An unexpected error occurred while adding the lesson', type: 'error' });
     }
   };
 
@@ -531,7 +541,7 @@ const CourseBuilder: React.FC = () => {
     try {
       resolvedModuleId = await resolveModuleId(moduleId);
     } catch (error) {
-      alert(`Error resolving module: ${(error as Error).message}`);
+      setToast({ msg: `Error resolving module: ${(error as Error).message}`, type: 'error' });
       return;
     }
 
@@ -588,7 +598,7 @@ const CourseBuilder: React.FC = () => {
         setCurriculum(prev => prev.map(m => m.id === moduleId ? { ...m, lessons: sortedContent } : m));
       }
     } catch (err) {
-      alert(`An unexpected error occurred while moving the ${contentType}`);
+      setToast({ msg: `An unexpected error occurred while moving the ${contentType}`, type: 'error' });
     }
   };
 
@@ -667,7 +677,7 @@ const CourseBuilder: React.FC = () => {
       }
     } catch (error) {
       console.error("Error creating module:", error);
-      alert("Failed to create module");
+      setToast({ msg: 'Failed to create module', type: 'error' });
     }
   };
 
@@ -685,7 +695,7 @@ const CourseBuilder: React.FC = () => {
       setCurriculum(curriculum.filter(m => m.id !== moduleId));
     } catch (error) {
       console.error("Error deleting module:", error);
-      alert("Failed to delete module");
+      setToast({ msg: 'Failed to delete module', type: 'error' });
     }
   };
 
@@ -723,7 +733,7 @@ const CourseBuilder: React.FC = () => {
       setCurriculum(curriculum.map((m) => m.id === moduleId ? { ...m, lessons: [...m.lessons, newQuizItem] } : m));
       setEditingQuiz({ moduleId, quiz: newQuiz, questions: [] });
     } catch (err) {
-      alert("Error adding quiz");
+      setToast({ msg: 'Error adding quiz', type: 'error' });
     }
   };
 
@@ -747,7 +757,7 @@ const CourseBuilder: React.FC = () => {
       setEditingQuiz({ ...editingQuiz, quiz: updatedQuiz });
     } catch (err) {
       console.error("Error saving quiz:", err);
-      alert("Error saving quiz");
+      setToast({ msg: 'Error saving quiz', type: 'error' });
     }
   };
 
@@ -798,34 +808,33 @@ const CourseBuilder: React.FC = () => {
   const handleCloseQuizEditor = () => setEditingQuiz(null);
 
   const handlePublish = async () => {
+    // Only set visibility — verification_status is set exclusively by admin
+    if (verificationStatus !== 'approved') return;
     try {
       const { error } = await supabase.from('courses').update({
-        verification_status: 'approved',
         visibility: 'public',
         updated_at: new Date().toISOString(),
       }).eq('id', courseId);
       if (error) throw error;
-      setVerificationStatus('approved');
-      setCourseStatus("published");
-      alert("Course Published Successfully!");
+      setCourseStatus('published');
+      setToast({ msg: 'Course published successfully!', type: 'success' });
     } catch (error: any) {
-      alert(`Failed to publish: ${error.message}`);
+      setToast({ msg: `Failed to publish: ${error.message}`, type: 'error' });
     }
   };
 
   const handleUnpublish = async () => {
+    // Only set visibility — preserve admin-approved verification_status
     try {
       const { error } = await supabase.from('courses').update({
-        verification_status: 'draft',
         visibility: 'private',
         updated_at: new Date().toISOString(),
       }).eq('id', courseId);
       if (error) throw error;
-      setVerificationStatus('draft');
-      setCourseStatus("draft");
-      alert("Course Unpublished.");
+      setCourseStatus('draft');
+      setToast({ msg: 'Course unpublished.', type: 'success' });
     } catch (error: any) {
-      alert(`Failed to unpublish: ${error.message}`);
+      setToast({ msg: `Failed to unpublish: ${error.message}`, type: 'error' });
     }
   };
 
@@ -843,15 +852,14 @@ const CourseBuilder: React.FC = () => {
       const { error } = await supabase.from('courses').update({ verification_status: 'pending_review' }).eq('id', courseId);
       if (error) throw error;
       setVerificationStatus('pending_review');
-      alert("Course submitted for review successfully!");
+      setToast({ msg: 'Course submitted for review successfully!', type: 'success' });
     } catch (error: any) {
-      alert(`Failed to submit: ${error.message}`);
+      setToast({ msg: `Failed to submit: ${error.message}`, type: 'error' });
     }
   };
 
   const handleDeleteCourse = async () => {
     if (!courseId) return;
-    if (!window.confirm('Are you sure you want to delete this course? This action cannot be undone.')) return;
     try {
       // Clean up related data before deleting the course
       const { data: mods } = await supabase.from('modules').select('id').eq('course_id', courseId);
@@ -871,7 +879,7 @@ const CourseBuilder: React.FC = () => {
       if (error) throw error;
       navigate('/coach/courses');
     } catch (error) {
-      alert('Failed to delete course. Please try again.');
+      setToast({ msg: 'Failed to delete course. Please try again.', type: 'error' });
     }
   };
 
@@ -896,12 +904,19 @@ const CourseBuilder: React.FC = () => {
         updated_at: new Date().toISOString(),
       }).eq("id", courseId);
 
-      // Topic Sync Logic omitted for brevity but should be here similar to original
+      // Sync course topics
+      await supabase.from('course_topics').delete().eq('course_id', courseId);
+      if (settings.topics && settings.topics.length > 0) {
+        await supabase.from('course_topics').insert(
+          settings.topics.map((topicId: number) => ({ course_id: courseId, topic_id: topicId }))
+        );
+      }
 
       setCourseStatus(settings.visibility === "public" ? "published" : "draft");
-      alert("Settings saved successfully");
+      setCourseUpdatedAt(new Date().toISOString());
+      setToast({ msg: 'Settings saved successfully', type: 'success' });
     } catch (error) {
-      alert("Failed to save settings");
+      setToast({ msg: 'Failed to save settings', type: 'error' });
     }
   };
 
@@ -921,10 +936,10 @@ const CourseBuilder: React.FC = () => {
       });
 
       await Promise.all(updates);
-      alert("Drip schedule saved successfully!");
+      setToast({ msg: 'Drip schedule saved successfully!', type: 'success' });
     } catch (error) {
       console.error("Error saving drip schedule:", error);
-      alert("Failed to save drip schedule");
+      setToast({ msg: 'Failed to save drip schedule', type: 'error' });
     }
   };
 
@@ -985,6 +1000,7 @@ const CourseBuilder: React.FC = () => {
             courseSubtitle={settings.subtitle}
             courseDescription={settings.longDescription}
             instructorName={instructorName}
+            updatedAt={courseUpdatedAt}
           />
         );
       default:
@@ -1048,6 +1064,27 @@ const CourseBuilder: React.FC = () => {
         onConfirm={handleDeleteCourse}
         courseName={settings.title}
       />
+
+      {/* Inline toast notification */}
+      {toast && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-2xl shadow-xl text-white text-sm font-medium transition-all ${
+            toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+          }`}
+        >
+          {toast.type === 'success' ? (
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          )}
+          <span>{toast.msg}</span>
+          <button onClick={() => setToast(null)} className="ml-2 opacity-70 hover:opacity-100 text-lg leading-none">&times;</button>
+        </div>
+      )}
     </CoachAppLayout>
   );
 };

@@ -60,23 +60,13 @@ const CourseDetailContent: React.FC<CourseDetailContentProps> = ({
         </div>
       )}
 
-      {/* Information about hidden features */}
-      <div className="mt-8 p-6 bg-blue-50 dark:bg-gray-800 rounded-2xl border border-blue-200 dark:border-gray-700">
-        <h4 className="font-semibold text-text-primary dark:text-dark-text-primary mb-2 flex items-center gap-2">
-          <span>🚧</span>
-          <span>Course Content Under Development</span>
-        </h4>
-        <p className="text-sm text-text-secondary dark:text-dark-text-secondary mb-3">
-          Lessons, quizzes, and detailed curriculum are currently being prepared
-          by the instructor.
-        </p>
-        {isEnrolled && (
+      {isEnrolled && (
+        <div className="mt-4 p-4 bg-[#F5F7FF] dark:bg-gray-800 rounded-2xl border border-[#EDF0FB] dark:border-gray-700">
           <p className="text-sm text-brand-primary font-medium">
-            💬 Meanwhile, join the Course Circle to connect with other enrolled
-            students and the instructor!
+            💬 Join the Course Circle to connect with other enrolled students and the instructor!
           </p>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

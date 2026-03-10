@@ -61,9 +61,10 @@ const CourseCreate: React.FC = () => {
             title: formData.title,
             category_id: formData.category_id ? parseInt(formData.category_id) : null,
             level: formData.level,
-            duration_hours: 0, // Default for now, can be updated later
-            price: 0, // Default for now
-            visibility: 'private', // Default to private (Draft)
+            language: formData.language,
+            duration_hours: 0,
+            price: 0,
+            visibility: 'private',
             coach_id: profile.id,
           },
         ])
