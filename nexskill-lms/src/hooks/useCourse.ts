@@ -86,24 +86,45 @@ export const useCourse = (courseId: string | undefined) => {
         }
 
         if (courseData) {
-          // 2. Fetch Curriculum (Modules -> ModuleContentItems -> Lessons/Quizzes)
+          console.log("[useCourse] Course data loaded:", courseData.id, courseData.title);
+          
+          // 2. Fetch ALL modules first (for debugging - remove is_published filter)
+          const { data: allModulesData, error: modulesError } = await supabase
+            .from("modules")
+            .select("id, title, position, is_published, course_id")
+            .eq("course_id", courseId)
+            .order("position", { ascending: true });
+          
+          console.log("[useCourse] All modules (including unpublished):", allModulesData);
+          console.log("[useCourse] Modules error:", modulesError);
+
+          // Now fetch only published modules
           const { data: modulesData } = await supabase
             .from("modules")
             .select("id, title, position")
             .eq("course_id", courseId)
             .eq("is_published", true)
             .order("position", { ascending: true });
+          
+          console.log("[useCourse] Published modules only:", modulesData);
 
           let curriculum: Module[] = [];
           if (modulesData && modulesData.length > 0) {
+            console.log("[useCourse] Found", modulesData.length, "published modules");
+            
             // Retrieve all module items for these modules
             const moduleIds = modulesData.map((m) => m.id);
-            const { data: itemsData } = await supabase
+            console.log("[useCourse] Module IDs:", moduleIds);
+            
+            const { data: itemsData, error: itemsError } = await supabase
               .from("module_content_items")
               .select("module_id, content_id, content_type, position")
               .in("module_id", moduleIds)
               .eq("is_published", true)
               .order("position", { ascending: true });
+
+            console.log("[useCourse] Content items data:", itemsData);
+            console.log("[useCourse] Content items error:", itemsError);
 
             if (itemsData && itemsData.length > 0) {
               // Separate IDs by type to fetch details

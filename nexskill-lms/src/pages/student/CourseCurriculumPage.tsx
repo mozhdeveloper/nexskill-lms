@@ -12,9 +12,18 @@ import type { ModuleWithContent, ContentItem } from '../../hooks/useCourseCurric
 const CourseCurriculumPage: React.FC = () => {
     const { courseId } = useParams<{ courseId: string }>();
     const navigate = useNavigate();
+    
+    // Debug: Log courseId and page load
+    console.log('[CourseCurriculumPage] courseId from params:', courseId);
+    
     const { course, modules, totalLessons, totalQuizzes, totalDurationMinutes, loading, error } = useCourseCurriculum(courseId);
     const [expandedModules, setExpandedModules] = useState<string[]>([]);
     const [isEnrolled, setIsEnrolled] = useState<boolean | null>(null);
+    
+    // Debug: Log curriculum data
+    useEffect(() => {
+        console.log('[CourseCurriculumPage] Curriculum data:', { course, modules, loading, error, isEnrolled });
+    }, [course, modules, loading, error, isEnrolled]);
 
     useEffect(() => {
         if (!courseId) return;

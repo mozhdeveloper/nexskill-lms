@@ -237,11 +237,12 @@ const CourseBuilder: React.FC = () => {
         const validModules = updatedCurriculum.filter(m => !m.id.startsWith('module-'));
         if (validModules.length === 0) return;
 
-        const updates = validModules.map(m => ({
+        const updates = validModules.map((m, index) => ({
           id: m.id,
           title: m.title,
           is_sequential: m.is_sequential,
           course_id: courseId,
+          position: m.position ?? index,
         }));
 
         const { error } = await supabase.from('modules').upsert(updates);
@@ -351,7 +352,6 @@ const CourseBuilder: React.FC = () => {
     const lessonId = uuidv4();
     
     try {
-      // Create the lesson in the database first with all content blocks
       const { error: lessonError } = await supabase.from("lessons").insert([{
         id: lessonId, 
         title: newLesson.title || "Untitled Lesson", 
@@ -366,7 +366,6 @@ const CourseBuilder: React.FC = () => {
         return; 
       }
 
-      // Get the max position for this module
       const { data: maxPositionData } = await supabase
         .from("module_content_items")
         .select("position")
@@ -378,7 +377,6 @@ const CourseBuilder: React.FC = () => {
         ? maxPositionData[0].position + 1 
         : 0;
 
-      // Link the lesson to the module
       const { error: linkError } = await supabase
         .from("module_content_items")
         .insert([{
@@ -390,13 +388,11 @@ const CourseBuilder: React.FC = () => {
         }]);
 
       if (linkError) {
-        // Rollback: delete the lesson if linking fails
         await supabase.from("lessons").delete().eq("id", lessonId);
         alert(`Error linking lesson: ${linkError.message}`);
         return;
       }
 
-      // Create the content item with the real database ID
       const updatedNewLesson: ContentItem = { 
         ...newLesson, 
         id: lessonId, 
@@ -405,7 +401,6 @@ const CourseBuilder: React.FC = () => {
         content_blocks: newLesson.content_blocks || []
       };
       
-      // Update the curriculum state
       setCurriculum(curriculum.map((m) =>
         m.id === moduleId ? { ...m, lessons: [...m.lessons, updatedNewLesson] } : m
       ));
@@ -513,7 +508,6 @@ const CourseBuilder: React.FC = () => {
   const handleSaveLesson = async (updatedLesson: Lesson) => {
     if (!editingLesson || !updatedLesson.id) return;
 
-    // Update local state immediately
     setEditingLesson({ ...editingLesson, lesson: updatedLesson });
     setCurriculum(curriculum.map((mod) =>
       mod.id === editingLesson.moduleId
@@ -526,29 +520,25 @@ const CourseBuilder: React.FC = () => {
 
     if (saveLessonTimeoutRef.current) clearTimeout(saveLessonTimeoutRef.current);
 
-    saveLessonTimeoutRef.current = setTimeout(async () => {
-      try {
-        // Save the lesson with its content blocks
-        const { error } = await supabase.from("lessons").upsert({
-          id: updatedLesson.id, 
-          title: updatedLesson.title, 
-          description: updatedLesson.description,
-          content_blocks: updatedLesson.content_blocks || [],
-          estimated_duration_minutes: updatedLesson.estimated_duration_minutes, 
-          is_published: updatedLesson.is_published,
-        }, { onConflict: "id" });
-        
-        if (error) throw error;
+    try {
+      const { error } = await supabase.from("lessons").upsert({
+        id: updatedLesson.id, 
+        title: updatedLesson.title, 
+        description: updatedLesson.description,
+        content_blocks: updatedLesson.content_blocks || [],
+        estimated_duration_minutes: updatedLesson.estimated_duration_minutes, 
+        is_published: updatedLesson.is_published,
+      }, { onConflict: "id" });
+      
+      if (error) throw error;
 
-        await supabase.from("module_content_items").update({ is_published: updatedLesson.is_published })
-          .match({ module_id: editingLesson.moduleId, content_id: updatedLesson.id, content_type: "lesson" });
-      } catch (err) {
-        console.error("Error saving lesson:", err);
-      }
-    }, 1000);
+      await supabase.from("module_content_items").update({ is_published: updatedLesson.is_published })
+        .match({ module_id: editingLesson.moduleId, content_id: updatedLesson.id, content_type: "lesson" });
+    } catch (err) {
+      console.error("Error saving lesson:", err);
+    }
   };
 
-  // Handle updating lesson title directly
   const handleUpdateLessonTitle = async (moduleId: string, lessonId: string, title: string) => {
     if (!lessonId || lessonId.startsWith('lesson-')) return;
     
@@ -566,7 +556,6 @@ const CourseBuilder: React.FC = () => {
     }
   };
 
-  // NEW: Handle updating lesson content blocks (videos/quizzes)
   const handleUpdateLessonContent = async (moduleId: string, lessonId: string, contentBlocks: any[]) => {
     if (!lessonId || lessonId.startsWith('lesson-')) return;
     
@@ -584,6 +573,40 @@ const CourseBuilder: React.FC = () => {
       }
     } catch (err) {
       console.error("Error in handleUpdateLessonContent:", err);
+    }
+  };
+
+  const handleSaveVideoBlock = async (moduleId: string, lessonId: string, videoUrl: string) => {
+    try {
+      const module = curriculum.find(m => m.id === moduleId);
+      const lesson = module?.lessons.find(l => l.id === lessonId);
+      
+      if (!lesson) {
+        console.error("[CourseBuilder] Lesson not found:", lessonId);
+        return;
+      }
+
+      const currentBlocks = (lesson as any).content_blocks || [];
+      const newBlock = {
+        id: crypto.randomUUID(),
+        type: "video",
+        content: videoUrl,
+        position: currentBlocks.length,
+        title: "",
+      };
+      const updatedBlocks = [...currentBlocks, newBlock];
+
+      const { error } = await supabase.from("lessons").update({
+        content_blocks: updatedBlocks,
+        updated_at: new Date().toISOString(),
+      }).eq("id", lessonId);
+
+      if (error) {
+        console.error("[CourseBuilder] Error saving video block:", error);
+        alert(`Failed to save video: ${error.message}`);
+      }
+    } catch (err) {
+      console.error("[CourseBuilder] Error saving video block:", err);
     }
   };
 
@@ -860,6 +883,7 @@ const CourseBuilder: React.FC = () => {
             onDeleteModule={handleDeleteModule}
             onUpdateLessonTitle={handleUpdateLessonTitle}
             onUpdateLessonContent={handleUpdateLessonContent}
+            onSaveVideoBlock={handleSaveVideoBlock}
           />
         );
       case "live-sessions":

@@ -355,18 +355,81 @@ const CourseModerationPage: React.FC = () => {
   const handleApprove = async (courseId: string) => {
     try {
       const { supabase } = await import('../../lib/supabaseClient');
-      const { error } = await supabase
+      
+      // 1. Approve the course
+      const { error: courseError } = await supabase
         .from('courses')
         .update({ verification_status: 'approved' })
         .eq('id', courseId);
 
-      if (error) throw error;
+      if (courseError) throw courseError;
+
+      // 2. Publish all modules for this course
+      const { error: modulesError } = await supabase
+        .from('modules')
+        .update({ is_published: true })
+        .eq('course_id', courseId);
+
+      if (modulesError) {
+        console.error('Error publishing modules:', modulesError);
+        // Continue anyway - modules error is not critical
+      }
+
+      // 3. Get all module IDs for this course
+      const { data: modulesData } = await supabase
+        .from('modules')
+        .select('id')
+        .eq('course_id', courseId);
+
+      if (modulesData && modulesData.length > 0) {
+        const moduleIds = modulesData.map(m => m.id);
+
+        // 4. Publish all module_content_items
+        const { error: itemsError } = await supabase
+          .from('module_content_items')
+          .update({ is_published: true })
+          .in('module_id', moduleIds);
+
+        if (itemsError) {
+          console.error('Error publishing content items:', itemsError);
+        }
+
+        // 5. Publish all lessons in this course
+        const { data: lessonContentItems } = await supabase
+          .from('module_content_items')
+          .select('content_id')
+          .in('module_id', moduleIds)
+          .eq('content_type', 'lesson');
+
+        if (lessonContentItems && lessonContentItems.length > 0) {
+          const lessonIds = lessonContentItems.map(l => l.content_id);
+          await supabase
+            .from('lessons')
+            .update({ is_published: true })
+            .in('id', lessonIds);
+        }
+
+        // 6. Publish all quizzes in this course
+        const { data: quizContentItems } = await supabase
+          .from('module_content_items')
+          .select('content_id')
+          .in('module_id', moduleIds)
+          .eq('content_type', 'quiz');
+
+        if (quizContentItems && quizContentItems.length > 0) {
+          const quizIds = quizContentItems.map(q => q.content_id);
+          await supabase
+            .from('quizzes')
+            .update({ is_published: true })
+            .in('id', quizIds);
+        }
+      }
 
       // Refresh list
       const updatedCourses = activeCourses.filter(c => c.id !== courseId);
       setActiveCourses(updatedCourses);
 
-      window.alert(`✅ Course Approved & Published\n\nCourse ID: ${courseId}\n\nStatus updated to Approved.`);
+      window.alert(`✅ Course Approved & Published\n\nCourse ID: ${courseId}\n\nAll modules, lessons, and quizzes have been published.`);
     } catch (error) {
       console.error('Error approving course:', error);
       window.alert('Failed to approve course');
