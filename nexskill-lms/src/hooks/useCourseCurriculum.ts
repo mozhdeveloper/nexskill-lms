@@ -75,23 +75,29 @@ export const useCourseCurriculum = (courseId: string | undefined) => {
                 setLoading(true);
                 setError(null);
 
+                console.log('[Curriculum] Fetching data for courseId:', courseId);
+
                 // 1. Fetch course info
                 const { data: courseData, error: courseError } = await supabase
                     .from('courses')
-                    .select('id, title, subtitle, short_description, level, duration_hours')
+                    .select('*')
                     .eq('id', courseId)
                     .single();
+                
+                console.log('[Curriculum] Course data:', courseData);
+                console.log('[Curriculum] Course error:', courseError);
 
                 if (courseError) throw courseError;
 
-                // 2. Fetch all PUBLISHED modules for this course (ordered by position)
-                // Only show published modules to students
+                // 2. Fetch all modules for this course (try without is_published filter first for debugging)
                 const { data: modulesData, error: modulesError } = await supabase
                     .from('modules')
-                    .select('id, title, description, position, is_published')
+                    .select('id, title, description, position, is_published, course_id')
                     .eq('course_id', courseId)
-                    .eq('is_published', true)
                     .order('position', { ascending: true });
+
+                console.log('[Curriculum] Modules data (all):', modulesData);
+                console.log('[Curriculum] Modules error:', modulesError);
 
                 if (modulesError) throw modulesError;
 
@@ -102,27 +108,35 @@ export const useCourseCurriculum = (courseId: string | undefined) => {
                 let totalDurationMinutes = 0;
 
                 for (const module of modulesData || []) {
-                    // Fetch PUBLISHED content items for this module
+                    console.log('[Curriculum] Fetching content for module:', module.id, module.title);
+
+                    // Fetch content items for this module (without is_published filter for debugging)
                     const { data: contentItems, error: contentError } = await supabase
                         .from('module_content_items')
                         .select('id, content_type, content_id, position, is_published')
                         .eq('module_id', module.id)
-                        .eq('is_published', true)
                         .order('position', { ascending: true });
+
+                    console.log('[Curriculum] Content items for module:', contentItems);
+                    console.log('[Curriculum] Content error:', contentError);
 
                     if (contentError) throw contentError;
 
                     const items: ContentItem[] = [];
 
                     for (const item of contentItems || []) {
+                        console.log('[Curriculum] Processing content item:', item);
+
                         if (item.content_type === 'lesson') {
-                            // Fetch PUBLISHED lesson details
+                            // Fetch lesson details (without is_published filter for debugging)
                             const { data: lesson, error: lessonError } = await supabase
                                 .from('lessons')
                                 .select('id, title, description, estimated_duration_minutes, is_published')
                                 .eq('id', item.content_id)
-                                .eq('is_published', true)
                                 .single();
+
+                            console.log('[Curriculum] Lesson data:', lesson);
+                            console.log('[Curriculum] Lesson error:', lessonError);
 
                             if (!lessonError && lesson) {
                                 items.push({
@@ -133,13 +147,15 @@ export const useCourseCurriculum = (courseId: string | undefined) => {
                                 totalDurationMinutes += lesson.estimated_duration_minutes || 0;
                             }
                         } else if (item.content_type === 'quiz') {
-                            // Fetch PUBLISHED quiz details
+                            // Fetch quiz details (without is_published filter for debugging)
                             const { data: quiz, error: quizError } = await supabase
                                 .from('quizzes')
                                 .select('id, title, description, passing_score, time_limit_minutes, is_published')
                                 .eq('id', item.content_id)
-                                .eq('is_published', true)
                                 .single();
+
+                            console.log('[Curriculum] Quiz data:', quiz);
+                            console.log('[Curriculum] Quiz error:', quizError);
 
                             if (!quizError && quiz) {
                                 items.push({
@@ -158,6 +174,8 @@ export const useCourseCurriculum = (courseId: string | undefined) => {
                     });
                 }
 
+                console.log('[Curriculum] Final modules with content:', modulesWithContent);
+
                 setData({
                     course: courseData,
                     modules: modulesWithContent,
@@ -175,6 +193,8 @@ export const useCourseCurriculum = (courseId: string | undefined) => {
 
         fetchCurriculum();
     }, [courseId]);
+
+    
 
     return { ...data, loading, error };
 };

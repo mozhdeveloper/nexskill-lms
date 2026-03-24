@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 interface Lesson {
@@ -29,12 +29,16 @@ const CourseCurriculumTab: React.FC<CourseCurriculumTabProps> = ({
     completedLessonIds = new Set(),
     completedQuizIds = new Set(),
 }) => {
+
+    useEffect(()=>{
+        console.log(curriculum)
+    },[])
     const navigate = useNavigate();
     // Default to expanding the first module
     const [expandedModules, setExpandedModules] = useState<string[]>(
         curriculum.length > 0 ? [curriculum[0].id] : []
     );
-
+    console.log(`debug = ${expandedModules}`)
     const toggleModule = (moduleId: string) => {
         setExpandedModules((prev) =>
             prev.includes(moduleId)
