@@ -8,12 +8,12 @@ import CurriculumEditor from "../../components/coach/course-builder/CurriculumEd
 import DripSchedulePanel from "../../components/coach/course-builder/DripSchedulePanel";
 import CoursePricingForm from "../../components/coach/course-builder/CoursePricingForm";
 import CoursePublishWorkflow from "../../components/coach/course-builder/CoursePublishWorkflow";
-import CoursePreviewPane from "../../components/coach/course-builder/CoursePreviewPane"; // Added import for Preview
+import CoursePreviewPane from "../../components/coach/course-builder/CoursePreviewPane";
 import DeleteCourseModal from "../../components/courses/DeleteCourseModal";
 import LessonEditorPanel from "../../components/coach/lesson-editor/LessonEditorPanel";
 import LiveSessionManager from "../../components/coach/live-sessions/LiveSessionManager";
 import QuizEditorPanel from "../../components/quiz/QuizEditorPanel";
-import CourseGoalsPanel from "../../components/coach/course-builder/CourseGoalsPanel"; // Added import
+import CourseGoalsPanel from "../../components/coach/course-builder/CourseGoalsPanel";
 import type { Lesson, Module } from "../../types/lesson";
 import type { Quiz, QuizQuestion } from "../../types/quiz";
 import type { ContentItem } from "../../types/content-item";
@@ -63,9 +63,9 @@ const CourseBuilder: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Ref to hold the timeout ID for debouncing
   const saveQuizQuestionsTimeoutRef = useRef<any>(null);
   const saveLessonTimeoutRef = useRef<any>(null);
+  const saveCurriculumTimeoutRef = useRef<any>(null);
 
   const initialData = location.state as CourseSettings | undefined;
 
@@ -76,7 +76,6 @@ const CourseBuilder: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [instructorName, setInstructorName] = useState<string>("Instructor");
 
-  // Settings state
   const [settings, setSettings] = useState<CourseSettings>({
     title: initialData?.title || "",
     subtitle: initialData?.subtitle || "",
@@ -94,7 +93,6 @@ const CourseBuilder: React.FC = () => {
     const fetchCourse = async () => {
       if (!courseId) return;
 
-      // Fetch current user for instructor name
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profile } = await supabase.from('profiles').select('first_name, last_name').eq('id', user.id).single();
@@ -105,14 +103,12 @@ const CourseBuilder: React.FC = () => {
 
       const { data: courseData, error: courseError } = await supabase
         .from("courses")
-        .select(
-          `
+        .select(`
           *,
           category:categories(name),
           course_topics(topic_id),
           admin_verification_feedback(content, created_at, is_resolved)
-        `
-        )
+        `)
         .eq("id", courseId)
         .single();
 
@@ -136,27 +132,16 @@ const CourseBuilder: React.FC = () => {
         setCourseStatus(courseData.verification_status === 'approved' ? "published" : "draft");
         setVerificationStatus(courseData.verification_status || "draft");
 
-        // Initialize pricing from DB
         const dbPrice = courseData.price ?? 0;
-        const pricingMode: 'free' | 'one-time' | 'subscription' =
-          dbPrice === 0 ? 'free' : 'one-time';
-        setPricing({
-          mode: pricingMode,
-          price: dbPrice,
-          currency: 'PHP',
-          salePrice: undefined,
-          subscriptionInterval: undefined,
-        });
+        const pricingMode: 'free' | 'one-time' | 'subscription' = dbPrice === 0 ? 'free' : 'one-time';
+        setPricing({ mode: pricingMode, price: dbPrice, currency: 'PHP', salePrice: undefined, subscriptionInterval: undefined });
 
-        // Get latest feedback if exists
         const feedbacks = courseData.admin_verification_feedback;
         const latestFeedback = feedbacks && feedbacks.length > 0
           ? feedbacks.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
           : null;
-
         setAdminFeedback(latestFeedback?.content || "");
 
-        // Fetch modules and their associated lessons
         const { data: modulesData, error: modulesError } = await supabase
           .from("modules")
           .select("*")
@@ -232,24 +217,15 @@ const CourseBuilder: React.FC = () => {
     fetchCourse();
   }, [courseId]);
 
-  // Clean up timeout on component unmount
   useEffect(() => {
     return () => {
-      if (saveQuizQuestionsTimeoutRef.current) {
-        clearTimeout(saveQuizQuestionsTimeoutRef.current);
-      }
-      if (saveLessonTimeoutRef.current) {
-        clearTimeout(saveLessonTimeoutRef.current);
-      }
-      if (saveCurriculumTimeoutRef.current) {
-        clearTimeout(saveCurriculumTimeoutRef.current);
-      }
+      if (saveQuizQuestionsTimeoutRef.current) clearTimeout(saveQuizQuestionsTimeoutRef.current);
+      if (saveLessonTimeoutRef.current) clearTimeout(saveLessonTimeoutRef.current);
+      if (saveCurriculumTimeoutRef.current) clearTimeout(saveCurriculumTimeoutRef.current);
     };
   }, []);
 
-  // Curriculum state
   const [curriculum, setCurriculum] = useState<Module[]>([]);
-  const saveCurriculumTimeoutRef = useRef<any>(null);
 
   const handleCurriculumChange = (updatedCurriculum: Module[]) => {
     setCurriculum(updatedCurriculum);
@@ -258,29 +234,7 @@ const CourseBuilder: React.FC = () => {
 
     saveCurriculumTimeoutRef.current = setTimeout(async () => {
       try {
-        // Prepare updates for modules (title, is_sequential)
-        // Note: We prioritize saving structure properties.
-        // We use upsert to handle both new and existing modules if we generate IDs.
-        // However, CurriculumEditor generates 'module-Date.now()'.
-        // We should check if IDs are valid UUIDs or temp IDs.
-        // If temp ID, we should insert.
-        // Ideally, 'handleAddModule' should handle creation properly.
-
-        // For now, let's assume we update existing modules.
-        // Filter out temp IDs for update? Handled by upsert?
-        // If ID is 'module-...', DB might reject if not UUID.
-        // But CurriculumEditor in this codebase seems to rely on backend generating IDs?
-        // No, line 75 in CurriculumEditor: id: `module-${Date.now()}`.
-        // If we try to upsert this, Postgres uuid check will fail.
-
-        // We'll filter for valid UUIDs to update.
-        // Creating new modules via 'onChange' is tricky if we don't swap the ID.
-        // Let's focus on updating EXISTING modules (title, is_sequential).
-        // New modules should probably have been handled by backend creation if possible, 
-        // or we need to handle creation here and swap ID.
-
         const validModules = updatedCurriculum.filter(m => !m.id.startsWith('module-'));
-
         if (validModules.length === 0) return;
 
         const updates = validModules.map(m => ({
@@ -288,43 +242,25 @@ const CourseBuilder: React.FC = () => {
           title: m.title,
           is_sequential: m.is_sequential,
           course_id: courseId,
-          // position: index // If we tracked position
         }));
 
         const { error } = await supabase.from('modules').upsert(updates);
         if (error) console.error("Error saving modules:", error);
-
       } catch (err) {
         console.error("Error in module auto-save:", err);
       }
     }, 1000);
   };
 
-  // Lesson editor state
-  const [editingLesson, setEditingLesson] = useState<{
-    moduleId: string;
-    lesson: Lesson;
-  } | null>(null);
-
-  // Quiz editor state
-  const [editingQuiz, setEditingQuiz] = useState<{
-    moduleId: string;
-    quiz: Quiz;
-    questions: QuizQuestion[];
-  } | null>(null);
-
-  // Drip schedule state
+  const [editingLesson, setEditingLesson] = useState<{ moduleId: string; lesson: Lesson } | null>(null);
+  const [editingQuiz, setEditingQuiz] = useState<{ moduleId: string; lessonId: string; quiz: Quiz; questions: QuizQuestion[] } | null>(null);
   const [drip, setDrip] = useState<ModuleDrip[]>([]);
 
-  // Sync drip state with curriculum
   useEffect(() => {
     setDrip((prevDrip) => {
-      // Map existing drip settings to preserve local edits
       const existingMap = new Map(prevDrip.map(d => [d.moduleId, d]));
-
       return curriculum.map((mod) => {
         const existing = existingMap.get(mod.id);
-        // Use existing local state if available, otherwise fall back to module data (DB or default)
         return {
           moduleId: mod.id,
           moduleTitle: mod.title,
@@ -336,59 +272,34 @@ const CourseBuilder: React.FC = () => {
     });
   }, [curriculum]);
 
-  // Pricing state
-  const [pricing, setPricing] = useState<PricingData>({
-    mode: "one-time",
-    price: 99,
-    currency: "USD",
-  });
+  const [pricing, setPricing] = useState<PricingData>({ mode: "one-time", price: 99, currency: "USD" });
 
-  // --- HELPER FUNCTIONS ---
+  // ─── Helpers ──────────────────────────────────────────────────────────────
 
   const resolveModuleId = async (tempModuleId: string): Promise<string> => {
     if (tempModuleId.startsWith("module-")) {
       const tempModule = curriculum.find((m) => m.id === tempModuleId);
       if (tempModule) {
         const { data: existingModule } = await supabase
-          .from("modules")
-          .select("id")
-          .eq("course_id", courseId)
-          .eq("title", tempModule.title)
-          .single();
+          .from("modules").select("id").eq("course_id", courseId).eq("title", tempModule.title).single();
 
         if (existingModule) {
-          const updatedCurriculum = curriculum.map((module) =>
-            module.id === tempModuleId ? { ...module, id: existingModule.id } : module
-          );
-          setCurriculum(updatedCurriculum);
+          setCurriculum(curriculum.map((m) => m.id === tempModuleId ? { ...m, id: existingModule.id } : m));
           return existingModule.id;
         } else {
           const moduleUuid = uuidv4();
           const { data: maxPositionData } = await supabase
-            .from("modules")
-            .select("position")
-            .eq("course_id", courseId)
-            .order("position", { ascending: false })
-            .limit(1);
-
+            .from("modules").select("position").eq("course_id", courseId).order("position", { ascending: false }).limit(1);
           const newPosition = maxPositionData && maxPositionData.length > 0 ? maxPositionData[0].position + 1 : 0;
-          const { error: moduleError } = await supabase.from("modules").insert([
-            {
-              id: moduleUuid,
-              course_id: courseId,
-              title: tempModule.title,
-              position: newPosition,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-          ]);
+
+          const { error: moduleError } = await supabase.from("modules").insert([{
+            id: moduleUuid, course_id: courseId, title: tempModule.title,
+            position: newPosition, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+          }]);
 
           if (moduleError) throw new Error(`Failed to create module: ${moduleError.message}`);
 
-          const updatedCurriculum = curriculum.map((module) =>
-            module.id === tempModuleId ? { ...module, id: moduleUuid } : module
-          );
-          setCurriculum(updatedCurriculum);
+          setCurriculum(curriculum.map((m) => m.id === tempModuleId ? { ...m, id: moduleUuid } : m));
           return moduleUuid;
         }
       }
@@ -396,59 +307,33 @@ const CourseBuilder: React.FC = () => {
     return tempModuleId;
   };
 
-  // --- HANDLERS ---
+  // ─── Handlers ─────────────────────────────────────────────────────────────
 
   const handleDeleteLesson = async (moduleId: string, contentId: string) => {
     const module = curriculum.find(m => m.id === moduleId);
     const contentItem = module?.lessons.find(l => l.id === contentId);
-
     if (!contentItem || !contentId) return;
 
     const contentType = 'instructions' in contentItem ? 'quiz' : 'lesson';
     let resolvedModuleId = moduleId;
-    try {
-      resolvedModuleId = await resolveModuleId(moduleId);
-    } catch (error) {
-      alert(`Error resolving module: ${(error as Error).message}`);
-      return;
-    }
+    try { resolvedModuleId = await resolveModuleId(moduleId); }
+    catch (error) { alert(`Error resolving module: ${(error as Error).message}`); return; }
 
     const itemName = contentType === 'quiz' ? 'quiz' : 'lesson';
     if (!window.confirm(`Are you sure you want to delete this ${itemName}? This action cannot be undone.`)) return;
 
     try {
-      const { error: unlinkError } = await supabase
-        .from("module_content_items")
-        .delete()
-        .match({
-          module_id: resolvedModuleId,
-          content_id: contentId,
-          content_type: contentType,
-        });
-
-      if (unlinkError) {
-        alert(`Error unlinking ${itemName}: ${unlinkError.message}`);
-        return;
-      }
+      const { error: unlinkError } = await supabase.from("module_content_items").delete()
+        .match({ module_id: resolvedModuleId, content_id: contentId, content_type: contentType });
+      if (unlinkError) { alert(`Error unlinking ${itemName}: ${unlinkError.message}`); return; }
 
       const table = contentType === 'lesson' ? 'lessons' : 'quizzes';
       const { error: deletionError } = await supabase.from(table).delete().eq("id", contentId);
+      if (deletionError) { alert(`Error deleting ${itemName}: ${deletionError.message}`); return; }
 
-      if (deletionError) {
-        alert(`Error deleting ${itemName}: ${deletionError.message}`);
-        return;
-      }
-
-      const updatedCurriculum = curriculum.map((module) => {
-        if (module.id === moduleId) {
-          return {
-            ...module,
-            lessons: module.lessons.filter((l) => l.id !== contentId),
-          };
-        }
-        return module;
-      });
-      setCurriculum(updatedCurriculum);
+      setCurriculum(curriculum.map((m) =>
+        m.id === moduleId ? { ...m, lessons: m.lessons.filter((l) => l.id !== contentId) } : m
+      ));
     } catch (err) {
       alert(`An unexpected error occurred while deleting the ${itemName}`);
     }
@@ -456,49 +341,26 @@ const CourseBuilder: React.FC = () => {
 
   const handleAddLesson = async (moduleId: string, newLesson: Lesson) => {
     let resolvedModuleId = moduleId;
-    try {
-      resolvedModuleId = await resolveModuleId(moduleId);
-    } catch (error) {
-      alert(`Error resolving module: ${(error as Error).message}`);
-      return;
-    }
+    try { resolvedModuleId = await resolveModuleId(moduleId); }
+    catch (error) { alert(`Error resolving module: ${(error as Error).message}`); return; }
 
     const lessonId = uuidv4();
     try {
-      const { error: lessonError } = await supabase.from("lessons").insert([
-        {
-          id: lessonId,
-          title: newLesson.title,
-          description: newLesson.description,
-          content_blocks: newLesson.content_blocks,
-          estimated_duration_minutes: newLesson.estimated_duration_minutes,
-          is_published: newLesson.is_published,
-        },
-      ]);
+      const { error: lessonError } = await supabase.from("lessons").insert([{
+        id: lessonId, title: newLesson.title, description: newLesson.description,
+        content_blocks: newLesson.content_blocks,
+        estimated_duration_minutes: newLesson.estimated_duration_minutes, is_published: newLesson.is_published,
+      }]);
+      if (lessonError) { alert(`Error adding lesson: ${lessonError.message}`); return; }
 
-      if (lessonError) {
-        alert(`Error adding lesson: ${lessonError.message}`);
-        return;
-      }
-
-      const { data: maxPositionData } = await supabase
-        .from("module_content_items")
-        .select("position")
-        .eq("module_id", resolvedModuleId)
-        .order("position", { ascending: false })
-        .limit(1);
-
+      const { data: maxPositionData } = await supabase.from("module_content_items")
+        .select("position").eq("module_id", resolvedModuleId).order("position", { ascending: false }).limit(1);
       const newPosition = maxPositionData && maxPositionData.length > 0 ? maxPositionData[0].position + 1 : 0;
 
-      const { error: linkError } = await supabase.from("module_content_items").insert([
-        {
-          module_id: resolvedModuleId,
-          content_type: "lesson",
-          content_id: lessonId,
-          position: newPosition,
-          is_published: newLesson.is_published,
-        },
-      ]);
+      const { error: linkError } = await supabase.from("module_content_items").insert([{
+        module_id: resolvedModuleId, content_type: "lesson", content_id: lessonId,
+        position: newPosition, is_published: newLesson.is_published,
+      }]);
 
       if (linkError) {
         await supabase.from("lessons").delete().eq("id", lessonId);
@@ -507,13 +369,9 @@ const CourseBuilder: React.FC = () => {
       }
 
       const updatedNewLesson: ContentItem = { ...newLesson, id: lessonId, type: 'lesson' };
-      const updatedCurriculum = curriculum.map((module) => {
-        if (module.id === moduleId) {
-          return { ...module, lessons: [...module.lessons, updatedNewLesson] };
-        }
-        return module;
-      });
-      setCurriculum(updatedCurriculum);
+      setCurriculum(curriculum.map((m) =>
+        m.id === moduleId ? { ...m, lessons: [...m.lessons, updatedNewLesson] } : m
+      ));
     } catch (err) {
       alert("An unexpected error occurred while adding the lesson");
     }
@@ -521,27 +379,19 @@ const CourseBuilder: React.FC = () => {
 
   const handleMoveLesson = async (moduleId: string, contentId: string, direction: "up" | "down") => {
     if (!contentId) return;
-
     const module = curriculum.find(m => m.id === moduleId);
     const contentItem = module?.lessons.find(l => l.id === contentId);
     if (!contentItem) return;
 
     const contentType = 'instructions' in contentItem ? 'quiz' : 'lesson';
     let resolvedModuleId = moduleId;
-    try {
-      resolvedModuleId = await resolveModuleId(moduleId);
-    } catch (error) {
-      alert(`Error resolving module: ${(error as Error).message}`);
-      return;
-    }
+    try { resolvedModuleId = await resolveModuleId(moduleId); }
+    catch (error) { alert(`Error resolving module: ${(error as Error).message}`); return; }
 
     try {
       const { data: contentItemsData, error: contentItemsError } = await supabase
-        .from("module_content_items")
-        .select("id, content_id, position")
-        .eq("module_id", resolvedModuleId)
-        .eq("content_type", contentType)
-        .order("position", { ascending: true });
+        .from("module_content_items").select("id, content_id, position")
+        .eq("module_id", resolvedModuleId).eq("content_type", contentType).order("position", { ascending: true });
 
       if (contentItemsError || !contentItemsData) return;
 
@@ -551,22 +401,16 @@ const CourseBuilder: React.FC = () => {
       const currentPosition = currentItem.position;
       const targetPosition = direction === "up" ? currentPosition - 1 : currentPosition + 1;
       const targetItem = contentItemsData.find((item) => item.position === targetPosition);
-
       if (!targetItem) return;
 
-      const updatePromises = [
+      await Promise.all([
         supabase.from("module_content_items").update({ position: targetPosition }).eq("id", currentItem.id),
         supabase.from("module_content_items").update({ position: currentPosition }).eq("id", targetItem.id),
-      ];
+      ]);
 
-      await Promise.all(updatePromises);
-
-      // Reload module content to reflect order
       const { data: allContentItemsData } = await supabase
-        .from("module_content_items")
-        .select("content_id, content_type")
-        .eq("module_id", resolvedModuleId)
-        .order("position", { ascending: true });
+        .from("module_content_items").select("content_id, content_type")
+        .eq("module_id", resolvedModuleId).order("position", { ascending: true });
 
       if (allContentItemsData) {
         const lessonIds = allContentItemsData.filter(i => i.content_type === 'lesson').map(i => i.content_id);
@@ -582,8 +426,9 @@ const CourseBuilder: React.FC = () => {
           if (qData) allContent = allContent.concat(qData.map(q => ({ ...q, type: 'quiz' } as ContentItem)));
         }
 
-        // Re-sort in Javascript to match the IDs order
-        const sortedContent = allContentItemsData.map(item => allContent.find(c => c.id === item.content_id)).filter(Boolean) as ContentItem[];
+        const sortedContent = allContentItemsData
+          .map(item => allContent.find(c => c.id === item.content_id))
+          .filter(Boolean) as ContentItem[];
 
         setCurriculum(prev => prev.map(m => m.id === moduleId ? { ...m, lessons: sortedContent } : m));
       }
@@ -598,25 +443,42 @@ const CourseBuilder: React.FC = () => {
     if (lesson) setEditingLesson({ moduleId, lesson: lesson as Lesson });
   };
 
-  const handleEditQuiz = (moduleId: string, quizId: string) => {
-    const module = curriculum.find((m) => m.id === moduleId);
-    const quiz = module?.lessons.find((item) => item.id === quizId && 'instructions' in item);
-    if (quiz) {
-      const fetchQuizQuestions = async () => {
-        const { data } = await supabase.from("quiz_questions").select("*").eq("quiz_id", quizId).order("position", { ascending: true });
-        setEditingQuiz({ moduleId, quiz: quiz as Quiz, questions: data || [] });
-      };
-      fetchQuizQuestions();
-    }
+  /**
+   * FIX: Now accepts 3 params (moduleId, lessonId, quizId) matching CurriculumEditor's
+   * onEditQuiz signature. Fetches quiz from DB by quizId and opens QuizEditorPanel.
+   */
+  const handleEditQuiz = (moduleId: string, lessonId: string, quizId: string) => {
+    const fetchAndOpenQuiz = async () => {
+      try {
+        const { data: quizData, error: quizError } = await supabase
+          .from("quizzes").select("*").eq("id", quizId).single();
+
+        if (quizError || !quizData) {
+          console.error("Error fetching quiz:", quizError);
+          alert("Could not load quiz. Please try again.");
+          return;
+        }
+
+        const { data: questionsData } = await supabase
+          .from("quiz_questions").select("*").eq("quiz_id", quizId).order("position", { ascending: true });
+
+        setEditingQuiz({
+          moduleId,
+          lessonId,
+          quiz: quizData as Quiz,
+          questions: questionsData || [],
+        });
+      } catch (err) {
+        console.error("Error opening quiz editor:", err);
+      }
+    };
+    fetchAndOpenQuiz();
   };
 
   const handleSaveLesson = async (updatedLesson: Lesson) => {
     if (!editingLesson || !updatedLesson.id) return;
 
-    // Immediate UI update
     setEditingLesson({ ...editingLesson, lesson: updatedLesson });
-
-    // Update curriculum immediately as well
     setCurriculum(curriculum.map((mod) =>
       mod.id === editingLesson.moduleId
         ? { ...mod, lessons: mod.lessons.map((l) => l.id === updatedLesson.id ? { ...updatedLesson, type: 'lesson' } as ContentItem : l) }
@@ -628,20 +490,14 @@ const CourseBuilder: React.FC = () => {
     saveLessonTimeoutRef.current = setTimeout(async () => {
       try {
         const { error } = await supabase.from("lessons").upsert({
-          id: updatedLesson.id,
-          title: updatedLesson.title,
-          description: updatedLesson.description,
+          id: updatedLesson.id, title: updatedLesson.title, description: updatedLesson.description,
           content_blocks: updatedLesson.content_blocks,
-          estimated_duration_minutes: updatedLesson.estimated_duration_minutes,
-          is_published: updatedLesson.is_published,
+          estimated_duration_minutes: updatedLesson.estimated_duration_minutes, is_published: updatedLesson.is_published,
         }, { onConflict: "id" });
-
         if (error) throw error;
 
-        await supabase.from("module_content_items")
-          .update({ is_published: updatedLesson.is_published })
+        await supabase.from("module_content_items").update({ is_published: updatedLesson.is_published })
           .match({ module_id: editingLesson.moduleId, content_id: updatedLesson.id, content_type: "lesson" });
-
       } catch (err) {
         console.error("Error saving lesson:", err);
       }
@@ -651,20 +507,13 @@ const CourseBuilder: React.FC = () => {
   const handleAddModule = async () => {
     try {
       const position = curriculum.length;
-      // Insert new module
       const { data, error } = await supabase.from('modules').insert({
-        course_id: courseId,
-        title: `Module ${position + 1}`,
-        position: position,
-        is_published: false,
-        is_sequential: false
+        course_id: courseId, title: `Module ${position + 1}`,
+        position, is_published: false, is_sequential: false,
       }).select().single();
 
       if (error) throw error;
-
-      if (data) {
-        setCurriculum([...curriculum, { ...data, lessons: [] }]);
-      }
+      if (data) setCurriculum([...curriculum, { ...data, lessons: [] }]);
     } catch (error) {
       console.error("Error creating module:", error);
       alert("Failed to create module");
@@ -673,15 +522,12 @@ const CourseBuilder: React.FC = () => {
 
   const handleDeleteModule = async (moduleId: string) => {
     try {
-      // If it's a temp ID (shouldn't happen with valid add), just remove from state
       if (moduleId.startsWith('module-')) {
         setCurriculum(curriculum.filter(m => m.id !== moduleId));
         return;
       }
-
       const { error } = await supabase.from('modules').delete().eq('id', moduleId);
       if (error) throw error;
-
       setCurriculum(curriculum.filter(m => m.id !== moduleId));
     } catch (error) {
       console.error("Error deleting module:", error);
@@ -694,17 +540,10 @@ const CourseBuilder: React.FC = () => {
     try { resolvedModuleId = await resolveModuleId(moduleId); } catch (e) { return; }
 
     const newQuiz: Quiz = {
-      id: uuidv4(),
-      title: "New Quiz",
-      description: "",
-      instructions: "",
-      passing_score: 70,
-      time_limit_minutes: 30,
-      max_attempts: 3,
-      requires_manual_grading: false,
-      is_published: false,
-      late_submission_allowed: true,
-      late_penalty_percent: 10,
+      id: uuidv4(), title: "New Quiz", description: "", instructions: "",
+      passing_score: 70, time_limit_minutes: 30, max_attempts: 3,
+      requires_manual_grading: false, is_published: false,
+      late_submission_allowed: true, late_penalty_percent: 10,
     };
 
     try {
@@ -716,23 +555,46 @@ const CourseBuilder: React.FC = () => {
       const newPosition = maxPositionData && maxPositionData.length > 0 ? maxPositionData[0].position + 1 : 0;
 
       await supabase.from("module_content_items").insert([{
-        module_id: resolvedModuleId, content_type: "quiz", content_id: newQuiz.id, position: newPosition, is_published: newQuiz.is_published,
+        module_id: resolvedModuleId, content_type: "quiz", content_id: newQuiz.id,
+        position: newPosition, is_published: newQuiz.is_published,
       }]);
 
       const newQuizItem: ContentItem = { ...newQuiz, type: 'quiz' };
       setCurriculum(curriculum.map((m) => m.id === moduleId ? { ...m, lessons: [...m.lessons, newQuizItem] } : m));
-      setEditingQuiz({ moduleId, quiz: newQuiz, questions: [] });
+      setEditingQuiz({ moduleId, lessonId: "", quiz: newQuiz, questions: [] });
     } catch (err) {
       alert("Error adding quiz");
     }
   };
 
+  /**
+   * FIX: Now returns the quizId (string) so CurriculumEditor can add the quiz block
+   * to the lesson's content_blocks with the real DB-generated ID.
+   */
+  const handleCreateQuizWithTitle = async (moduleId: string, lessonId: string, quizTitle: string): Promise<string> => {
+    let resolvedModuleId = moduleId;
+    try { resolvedModuleId = await resolveModuleId(moduleId); } catch (e) { throw new Error("Failed to resolve module"); }
+
+    const quizId = uuidv4();
+
+    const newQuiz: Quiz = {
+      id: quizId, title: quizTitle, description: "", instructions: "",
+      passing_score: 70, time_limit_minutes: 30, max_attempts: 3,
+      requires_manual_grading: false, is_published: false,
+      late_submission_allowed: true, late_penalty_percent: 10,
+    };
+
+    const { error: quizError } = await supabase.from("quizzes").insert([newQuiz]);
+    if (quizError) throw new Error(quizError.message);
+
+    // Return the quizId — CurriculumEditor uses this to build the quiz content block
+    return quizId;
+  };
+
   const handleSaveQuiz = async (updatedQuiz: Quiz) => {
     if (!editingQuiz || !updatedQuiz.id) return;
     try {
-      // Sanitize payload: Remove 'type' or other UI-only props that might have crept in
       const { type, ...quizDataToSave } = updatedQuiz as any;
-
       const { error } = await supabase.from("quizzes").upsert(quizDataToSave, { onConflict: "id" });
       if (error) throw error;
 
@@ -754,29 +616,19 @@ const CourseBuilder: React.FC = () => {
   const handleSaveQuizQuestions = async (updatedQuestions: QuizQuestion[]) => {
     if (!editingQuiz) return;
 
-    // Immediate UI update to prevent lag/focus loss
     setEditingQuiz({ ...editingQuiz, questions: updatedQuestions });
 
     if (saveQuizQuestionsTimeoutRef.current) clearTimeout(saveQuizQuestionsTimeoutRef.current);
 
     saveQuizQuestionsTimeoutRef.current = setTimeout(async () => {
       try {
-        // Use upsert to update existing questions or insert new ones without changing IDs
-        // This preserves the stable identity of questions
         const questionsToSave = updatedQuestions.map((q, index) => ({
-          ...q,
-          quiz_id: editingQuiz.quiz.id,
-          position: index
+          ...q, quiz_id: editingQuiz.quiz.id, position: index,
         }));
 
         const { error } = await supabase.from("quiz_questions").upsert(questionsToSave, { onConflict: 'id' });
-
         if (error) throw error;
 
-        // Identify deleted questions
-        // This is a naive check: anything in DB for this quiz NOT in our list should be deleted
-        // For robustness, we might want to do this differently, but for now let's stick to upsert for stability.
-        // If we strictly need to handle deletions here without the delete-all approach:
         const currentIds = updatedQuestions.map(q => q.id).filter(Boolean);
         if (currentIds.length > 0) {
           await supabase.from("quiz_questions").delete()
@@ -785,14 +637,10 @@ const CourseBuilder: React.FC = () => {
         } else if (updatedQuestions.length === 0) {
           await supabase.from("quiz_questions").delete().eq('quiz_id', editingQuiz.quiz.id);
         }
-
-        // CRITICAL: Do NOT re-fetch and setEditingQuiz here. 
-        // That causes the focus loss/UI reset loop. 
-        // The local state is already the source of truth for the editor session.
       } catch (err) {
         console.error("Error saving quiz questions:", err);
       }
-    }, 1000); // Increased debounce to 1s
+    }, 1000);
   };
 
   const handleCloseQuizEditor = () => setEditingQuiz(null);
@@ -800,9 +648,7 @@ const CourseBuilder: React.FC = () => {
   const handlePublish = async () => {
     try {
       const { error } = await supabase.from('courses').update({
-        verification_status: 'approved',
-        visibility: 'public',
-        updated_at: new Date().toISOString(),
+        verification_status: 'approved', visibility: 'public', updated_at: new Date().toISOString(),
       }).eq('id', courseId);
       if (error) throw error;
       setVerificationStatus('approved');
@@ -816,9 +662,7 @@ const CourseBuilder: React.FC = () => {
   const handleUnpublish = async () => {
     try {
       const { error } = await supabase.from('courses').update({
-        verification_status: 'draft',
-        visibility: 'private',
-        updated_at: new Date().toISOString(),
+        verification_status: 'draft', visibility: 'private', updated_at: new Date().toISOString(),
       }).eq('id', courseId);
       if (error) throw error;
       setVerificationStatus('draft');
@@ -832,8 +676,7 @@ const CourseBuilder: React.FC = () => {
   const handleSavePricing = async () => {
     if (!courseId) return;
     const { error } = await supabase.from('courses').update({
-      price: pricing.mode === 'free' ? 0 : pricing.price,
-      updated_at: new Date().toISOString(),
+      price: pricing.mode === 'free' ? 0 : pricing.price, updated_at: new Date().toISOString(),
     }).eq('id', courseId);
     if (error) throw error;
   };
@@ -853,7 +696,6 @@ const CourseBuilder: React.FC = () => {
     if (!courseId) return;
     if (!window.confirm('Are you sure you want to delete this course? This action cannot be undone.')) return;
     try {
-      // Clean up related data before deleting the course
       const { data: mods } = await supabase.from('modules').select('id').eq('course_id', courseId);
       const modIds = (mods || []).map((m: any) => m.id);
       if (modIds.length > 0) {
@@ -885,18 +727,11 @@ const CourseBuilder: React.FC = () => {
       }
 
       await supabase.from("courses").update({
-        title: settings.title,
-        subtitle: settings.subtitle,
-        short_description: settings.shortDescription,
-        long_description: settings.longDescription,
-        visibility: settings.visibility,
-        language: settings.language,
-        category_id: categoryId,
-        level: settings.level,
-        updated_at: new Date().toISOString(),
+        title: settings.title, subtitle: settings.subtitle,
+        short_description: settings.shortDescription, long_description: settings.longDescription,
+        visibility: settings.visibility, language: settings.language,
+        category_id: categoryId, level: settings.level, updated_at: new Date().toISOString(),
       }).eq("id", courseId);
-
-      // Topic Sync Logic omitted for brevity but should be here similar to original
 
       setCourseStatus(settings.visibility === "public" ? "published" : "draft");
       alert("Settings saved successfully");
@@ -908,18 +743,11 @@ const CourseBuilder: React.FC = () => {
   const handleSaveDrip = async () => {
     try {
       const updates = drip.map(async (dripModule) => {
-        const { error } = await supabase
-          .from("modules")
-          .update({
-            drip_mode: dripModule.mode,
-            drip_days: dripModule.daysAfter,
-            drip_date: dripModule.specificDate
-          })
-          .eq("id", dripModule.moduleId);
-
+        const { error } = await supabase.from("modules").update({
+          drip_mode: dripModule.mode, drip_days: dripModule.daysAfter, drip_date: dripModule.specificDate,
+        }).eq("id", dripModule.moduleId);
         if (error) throw error;
       });
-
       await Promise.all(updates);
       alert("Drip schedule saved successfully!");
     } catch (error) {
@@ -946,7 +774,7 @@ const CourseBuilder: React.FC = () => {
             onChange={handleCurriculumChange}
             onEditLesson={handleEditLesson}
             onEditQuiz={handleEditQuiz}
-            onAddQuiz={handleAddQuiz}
+            onCreateQuiz={handleCreateQuizWithTitle}
             onAddLesson={handleAddLesson}
             onDeleteLesson={handleDeleteLesson}
             onMoveLesson={handleMoveLesson}
@@ -979,7 +807,6 @@ const CourseBuilder: React.FC = () => {
         );
       case "preview":
         return (
-
           <CoursePreviewPane
             courseTitle={settings.title}
             courseSubtitle={settings.subtitle}
@@ -995,7 +822,6 @@ const CourseBuilder: React.FC = () => {
   return (
     <CoachAppLayout>
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Breadcrumb */}
         <div className="mb-6">
           <button
             onClick={() => navigate("/coach/courses")}
@@ -1015,7 +841,6 @@ const CourseBuilder: React.FC = () => {
             courseTitle={settings.title || "Untitled course"}
             courseStatus={courseStatus}
           />
-
           <div className="flex-1">
             <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-lg p-8">
               {renderSection()}
