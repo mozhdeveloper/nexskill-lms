@@ -237,15 +237,19 @@ const CourseBuilder: React.FC = () => {
         const validModules = updatedCurriculum.filter(m => !m.id.startsWith('module-'));
         if (validModules.length === 0) return;
 
-        const updates = validModules.map(m => ({
+        const updates = validModules.map((m, index) => ({
           id: m.id,
           title: m.title,
           is_sequential: m.is_sequential,
           course_id: courseId,
+          position: m.position ?? index, // Use existing position or fallback to index
         }));
+
+        console.log("[CourseBuilder] Saving modules:", updates);
 
         const { error } = await supabase.from('modules').upsert(updates);
         if (error) console.error("Error saving modules:", error);
+        else console.log("[CourseBuilder] Modules saved successfully");
       } catch (err) {
         console.error("Error in module auto-save:", err);
       }
@@ -478,6 +482,9 @@ const CourseBuilder: React.FC = () => {
   const handleSaveLesson = async (updatedLesson: Lesson) => {
     if (!editingLesson || !updatedLesson.id) return;
 
+    console.log("[CourseBuilder] Saving lesson:", updatedLesson.id, updatedLesson.title);
+    console.log("[CourseBuilder] Lesson content_blocks:", updatedLesson.content_blocks);
+
     setEditingLesson({ ...editingLesson, lesson: updatedLesson });
     setCurriculum(curriculum.map((mod) =>
       mod.id === editingLesson.moduleId
@@ -487,21 +494,102 @@ const CourseBuilder: React.FC = () => {
 
     if (saveLessonTimeoutRef.current) clearTimeout(saveLessonTimeoutRef.current);
 
-    saveLessonTimeoutRef.current = setTimeout(async () => {
-      try {
-        const { error } = await supabase.from("lessons").upsert({
-          id: updatedLesson.id, title: updatedLesson.title, description: updatedLesson.description,
-          content_blocks: updatedLesson.content_blocks,
-          estimated_duration_minutes: updatedLesson.estimated_duration_minutes, is_published: updatedLesson.is_published,
-        }, { onConflict: "id" });
-        if (error) throw error;
+    // Save immediately instead of waiting
+    try {
+      console.log("[CourseBuilder] Starting database save for lesson:", updatedLesson.id);
+      
+      const lessonToSave = {
+        id: updatedLesson.id,
+        title: updatedLesson.title,
+        description: updatedLesson.description || "",
+        content_blocks: updatedLesson.content_blocks || [],
+        estimated_duration_minutes: updatedLesson.estimated_duration_minutes || 0,
+        is_published: true,
+        updated_at: new Date().toISOString(),
+      };
 
-        await supabase.from("module_content_items").update({ is_published: updatedLesson.is_published })
-          .match({ module_id: editingLesson.moduleId, content_id: updatedLesson.id, content_type: "lesson" });
-      } catch (err) {
-        console.error("Error saving lesson:", err);
+      console.log("[CourseBuilder] Lesson data to save:", lessonToSave);
+
+      const { data: upsertData, error: upsertError } = await supabase.from("lessons").upsert(lessonToSave, { onConflict: "id" });
+      
+      if (upsertError) {
+        console.error("[CourseBuilder] Error saving lesson:", upsertError);
+        alert(`Failed to save lesson: ${upsertError.message}`);
+        return;
       }
-    }, 15000);
+      
+      console.log("[CourseBuilder] Lesson saved successfully:", upsertData);
+
+      // Also publish the module_content_items link
+      const { error: linkError } = await supabase.from("module_content_items")
+        .update({ is_published: true, updated_at: new Date().toISOString() })
+        .match({ module_id: editingLesson.moduleId, content_id: updatedLesson.id, content_type: "lesson" });
+      
+      if (linkError) {
+        console.error("[CourseBuilder] Error updating module_content_items:", linkError);
+      } else {
+        console.log("[CourseBuilder] Module content item updated");
+      }
+
+      // Also publish the parent module
+      const { error: moduleError } = await supabase.from("modules")
+        .update({ is_published: true, updated_at: new Date().toISOString() })
+        .eq("id", editingLesson.moduleId);
+      
+      if (moduleError) {
+        console.error("[CourseBuilder] Error updating module:", moduleError);
+      } else {
+        console.log("[CourseBuilder] Module published");
+      }
+
+      alert("✅ Lesson saved successfully!");
+    } catch (err) {
+      console.error("[CourseBuilder] Unexpected error saving lesson:", err);
+      alert("Error saving lesson: " + (err as Error).message);
+    }
+  };
+
+  // Save video block directly to database (called from CurriculumEditor)
+  const handleSaveVideoBlock = async (moduleId: string, lessonId: string, videoUrl: string) => {
+    try {
+      console.log("[CourseBuilder] Saving video block to lesson:", lessonId, videoUrl);
+      
+      // Find the lesson in current curriculum
+      const module = curriculum.find(m => m.id === moduleId);
+      const lesson = module?.lessons.find(l => l.id === lessonId);
+      
+      if (!lesson) {
+        console.error("[CourseBuilder] Lesson not found:", lessonId);
+        return;
+      }
+
+      // Get current content_blocks and add the new video block
+      const currentBlocks = lesson.content_blocks || [];
+      const newBlock = {
+        id: crypto.randomUUID(),
+        type: "video",
+        content: videoUrl,
+        position: currentBlocks.length,
+        title: "",
+      };
+      const updatedBlocks = [...currentBlocks, newBlock];
+
+      // Save to database
+      const { error } = await supabase.from("lessons").update({
+        content_blocks: updatedBlocks,
+        updated_at: new Date().toISOString(),
+      }).eq("id", lessonId);
+
+      if (error) {
+        console.error("[CourseBuilder] Error saving video block:", error);
+        alert(`Failed to save video: ${error.message}`);
+      } else {
+        console.log("[CourseBuilder] Video block saved successfully");
+      }
+    } catch (err) {
+      console.error("[CourseBuilder] Error saving video block:", err);
+      alert("Error saving video: " + (err as Error).message);
+    }
   };
 
   const handleAddModule = async () => {
@@ -780,6 +868,7 @@ const CourseBuilder: React.FC = () => {
             onMoveLesson={handleMoveLesson}
             onAddModule={handleAddModule}
             onDeleteModule={handleDeleteModule}
+            onSaveVideoBlock={handleSaveVideoBlock}
           />
         );
       case "live-sessions":
