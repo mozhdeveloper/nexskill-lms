@@ -341,38 +341,77 @@ const CourseBuilder: React.FC = () => {
 
   const handleAddLesson = async (moduleId: string, newLesson: Lesson) => {
     let resolvedModuleId = moduleId;
-    try { resolvedModuleId = await resolveModuleId(moduleId); }
-    catch (error) { alert(`Error resolving module: ${(error as Error).message}`); return; }
+    try { 
+      resolvedModuleId = await resolveModuleId(moduleId); 
+    } catch (error) { 
+      alert(`Error resolving module: ${(error as Error).message}`); 
+      return; 
+    }
 
     const lessonId = uuidv4();
+    
     try {
+      // Create the lesson in the database first with all content blocks
       const { error: lessonError } = await supabase.from("lessons").insert([{
-        id: lessonId, title: newLesson.title, description: newLesson.description,
-        content_blocks: newLesson.content_blocks,
-        estimated_duration_minutes: newLesson.estimated_duration_minutes, is_published: newLesson.is_published,
+        id: lessonId, 
+        title: newLesson.title || "Untitled Lesson", 
+        description: newLesson.description || "",
+        content_blocks: newLesson.content_blocks || [],
+        estimated_duration_minutes: newLesson.estimated_duration_minutes || 15, 
+        is_published: newLesson.is_published || false,
       }]);
-      if (lessonError) { alert(`Error adding lesson: ${lessonError.message}`); return; }
+      
+      if (lessonError) { 
+        alert(`Error adding lesson: ${lessonError.message}`); 
+        return; 
+      }
 
-      const { data: maxPositionData } = await supabase.from("module_content_items")
-        .select("position").eq("module_id", resolvedModuleId).order("position", { ascending: false }).limit(1);
-      const newPosition = maxPositionData && maxPositionData.length > 0 ? maxPositionData[0].position + 1 : 0;
+      // Get the max position for this module
+      const { data: maxPositionData } = await supabase
+        .from("module_content_items")
+        .select("position")
+        .eq("module_id", resolvedModuleId)
+        .order("position", { ascending: false })
+        .limit(1);
+      
+      const newPosition = maxPositionData && maxPositionData.length > 0 
+        ? maxPositionData[0].position + 1 
+        : 0;
 
-      const { error: linkError } = await supabase.from("module_content_items").insert([{
-        module_id: resolvedModuleId, content_type: "lesson", content_id: lessonId,
-        position: newPosition, is_published: newLesson.is_published,
-      }]);
+      // Link the lesson to the module
+      const { error: linkError } = await supabase
+        .from("module_content_items")
+        .insert([{
+          module_id: resolvedModuleId, 
+          content_type: "lesson", 
+          content_id: lessonId,
+          position: newPosition, 
+          is_published: newLesson.is_published || false,
+        }]);
 
       if (linkError) {
+        // Rollback: delete the lesson if linking fails
         await supabase.from("lessons").delete().eq("id", lessonId);
         alert(`Error linking lesson: ${linkError.message}`);
         return;
       }
 
-      const updatedNewLesson: ContentItem = { ...newLesson, id: lessonId, type: 'lesson' };
+      // Create the content item with the real database ID
+      const updatedNewLesson: ContentItem = { 
+        ...newLesson, 
+        id: lessonId, 
+        type: 'lesson',
+        title: newLesson.title || "Untitled Lesson",
+        content_blocks: newLesson.content_blocks || []
+      };
+      
+      // Update the curriculum state
       setCurriculum(curriculum.map((m) =>
         m.id === moduleId ? { ...m, lessons: [...m.lessons, updatedNewLesson] } : m
       ));
+      
     } catch (err) {
+      console.error("Error adding lesson:", err);
       alert("An unexpected error occurred while adding the lesson");
     }
   };
@@ -443,10 +482,6 @@ const CourseBuilder: React.FC = () => {
     if (lesson) setEditingLesson({ moduleId, lesson: lesson as Lesson });
   };
 
-  /**
-   * FIX: Now accepts 3 params (moduleId, lessonId, quizId) matching CurriculumEditor's
-   * onEditQuiz signature. Fetches quiz from DB by quizId and opens QuizEditorPanel.
-   */
   const handleEditQuiz = (moduleId: string, lessonId: string, quizId: string) => {
     const fetchAndOpenQuiz = async () => {
       try {
@@ -478,10 +513,14 @@ const CourseBuilder: React.FC = () => {
   const handleSaveLesson = async (updatedLesson: Lesson) => {
     if (!editingLesson || !updatedLesson.id) return;
 
+    // Update local state immediately
     setEditingLesson({ ...editingLesson, lesson: updatedLesson });
     setCurriculum(curriculum.map((mod) =>
       mod.id === editingLesson.moduleId
-        ? { ...mod, lessons: mod.lessons.map((l) => l.id === updatedLesson.id ? { ...updatedLesson, type: 'lesson' } as ContentItem : l) }
+        ? { 
+            ...mod, 
+            lessons: mod.lessons.map((l) => l.id === updatedLesson.id ? { ...updatedLesson, type: 'lesson' } as ContentItem : l) 
+          }
         : mod
     ));
 
@@ -489,11 +528,16 @@ const CourseBuilder: React.FC = () => {
 
     saveLessonTimeoutRef.current = setTimeout(async () => {
       try {
+        // Save the lesson with its content blocks
         const { error } = await supabase.from("lessons").upsert({
-          id: updatedLesson.id, title: updatedLesson.title, description: updatedLesson.description,
-          content_blocks: updatedLesson.content_blocks,
-          estimated_duration_minutes: updatedLesson.estimated_duration_minutes, is_published: updatedLesson.is_published,
+          id: updatedLesson.id, 
+          title: updatedLesson.title, 
+          description: updatedLesson.description,
+          content_blocks: updatedLesson.content_blocks || [],
+          estimated_duration_minutes: updatedLesson.estimated_duration_minutes, 
+          is_published: updatedLesson.is_published,
         }, { onConflict: "id" });
+        
         if (error) throw error;
 
         await supabase.from("module_content_items").update({ is_published: updatedLesson.is_published })
@@ -501,7 +545,46 @@ const CourseBuilder: React.FC = () => {
       } catch (err) {
         console.error("Error saving lesson:", err);
       }
-    }, 15000);
+    }, 1000);
+  };
+
+  // Handle updating lesson title directly
+  const handleUpdateLessonTitle = async (moduleId: string, lessonId: string, title: string) => {
+    if (!lessonId || lessonId.startsWith('lesson-')) return;
+    
+    try {
+      const { error } = await supabase
+        .from("lessons")
+        .update({ title: title, updated_at: new Date().toISOString() })
+        .eq("id", lessonId);
+      
+      if (error) {
+        console.error("Error updating lesson title:", error);
+      }
+    } catch (err) {
+      console.error("Error in handleUpdateLessonTitle:", err);
+    }
+  };
+
+  // NEW: Handle updating lesson content blocks (videos/quizzes)
+  const handleUpdateLessonContent = async (moduleId: string, lessonId: string, contentBlocks: any[]) => {
+    if (!lessonId || lessonId.startsWith('lesson-')) return;
+    
+    try {
+      const { error } = await supabase
+        .from("lessons")
+        .update({ 
+          content_blocks: contentBlocks, 
+          updated_at: new Date().toISOString() 
+        })
+        .eq("id", lessonId);
+      
+      if (error) {
+        console.error("Error updating lesson content:", error);
+      }
+    } catch (err) {
+      console.error("Error in handleUpdateLessonContent:", err);
+    }
   };
 
   const handleAddModule = async () => {
@@ -567,10 +650,6 @@ const CourseBuilder: React.FC = () => {
     }
   };
 
-  /**
-   * FIX: Now returns the quizId (string) so CurriculumEditor can add the quiz block
-   * to the lesson's content_blocks with the real DB-generated ID.
-   */
   const handleCreateQuizWithTitle = async (moduleId: string, lessonId: string, quizTitle: string): Promise<string> => {
     let resolvedModuleId = moduleId;
     try { resolvedModuleId = await resolveModuleId(moduleId); } catch (e) { throw new Error("Failed to resolve module"); }
@@ -587,7 +666,6 @@ const CourseBuilder: React.FC = () => {
     const { error: quizError } = await supabase.from("quizzes").insert([newQuiz]);
     if (quizError) throw new Error(quizError.message);
 
-    // Return the quizId — CurriculumEditor uses this to build the quiz content block
     return quizId;
   };
 
@@ -780,6 +858,8 @@ const CourseBuilder: React.FC = () => {
             onMoveLesson={handleMoveLesson}
             onAddModule={handleAddModule}
             onDeleteModule={handleDeleteModule}
+            onUpdateLessonTitle={handleUpdateLessonTitle}
+            onUpdateLessonContent={handleUpdateLessonContent}
           />
         );
       case "live-sessions":

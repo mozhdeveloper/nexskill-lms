@@ -33,6 +33,8 @@ interface CurriculumEditorProps {
     onDeleteModule?: (moduleId: string) => Promise<void>;
     onAddModule?: () => Promise<void>;
     onMoveLesson?: (moduleId: string, lessonId: string, direction: "up" | "down") => Promise<void>;
+    onUpdateLessonTitle?: (moduleId: string, lessonId: string, title: string) => Promise<void>;
+    onUpdateLessonContent?: (moduleId: string, lessonId: string, contentBlocks: any[]) => Promise<void>;
 }
 
 interface ActivePlusMenu {
@@ -70,6 +72,8 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
     onDeleteModule,
     onAddModule,
     onMoveLesson,
+    onUpdateLessonTitle,
+    onUpdateLessonContent,
 }) => {
     const [expandedModules, setExpandedModules] = useState<Set<string>>(
         new Set(curriculum.map((m) => m.id))
@@ -148,12 +152,19 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
         }
     };
 
-    const handleLessonTitleChange = (moduleId: string, lessonId: string, title: string) =>
+    const handleLessonTitleChange = async (moduleId: string, lessonId: string, title: string) => {
+        // Update local state immediately
         onChange(curriculum.map((m) =>
             m.id === moduleId
                 ? { ...m, lessons: m.lessons.map((l) => l.id === lessonId ? { ...l, title } : l) }
                 : m
         ));
+        
+        // Save to database if the lesson has a real ID (not temporary)
+        if (!lessonId.startsWith('lesson-') && onUpdateLessonTitle) {
+            await onUpdateLessonTitle(moduleId, lessonId, title);
+        }
+    };
 
     const handleDeleteLesson = async (moduleId: string, lessonId: string) => {
         if (onDeleteLesson) await onDeleteLesson(moduleId, lessonId);
@@ -194,9 +205,11 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
         setContentOptions({ ...contentOptions, mode: "quiz-input", quizTitle: "" });
     };
 
-    const handleSaveVideoUrl = (moduleId: string, lessonId: string) => {
+    const handleSaveVideoUrl = async (moduleId: string, lessonId: string) => {
         if (!contentOptions?.videoUrl.trim()) return;
-        onChange(curriculum.map((m) =>
+        
+        // Find the lesson and update its content_blocks
+        const updatedCurriculum = curriculum.map((m) =>
             m.id === moduleId ? {
                 ...m,
                 lessons: m.lessons.map((l) => {
@@ -212,7 +225,21 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                     return { ...l, content_blocks: [...blocks, newBlock] };
                 }),
             } : m
-        ));
+        );
+        
+        // Update local state
+        onChange(updatedCurriculum);
+        
+        // Save to database if the lesson has a real ID
+        if (!lessonId.startsWith('lesson-') && onUpdateLessonContent) {
+            const updatedLesson = updatedCurriculum
+                .find(m => m.id === moduleId)
+                ?.lessons.find(l => l.id === lessonId);
+            if (updatedLesson) {
+                await onUpdateLessonContent(moduleId, lessonId, (updatedLesson as any).content_blocks || []);
+            }
+        }
+        
         setContentOptions(null);
         setExpandedLessons((prev) => { const next = new Set(prev); next.delete(lessonId); return next; });
     };
@@ -231,7 +258,8 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
             }
         }
 
-        onChange(curriculum.map((m) =>
+        // Find the lesson and update its content_blocks
+        const updatedCurriculum = curriculum.map((m) =>
             m.id === moduleId ? {
                 ...m,
                 lessons: m.lessons.map((l) => {
@@ -240,22 +268,41 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                     const newBlock = {
                         id: crypto.randomUUID(),
                         type: "quiz",
-                        quizId,
+                        quizId: quizId,
                         title: contentOptions.quizTitle,
                         position: blocks.length,
                     };
                     return { ...l, content_blocks: [...blocks, newBlock] };
                 }),
             } : m
-        ));
+        );
+
+        // Update local state
+        onChange(updatedCurriculum);
+        
+        // Save to database if the lesson has a real ID
+        if (!lessonId.startsWith('lesson-') && onUpdateLessonContent) {
+            const updatedLesson = updatedCurriculum
+                .find(m => m.id === moduleId)
+                ?.lessons.find(l => l.id === lessonId);
+            if (updatedLesson) {
+                await onUpdateLessonContent(moduleId, lessonId, (updatedLesson as any).content_blocks || []);
+            }
+        }
 
         setContentOptions(null);
+        setExpandedLessons((prev) => {
+            const next = new Set(prev);
+            next.delete(lessonId);
+            return next;
+        });
 
         if (onEditQuiz) onEditQuiz(moduleId, lessonId, quizId);
     };
 
-    const handleDeleteBlock = (moduleId: string, lessonId: string, blockId: string) => {
-        onChange(curriculum.map((m) =>
+    const handleDeleteBlock = async (moduleId: string, lessonId: string, blockId: string) => {
+        // Find the lesson and remove the block
+        const updatedCurriculum = curriculum.map((m) =>
             m.id === moduleId ? {
                 ...m,
                 lessons: m.lessons.map((l) => {
@@ -264,7 +311,20 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                     return { ...l, content_blocks: blocks.filter((b: any) => b.id !== blockId) };
                 }),
             } : m
-        ));
+        );
+        
+        // Update local state
+        onChange(updatedCurriculum);
+        
+        // Save to database if the lesson has a real ID
+        if (!lessonId.startsWith('lesson-') && onUpdateLessonContent) {
+            const updatedLesson = updatedCurriculum
+                .find(m => m.id === moduleId)
+                ?.lessons.find(l => l.id === lessonId);
+            if (updatedLesson) {
+                await onUpdateLessonContent(moduleId, lessonId, (updatedLesson as any).content_blocks || []);
+            }
+        }
     };
 
     // ── Helpers ───────────────────────────────────────────────────────────────
