@@ -18,6 +18,8 @@ interface FlatItem {
   type: 'lesson' | 'quiz';
 }
 
+type BottomTab = 'downloads' | 'notes' | 'ask-ai' | 'ai-summary';
+
 const CoursePlayer: React.FC = () => {
   const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>();
   const navigate = useNavigate();
@@ -32,6 +34,9 @@ const CoursePlayer: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [flatItemList, setFlatItemList] = useState<FlatItem[]>([]);
+
+  // New state: active bottom tab
+  const [activeTab, setActiveTab] = useState<BottomTab | null>(null);
 
   useEffect(() => {
     const fetchLessonData = async () => {
@@ -148,6 +153,11 @@ const CoursePlayer: React.FC = () => {
     fetchLessonData();
   }, [courseId, lessonId]);
 
+  // Calculate lesson number (1-based index of lessons only)
+  const lessonNumber = flatItemList
+    .filter(item => item.type === 'lesson')
+    .findIndex(item => item.id === lessonId) + 1;
+
   // Calculate progress based on completed lessons
   const progress = totalLessonsInCourse > 0
     ? Math.min(100, Math.round((completedLessons.length / totalLessonsInCourse) * 100))
@@ -211,6 +221,22 @@ const CoursePlayer: React.FC = () => {
     }
   }, [completedLessons, totalLessonsInCourse]);
 
+  // Handle AI Summary tab — opens drawer instead of inline panel
+  const handleTabClick = (tab: BottomTab) => {
+    if (tab === 'ai-summary') {
+      setShowAIDrawer(true);
+      return;
+    }
+    setActiveTab(prev => prev === tab ? null : tab);
+  };
+
+  const bottomTabs: { id: BottomTab; label: string; icon: string }[] = [
+    { id: 'downloads', label: 'Downloads', icon: '📥' },
+    { id: 'notes', label: 'Notes', icon: '📝' },
+    { id: 'ask-ai', label: 'Ask AI', icon: '🤖' },
+    { id: 'ai-summary', label: 'AI Summary', icon: '✨' },
+  ];
+
   if (loading) {
     return (
       <StudentAppLayout>
@@ -267,7 +293,7 @@ const CoursePlayer: React.FC = () => {
 
   return (
     <StudentAppLayout>
-      {/* Header */}
+      {/* Header — unchanged */}
       <div className="px-8 py-4 border-b border-[#EDF0FB] dark:border-gray-700">
         <div className="flex items-start justify-between mb-2">
           <div className="flex-1">
@@ -276,7 +302,7 @@ const CoursePlayer: React.FC = () => {
             <div className="flex items-center gap-4 text-sm text-text-muted dark:text-dark-text-muted">
               <span>{currentLesson.moduleTitle ?? ''}</span>
               <span>•</span>
-              <span>Lesson {lessonId}</span>
+              <span>Lesson {lessonNumber > 0 ? lessonNumber : 1}</span>
               <span>•</span>
               <span>{currentLesson.estimated_duration_minutes} min</span>
             </div>
@@ -296,32 +322,23 @@ const CoursePlayer: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content — Udemy-style 2-column layout */}
       <div className="flex-1 overflow-y-auto px-8 py-6">
-        <div className="flex gap-6">
-          {/* Left: Lesson Sidebar */}
-          <aside className="w-80 flex-shrink-0">
-            <LessonSidebar
-              courseId={courseId || ''}
-              activeLessonId={lessonId || ''}
-              onSelectLesson={handleSelectLesson}
-              completedLessonIds={completedLessons}
-              completedQuizIds={completedQuizIds}
-            />
-          </aside>
+        <div className="flex gap-6 h-full">
 
-          {/* Center: Main Content */}
-          <div className="flex-1 min-w-0">
-            {/* Render content blocks (lessons store all content as content_blocks jsonb) */}
-            <div className="bg-white dark:bg-dark-background-card rounded-2xl p-6 shadow-md border border-gray-100 dark:border-gray-700">
-              <ContentBlockRenderer 
-                  contentBlocks={currentLesson.content_blocks || []} 
-                  onQuizClick={(quizId) => navigate(`/student/courses/${courseId}/quizzes/${quizId}/take`)}
-                />
+          {/* Left: Main content area (expanded) */}
+          <div className="flex-1 min-w-0 flex flex-col gap-6">
+
+            {/* Content renderer — larger, more padded */}
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl p-8 shadow-lg border border-gray-100 dark:border-gray-700">
+              <ContentBlockRenderer
+                contentBlocks={currentLesson.content_blocks || []}
+                onQuizClick={(quizId) => navigate(`/student/courses/${courseId}/quizzes/${quizId}/take`)}
+              />
             </div>
 
             {/* Next / Previous Navigation */}
-            <div className="flex items-center justify-between mt-4">
+            <div className="flex items-center justify-between">
               {prevItem ? (
                 <button
                   onClick={() => navigateToItem(prevItem)}
@@ -339,24 +356,74 @@ const CoursePlayer: React.FC = () => {
                 </button>
               ) : <div />}
             </div>
+
+            {/* Bottom tools section — horizontal tab bar */}
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden">
+              {/* Tab headers */}
+              <div className="flex border-b border-gray-200 dark:border-gray-700">
+                {bottomTabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleTabClick(tab.id)}
+                    className={`flex-1 py-3 px-4 text-sm font-medium flex items-center justify-center gap-2 transition-all duration-300 ease-in-out
+                      ${activeTab === tab.id
+                        ? 'text-brand-primary border-b-2 border-brand-primary bg-[#F5F7FF] dark:bg-gray-800'
+                        : 'text-text-secondary dark:text-dark-text-secondary hover:bg-gray-50 dark:hover:bg-gray-800/50'
+                      }`}
+                  >
+                    <span>{tab.icon}</span>
+                    <span className="hidden sm:inline">{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Active tab content — smooth transition */}
+              {activeTab && activeTab !== 'ai-summary' && (
+                <div
+                  className="p-6 transition-all duration-300 ease-in-out"
+                  style={{ animation: 'fadeSlideIn 0.3s ease forwards' }}
+                >
+                  {activeTab === 'downloads' && (
+                    <DownloadCenter resources={[]} />
+                  )}
+                  {activeTab === 'notes' && (
+                    <LessonNotesPanel activeLessonId={lessonId || ''} />
+                  )}
+                  {activeTab === 'ask-ai' && (
+                    <AskAIWidget activeLessonId={lessonId || ''} />
+                  )}
+                </div>
+              )}
+            </div>
+
           </div>
 
-          {/* Right: Secondary Panels */}
-          <aside className="w-80 flex-shrink-0 space-y-4">
-            <DownloadCenter resources={[]} />
-            <LessonNotesPanel activeLessonId={lessonId || ''} />
-            <AskAIWidget activeLessonId={lessonId || ''} />
-
-            {/* AI Summary Button */}
-            <button
-              onClick={() => setShowAIDrawer(true)}
-              className="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-medium rounded-full hover:shadow-lg hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
-            >
-              <span>✨</span> View AI Summary
-            </button>
+          {/* Right: Course content sidebar (Udemy-style, full height, sticky) */}
+          <aside className="w-80 xl:w-96 flex-shrink-0 h-[calc(100vh-200px)] sticky top-4 overflow-y-auto rounded-2xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/60 shadow-sm
+            [&::-webkit-scrollbar]:w-1.5
+            [&::-webkit-scrollbar-track]:bg-transparent
+            [&::-webkit-scrollbar-thumb]:bg-gray-300
+            dark:[&::-webkit-scrollbar-thumb]:bg-gray-700
+            [&::-webkit-scrollbar-thumb]:rounded-full">
+            <LessonSidebar
+              courseId={courseId || ''}
+              activeLessonId={lessonId || ''}
+              onSelectLesson={handleSelectLesson}
+              completedLessonIds={completedLessons}
+              completedQuizIds={completedQuizIds}
+            />
           </aside>
+
         </div>
       </div>
+
+      {/* Inline fade-slide animation for tab content */}
+      <style>{`
+        @keyframes fadeSlideIn {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
 
       {/* AI Summary Drawer */}
       <AISummaryDrawer
