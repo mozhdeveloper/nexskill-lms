@@ -10,7 +10,7 @@ export interface LessonContentBlock {
     | "quote"
     | "divider"
     | "embed"
-    | "document"; // Added document type
+    | "document";
     content: string; // HTML content for text blocks, URL for media
     attributes?: {
         // Common attributes
@@ -21,30 +21,31 @@ export interface LessonContentBlock {
         language?: string;
         // Image-specific
         alt?: string;
-        // Media metadata
-        media_metadata?: {
-            cloudinary_id: string;
-            public_id: string;
-            url: string;
-            resource_type: "image" | "video" | "raw"; // Added raw for documents
-            format: string;
-            bytes?: number;
-            original_filename?: string;
-            width?: number;
-            height?: number;
-            duration?: number;
-            thumbnail_url?: string;
-            bit_rate?: number;
-            frame_rate?: number;
-            codec?: string;
-        };
         // Video-specific attributes
         external_url?: string; // For YouTube/Vimeo URLs
+        source_url?: string; // For uploaded video URL from Cloudinary
         is_external?: boolean; // Flag for external videos
         autoplay?: boolean;
         controls?: boolean;
         loop?: boolean;
         muted?: boolean;
+        // Media metadata for uploaded videos
+        media_metadata?: {
+            cloudinary_id: string;
+            public_id: string;
+            secure_url: string;
+            resource_type: string;
+            format: string;
+            bytes: number;
+            original_filename?: string;
+            width?: number;
+            height?: number;
+            duration?: number;
+            thumbnail_url?: string;
+        };
+        // Document-specific
+        original_filename?: string;
+        bytes?: number;
         [key: string]: any; // Allow additional custom attributes
     };
     position: number;
@@ -64,7 +65,7 @@ export interface Lesson {
     is_published: boolean;
     created_at?: string;
     updated_at?: string;
-    type?: "video" | "pdf" | "quiz" | "live" | "text" | "lesson"; // Added type to match existing
+    type?: "video" | "pdf" | "quiz" | "live" | "text" | "lesson";
     duration?: string; // For backward compatibility
     summary?: string; // For backward compatibility
     video?: { filename: string; duration: string }; // For backward compatibility

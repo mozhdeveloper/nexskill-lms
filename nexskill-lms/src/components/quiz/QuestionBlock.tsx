@@ -145,9 +145,6 @@ const QuestionBlock: React.FC<QuestionBlockProps> = React.memo(({
                                 onContentUpdate={
                                     contentBlockHandlers.handleContentUpdate
                                 }
-                                onMediaUpload={
-                                    contentBlockHandlers.handleMediaUpload
-                                }
                                 onAttributeUpdate={
                                     contentBlockHandlers.updateBlockAttributes
                                 }

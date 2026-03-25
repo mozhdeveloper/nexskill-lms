@@ -1,5 +1,3 @@
-import type { MediaMetadata } from "./media.types";
-
 // ============================================
 // Content Block Types (Shared by Lessons & Quizzes)
 // ============================================
@@ -14,7 +12,6 @@ export interface ContentBlock {
         level?: 1 | 2 | 3;
 
         // For image blocks
-        media_metadata?: MediaMetadata;
         alt?: string;
         caption?: string;
 

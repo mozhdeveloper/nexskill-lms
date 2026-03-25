@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { Lesson, LessonContentBlock, CompletionCriteria } from "../../../types/lesson";
 import CompletionSettingsModal from "./CompletionSettingsModal";
+import VideoBlockEditor from "./VideoBlockEditor";
 
 interface LessonEditorPanelProps {
     lesson: Lesson;
@@ -187,32 +188,37 @@ const LessonEditorPanel: React.FC<LessonEditorPanelProps> = ({
                                     />
                                 )}
 
-                                {(block.type === "image" || block.type === "video") && (
+                                {block.type === "image" && (
                                     <div className="space-y-4">
                                         <input
                                             type="text"
                                             value={block.content}
                                             onChange={(e) => updateBlock(block.id, e.target.value)}
                                             className="w-full px-4 py-2 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700 text-sm"
-                                            placeholder={`Enter ${block.type} URL...`}
+                                            placeholder="Enter image URL..."
                                         />
                                         {block.content && (
                                             <div className="aspect-video bg-gray-100 dark:bg-slate-950 rounded-lg overflow-hidden flex items-center justify-center border border-gray-200 dark:border-gray-800">
-                                                {block.type === "image" ? (
-                                                    <img
-                                                        src={block.content}
-                                                        alt="Preview"
-                                                        className="w-full h-full object-contain"
-                                                    />
-                                                ) : (
-                                                    <div className="text-gray-400 flex flex-col items-center">
-                                                        <Video className="w-8 h-8 opacity-50 mb-2" />
-                                                        <span className="text-xs">Video Preview</span>
-                                                    </div>
-                                                )}
+                                                <img
+                                                    src={block.content}
+                                                    alt="Preview"
+                                                    className="w-full h-full object-contain"
+                                                />
                                             </div>
                                         )}
                                     </div>
+                                )}
+
+                                {block.type === "video" && (
+                                    <VideoBlockEditor
+                                        block={block}
+                                        onChange={(updatedBlock) => {
+                                            const updatedBlocks = currentLesson.content_blocks.map((b) =>
+                                                b.id === updatedBlock.id ? updatedBlock : b
+                                            );
+                                            updateLesson({ content_blocks: updatedBlocks });
+                                        }}
+                                    />
                                 )}
                             </div>
                         </div>

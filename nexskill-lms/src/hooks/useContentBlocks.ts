@@ -1,6 +1,15 @@
 import { useCallback } from "react";
 import type { ContentBlock } from "../types/quiz";
-import type { MediaMetadata } from "../types/media.types";
+
+interface MediaMetadata {
+    url: string;
+    thumbnail_url?: string;
+    duration?: number;
+    width?: number;
+    height?: number;
+    bytes?: number;
+    original_filename?: string;
+}
 
 /**
  * Generates a unique ID for content blocks
@@ -142,7 +151,6 @@ export const useContentBlocks = (
                       content: metadata.url,
                       attributes: {
                           ...block.attributes,
-                          media_metadata: metadata,
                       },
                   }
                 : block

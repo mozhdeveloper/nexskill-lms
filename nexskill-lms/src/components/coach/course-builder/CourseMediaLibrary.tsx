@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, FileText, Image, Video, Trash2, ExternalLink, Loader } from 'lucide-react';
 import { supabase } from '../../../lib/supabaseClient';
-import { MediaUploader } from '../../MediaUploader';
-import type { MediaMetadata } from '../../../types/media.types';
 
 interface CourseMedia {
   id: string;
@@ -12,7 +10,6 @@ interface CourseMedia {
   url: string;
   fileSize: number;
   uploadedAt: string;
-  metadata?: MediaMetadata;
 }
 
 interface CourseMediaLibraryProps {
@@ -23,8 +20,6 @@ const CourseMediaLibrary: React.FC<CourseMediaLibraryProps> = ({ courseId }) => 
   const [media, setMedia] = useState<CourseMedia[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'all' | 'images' | 'videos' | 'documents'>('all');
-  const [uploadType, setUploadType] = useState<'image' | 'video' | 'document'>('image');
-  const [showUploader, setShowUploader] = useState(false);
 
   useEffect(() => {
     fetchMedia();
@@ -79,7 +74,6 @@ const CourseMediaLibrary: React.FC<CourseMediaLibraryProps> = ({ courseId }) => 
                 url: block.content,
                 fileSize: block.attributes?.bytes || 0,
                 uploadedAt: new Date().toISOString(),
-                metadata: block.attributes?.media_metadata,
               });
             }
           });
@@ -94,29 +88,12 @@ const CourseMediaLibrary: React.FC<CourseMediaLibraryProps> = ({ courseId }) => 
     }
   };
 
-  const handleUploadComplete = (metadata: MediaMetadata) => {
-    const newMedia: CourseMedia = {
-      id: metadata.public_id,
-      courseId,
-      type: uploadType,
-      filename: metadata.original_filename || metadata.public_id,
-      url: metadata.url,
-      fileSize: metadata.bytes || 0,
-      uploadedAt: new Date().toISOString(),
-      metadata,
-    };
-
-    setMedia([newMedia, ...media]);
-    setShowUploader(false);
-  };
-
   const handleDelete = async (mediaId: string) => {
     if (!window.confirm('Are you sure you want to delete this media? It may be used in lessons.')) {
       return;
     }
 
     try {
-      // Note: In a real implementation, you'd also delete from Cloudinary/storage
       setMedia(media.filter(m => m.id !== mediaId));
     } catch (error) {
       console.error('Error deleting media:', error);
@@ -176,58 +153,10 @@ const CourseMediaLibrary: React.FC<CourseMediaLibraryProps> = ({ courseId }) => 
         <div>
           <h2 className="text-2xl font-bold text-slate-900 dark:text-dark-text-primary">Media Library</h2>
           <p className="text-sm text-slate-600 dark:text-dark-text-secondary mt-1">
-            Manage all media files used in your course
+            View all media files used in your course
           </p>
         </div>
-        <button
-          onClick={() => setShowUploader(!showUploader)}
-          className="px-5 py-2 bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white font-semibold rounded-full hover:shadow-lg transition-all flex items-center gap-2"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Upload Media
-        </button>
       </div>
-
-      {/* Upload Section */}
-      {showUploader && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-6">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-dark-text-primary mb-4">
-            Upload New Media
-          </h3>
-
-          {/* Type Selector */}
-          <div className="flex gap-3 mb-6">
-            {(['image', 'video', 'document'] as const).map(type => (
-              <button
-                key={type}
-                onClick={() => setUploadType(type)}
-                className={`px-4 py-2 rounded-lg font-medium transition-all capitalize ${
-                  uploadType === type
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50'
-                }`}
-              >
-                {type === 'document' ? 'PDF/PPT' : type}
-              </button>
-            ))}
-          </div>
-
-          {/* Uploader Component */}
-          <MediaUploader
-            resourceType={uploadType}
-            onUploadComplete={handleUploadComplete}
-            className="max-w-md"
-          />
-
-          {uploadType === 'document' && (
-            <p className="text-xs text-slate-600 dark:text-dark-text-secondary mt-3">
-              Supported: PDF, PowerPoint (.pptx), Word (.docx), Excel (.xlsx), and other documents
-            </p>
-          )}
-        </div>
-      )}
 
       {/* Filter Tabs */}
       <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700">
@@ -254,8 +183,8 @@ const CourseMediaLibrary: React.FC<CourseMediaLibraryProps> = ({ courseId }) => 
             No media yet
           </p>
           <p className="text-sm text-slate-500 dark:text-slate-500">
-            {activeTab === 'all' 
-              ? 'Upload your first media file to get started'
+            {activeTab === 'all'
+              ? 'Add media to your lessons to see it here'
               : `No ${activeTab.slice(0, -1)} files yet`}
           </p>
         </div>

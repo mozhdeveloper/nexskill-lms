@@ -1,6 +1,22 @@
 import React, { useState } from "react";
 import { Play, Loader2 } from "lucide-react";
-import type { MediaMetadata } from "../types/media.types";
+
+interface MediaMetadata {
+    url: string;
+    cloudinary_id?: string;
+    public_id?: string;
+    secure_url?: string;
+    thumbnail_url?: string;
+    duration?: number;
+    width?: number;
+    height?: number;
+    bytes?: number;
+    original_filename?: string;
+    resource_type?: string;
+    format?: string;
+    is_external?: boolean;
+    source_url?: string;
+}
 
 interface MediaPreviewProps {
     url: string;
@@ -24,23 +40,26 @@ export const MediaPreview: React.FC<MediaPreviewProps> = ({
     const [imageLoaded, setImageLoaded] = useState(false);
     const [imageError, setImageError] = useState(false);
     const [videoError, setVideoError] = useState(false);
+    const [videoLoaded, setVideoLoaded] = useState(false);
 
     if (!url || url === "https://example.com/media-url") {
         return null;
     }
 
+    // Check if it's a Cloudinary video URL
+    const isCloudinaryVideo = url.includes('res.cloudinary.com') && url.includes('/video/upload/');
+    
     // Check if it's a YouTube video
     const isYouTube = url.includes("youtube.com") || url.includes("youtu.be");
-    let embedUrl = url;
+    
+    // Check if it's a Vimeo video
+    const isVimeo = url.includes("vimeo.com");
 
-    if (isYouTube && resourceType === "video") {
-        if (url.includes("watch?v=")) {
-            embedUrl = url.replace("watch?v=", "embed/");
-        } else if (url.includes("youtu.be/")) {
-            const videoId = url.split("youtu.be/")[1]?.split("?")[0];
-            embedUrl = `https://www.youtube.com/embed/${videoId}`;
-        }
-    }
+    // Check if it's an external video (YouTube/Vimeo)
+    const isExternalVideo = isYouTube || isVimeo;
+
+    // For Cloudinary videos, use the secure_url directly
+    const videoSrc = metadata?.secure_url || metadata?.source_url || url;
 
     if (resourceType === "image") {
         return (
@@ -66,7 +85,9 @@ export const MediaPreview: React.FC<MediaPreviewProps> = ({
                                 imageLoaded ? "opacity-100" : "opacity-0"
                             }`}
                             loading={lazy ? "lazy" : "eager"}
-                            onLoad={() => setImageLoaded(true)}
+                            onLoad={() => {
+                                setImageLoaded(true);
+                            }}
                             onError={() => {
                                 setImageError(true);
                                 setImageLoaded(true);
@@ -111,9 +132,20 @@ export const MediaPreview: React.FC<MediaPreviewProps> = ({
         return (
             <figure className={`my-6 ${className}`}>
                 <div className="relative w-full rounded-xl overflow-hidden bg-black shadow-md aspect-video">
+                    {/* YouTube */}
                     {isYouTube ? (
                         <iframe
-                            src={embedUrl}
+                            src={getYouTubeEmbedUrl(url)}
+                            className="w-full h-full"
+                            title={alt || "Video player"}
+                            allowFullScreen
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            loading={lazy ? "lazy" : "eager"}
+                        />
+                    ) : isVimeo ? (
+                        // Vimeo
+                        <iframe
+                            src={getVimeoEmbedUrl(url)}
                             className="w-full h-full"
                             title={alt || "Video player"}
                             allowFullScreen
@@ -121,15 +153,28 @@ export const MediaPreview: React.FC<MediaPreviewProps> = ({
                             loading={lazy ? "lazy" : "eager"}
                         />
                     ) : (
+                        // Cloudinary or direct video file
                         <>
+                            {!videoLoaded && !videoError && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+                                    <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+                                </div>
+                            )}
+                            
                             {!videoError ? (
                                 <video
-                                    src={url}
+                                    src={videoSrc}
                                     controls
-                                    className="w-full h-full object-contain"
-                                    preload={lazy ? "metadata" : "auto"}
+                                    className={`w-full h-full object-contain ${videoLoaded ? 'opacity-100' : 'opacity-0'}`}
+                                    preload="metadata"
                                     poster={metadata?.thumbnail_url}
-                                    onError={() => setVideoError(true)}
+                                    onLoadedData={() => {
+                                        setVideoLoaded(true);
+                                    }}
+                                    onError={() => {
+                                        setVideoError(true);
+                                        setVideoLoaded(true);
+                                    }}
                                 >
                                     <track kind="captions" />
                                     Your browser does not support the video tag.
@@ -142,14 +187,14 @@ export const MediaPreview: React.FC<MediaPreviewProps> = ({
                                             Failed to load video
                                         </p>
                                         <p className="text-gray-500 text-xs mt-1 px-4 break-all">
-                                            {url}
+                                            {videoSrc}
                                         </p>
                                     </div>
                                 </div>
                             )}
 
                             {/* Video Duration Overlay */}
-                            {metadata?.duration && !videoError && (
+                            {metadata?.duration && !videoError && videoLoaded && (
                                 <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/70 text-white text-xs rounded">
                                     {Math.floor(metadata.duration / 60)}:
                                     {String(
@@ -189,5 +234,25 @@ export const MediaPreview: React.FC<MediaPreviewProps> = ({
 
     return null;
 };
+
+// Helper function to get YouTube embed URL
+function getYouTubeEmbedUrl(url: string): string {
+    if (url.includes("watch?v=")) {
+        return url.replace("watch?v=", "embed/");
+    } else if (url.includes("youtu.be/")) {
+        const videoId = url.split("youtu.be/")[1]?.split("?")[0];
+        return `https://www.youtube.com/embed/${videoId}`;
+    }
+    return url;
+}
+
+// Helper function to get Vimeo embed URL
+function getVimeoEmbedUrl(url: string): string {
+    const vimeoMatch = url.match(/vimeo\.com\/(?:.*\/)?(\d+)/);
+    if (vimeoMatch && vimeoMatch[1]) {
+        return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+    }
+    return url;
+}
 
 export default MediaPreview;

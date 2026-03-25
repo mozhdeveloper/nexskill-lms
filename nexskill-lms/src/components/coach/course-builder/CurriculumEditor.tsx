@@ -18,9 +18,13 @@ import {
     PenLine,
     Play,
     ExternalLink,
+    Upload,
+    AlertCircle,
 } from "lucide-react";
 import type { Lesson, Module } from "../../../types/lesson";
 import type { ContentItem } from "../../../types/content-item";
+import { CloudinaryVideoUploadService } from "../../../services/cloudinaryVideoUpload.service";
+import { supabase } from "../../../lib/supabaseClient";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,9 +52,13 @@ interface ActivePlusMenu {
 interface ContentOptions {
     moduleId: string;
     lessonId: string;
-    mode: "picker" | "video-input" | "quiz-input";
+    mode: "picker" | "video-input" | "video-upload" | "quiz-input";
     videoUrl: string;
     quizTitle: string;
+    isUploading: boolean;
+    uploadProgress: number;
+    uploadedVideoPreview?: string;
+    uploadError?: string;
 }
 
 interface VideoPreviewModalProps {
@@ -304,7 +312,7 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
     const handleContentClick = (moduleId: string, lessonId: string) => {
         setActivePlusMenu(null);
         setExpandedLessons((prev) => new Set([...prev, lessonId]));
-        setContentOptions({ moduleId, lessonId, mode: "picker", videoUrl: "", quizTitle: "" });
+        setContentOptions({ moduleId, lessonId, mode: "picker", videoUrl: "", quizTitle: "", isUploading: false, uploadProgress: 0 });
     };
 
     const handleVideoLinkClick = () => {
@@ -666,13 +674,20 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                                                     <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">
                                                                         Add content
                                                                     </p>
-                                                                    <div className="flex items-center gap-2">
+                                                                    <div className="flex items-center gap-2 flex-wrap">
                                                                         <button
                                                                             onClick={handleVideoLinkClick}
                                                                             className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg text-xs font-medium transition-all"
                                                                         >
                                                                             <Link className="w-3.5 h-3.5" />
                                                                             Video Link
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => setContentOptions({ ...contentOptions, mode: "video-upload" })}
+                                                                            className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg text-xs font-medium transition-all"
+                                                                        >
+                                                                            <Upload className="w-3.5 h-3.5" />
+                                                                            Upload Video
                                                                         </button>
                                                                         <button
                                                                             onClick={handleQuizPickerClick}
@@ -688,6 +703,239 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                                                             <X className="w-3.5 h-3.5" />
                                                                         </button>
                                                                     </div>
+                                                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                                                        Add video content via YouTube/Vimeo link or upload video file directly
+                                                                    </p>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Video Upload with Progress and Preview */}
+                                                            {showingOpts && contentOptions?.mode === "video-upload" && (
+                                                                <div className="pt-2">
+                                                                    <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">
+                                                                        Upload Video
+                                                                    </p>
+
+                                                                    {/* File Input (hidden) */}
+                                                                    <input
+                                                                        type="file"
+                                                                        accept="video/*"
+                                                                        id="video-upload-input"
+                                                                        className="hidden"
+                                                                        onChange={async (e) => {
+                                                                            const file = e.target.files?.[0];
+                                                                            if (!file) return;
+
+                                                                            // Validate file
+                                                                            const validation = CloudinaryVideoUploadService.validateVideoFile(file);
+                                                                            if (!validation.valid) {
+                                                                                setContentOptions({
+                                                                                    ...contentOptions,
+                                                                                    uploadError: validation.error || "Invalid video file"
+                                                                                });
+                                                                                return;
+                                                                            }
+
+                                                                            setContentOptions({
+                                                                                ...contentOptions,
+                                                                                isUploading: true,
+                                                                                uploadProgress: 0,
+                                                                                uploadError: undefined
+                                                                            });
+
+                                                                            try {
+                                                                                // Upload to Cloudinary
+                                                                                const response = await CloudinaryVideoUploadService.uploadVideo(file, (progress) => {
+                                                                                    setContentOptions(prev => prev ? {
+                                                                                        ...prev,
+                                                                                        uploadProgress: progress.percentage
+                                                                                    } : null);
+                                                                                });
+
+                                                                                // Add video to lesson
+                                                                                const updatedCurriculum = curriculum.map((m) =>
+                                                                                    m.id === contentOptions.moduleId ? {
+                                                                                        ...m,
+                                                                                        lessons: m.lessons.map((l) => {
+                                                                                            if (l.id !== contentOptions.lessonId) return l;
+                                                                                            const blocks: any[] = (l as any).content_blocks || [];
+                                                                                            const newBlock = {
+                                                                                                id: crypto.randomUUID(),
+                                                                                                type: "video",
+                                                                                                content: response.secure_url,
+                                                                                                position: blocks.length,
+                                                                                                title: "",
+                                                                                                attributes: {
+                                                                                                    source_url: response.secure_url,
+                                                                                                    is_external: false,
+                                                                                                    media_metadata: {
+                                                                                                        cloudinary_id: response.public_id,
+                                                                                                        public_id: response.public_id,
+                                                                                                        secure_url: response.secure_url,
+                                                                                                        resource_type: "video",
+                                                                                                        format: response.format,
+                                                                                                        bytes: response.bytes,
+                                                                                                        original_filename: response.original_filename || file.name,
+                                                                                                        width: response.width,
+                                                                                                        height: response.height,
+                                                                                                        duration: response.duration,
+                                                                                                        thumbnail_url: CloudinaryVideoUploadService.generateThumbnailUrl(response.public_id),
+                                                                                                    },
+                                                                                                },
+                                                                                            };
+                                                                                            return { ...l, content_blocks: [...blocks, newBlock] };
+                                                                                        }),
+                                                                                    } : m
+                                                                                );
+
+                                                                                onChange(updatedCurriculum);
+
+                                                                                // Save to database
+                                                                                if (!contentOptions.lessonId.startsWith('lesson-')) {
+                                                                                    if (onUpdateLessonContent) {
+                                                                                        const updatedLesson = updatedCurriculum
+                                                                                            .find(m => m.id === contentOptions.moduleId)
+                                                                                            ?.lessons.find(l => l.id === contentOptions.lessonId);
+                                                                                        if (updatedLesson) {
+                                                                                            await onUpdateLessonContent(contentOptions.moduleId, contentOptions.lessonId, (updatedLesson as any).content_blocks || []);
+                                                                                        }
+                                                                                    }
+                                                                                }
+
+                                                                                // Set preview
+                                                                                setContentOptions({
+                                                                                    ...contentOptions,
+                                                                                    isUploading: false,
+                                                                                    uploadProgress: 100,
+                                                                                    uploadedVideoPreview: response.secure_url
+                                                                                });
+                                                                            } catch (error) {
+                                                                                console.error("Video upload error:", error);
+                                                                                setContentOptions({
+                                                                                    ...contentOptions,
+                                                                                    isUploading: false,
+                                                                                    uploadProgress: 0,
+                                                                                    uploadError: error instanceof Error ? error.message : "Upload failed. Please try again."
+                                                                                });
+                                                                            }
+
+                                                                            // Reset file input
+                                                                            e.target.value = "";
+                                                                        }}
+                                                                    />
+
+                                                                    {/* Upload Progress */}
+                                                                    {contentOptions.isUploading && (
+                                                                        <div className="mb-4">
+                                                                            <div className="flex items-center justify-between mb-2">
+                                                                                <span className="text-xs font-medium text-blue-600 dark:text-blue-400 flex items-center gap-2">
+                                                                                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                                                                                    Uploading video...
+                                                                                </span>
+                                                                                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                                                                                    {Math.round(contentOptions.uploadProgress)}%
+                                                                                </span>
+                                                                            </div>
+                                                                            <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                                                                <div
+                                                                                    className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 transition-all duration-300"
+                                                                                    style={{ width: `${contentOptions.uploadProgress}%` }}
+                                                                                />
+                                                                            </div>
+                                                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                                                                Please wait while your video is being uploaded to Cloudinary...
+                                                                            </p>
+                                                                        </div>
+                                                                    )}
+
+                                                                    {/* Uploaded Video Preview */}
+                                                                    {contentOptions.uploadedVideoPreview && (
+                                                                        <div className="mb-4">
+                                                                            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50 dark:bg-slate-800">
+                                                                                <div className="px-3 py-2 bg-gray-100 dark:bg-slate-700 border-b border-gray-200 dark:border-gray-600 flex items-center justify-between">
+                                                                                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                                                                                        <Check className="w-3.5 h-3.5 text-green-600" />
+                                                                                        Video Uploaded Successfully
+                                                                                    </span>
+                                                                                </div>
+                                                                                <div className="aspect-video bg-black">
+                                                                                    <video
+                                                                                        controls
+                                                                                        className="w-full h-full"
+                                                                                        src={contentOptions.uploadedVideoPreview}
+                                                                                    >
+                                                                                        Your browser does not support the video tag.
+                                                                                    </video>
+                                                                                </div>
+                                                                                <div className="px-3 py-2 bg-gray-50 dark:bg-slate-800">
+                                                                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                                                        Preview your uploaded video
+                                                                                    </p>
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="flex items-center gap-2 mt-3">
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        // Save and close
+                                                                                        setContentOptions(null);
+                                                                                        setExpandedLessons((prev) => {
+                                                                                            const next = new Set(prev);
+                                                                                            next.delete(contentOptions.lessonId);
+                                                                                            return next;
+                                                                                        });
+                                                                                    }}
+                                                                                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors"
+                                                                                >
+                                                                                    <Check className="w-3.5 h-3.5" />
+                                                                                    Save & Close
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        // Re-upload
+                                                                                        setContentOptions({
+                                                                                            ...contentOptions,
+                                                                                            isUploading: false,
+                                                                                            uploadProgress: 0,
+                                                                                            uploadedVideoPreview: undefined
+                                                                                        });
+                                                                                        // Trigger file input
+                                                                                        setTimeout(() => {
+                                                                                            document.getElementById('video-upload-input')?.click();
+                                                                                        }, 100);
+                                                                                    }}
+                                                                                    className="px-3 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg text-xs font-medium transition-colors"
+                                                                                >
+                                                                                    Upload Different Video
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+
+                                                                    {/* Upload Instructions */}
+                                                                    {!contentOptions.isUploading && !contentOptions.uploadedVideoPreview && (
+                                                                        <div className="space-y-3">
+                                                                            {contentOptions.uploadError && (
+                                                                                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-2">
+                                                                                    <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                                                                                    <div className="flex-1">
+                                                                                        <p className="text-sm text-red-600 dark:text-red-400">{contentOptions.uploadError}</p>
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => document.getElementById('video-upload-input')?.click()}
+                                                                                className="w-full py-3 bg-[#304DB5] hover:bg-[#2540a3] text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                                                                            >
+                                                                                <Upload className="w-5 h-5" />
+                                                                                Choose Video File
+                                                                            </button>
+                                                                            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                                                                <Video className="w-3.5 h-3.5" />
+                                                                                <span>Select a video file to upload (MP4, MOV, AVI, WebM - max 100MB)</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             )}
 
@@ -833,27 +1081,52 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
 
                                                             {/* Video block display with preview button */}
                                                             {!showingOpts && videoBlock && (
-                                                                <div className="pt-2 flex items-center gap-2">
-                                                                    <div className="flex items-center gap-2 flex-1 min-w-0 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2">
-                                                                        <Video className="w-4 h-4 text-blue-500 flex-shrink-0" />
-                                                                        <span className="text-sm text-gray-600 dark:text-gray-300 truncate">
-                                                                            {videoBlock.content || "No URL"}
-                                                                        </span>
-                                                                    </div>
-                                                                    <button
-                                                                        onClick={() => setPreviewVideoUrl(videoBlock.content)}
-                                                                        className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors flex-shrink-0"
-                                                                        title="Preview video"
-                                                                    >
-                                                                        <Play className="w-4 h-4" />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleDeleteBlock(module.id, item.id, videoBlock.id)}
-                                                                        className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors flex-shrink-0"
-                                                                        title="Remove video"
-                                                                    >
-                                                                        <Trash2 className="w-4 h-4" />
-                                                                    </button>
+                                                                <div className="pt-2">
+                                                                    {/* Check if this is an uploaded Cloudinary video or external link */}
+                                                                    {videoBlock.content?.includes('cloudinary.com') && videoBlock.content?.includes('/video/upload/') ? (
+                                                                        // UPLOADED VIDEO (Cloudinary) - Show inline video player
+                                                                        <div className="rounded-xl overflow-hidden shadow-lg border border-gray-200 dark:border-gray-700 bg-black">
+                                                                            <video
+                                                                                src={videoBlock.content}
+                                                                                controls
+                                                                                className="w-full aspect-video"
+                                                                                poster={videoBlock.attributes?.media_metadata?.thumbnail_url}
+                                                                                preload="metadata"
+                                                                            >
+                                                                                <track kind="captions" />
+                                                                                Your browser does not support the video tag.
+                                                                            </video>
+                                                                            {videoBlock.attributes?.caption && (
+                                                                                <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-2 italic px-4 pb-3">
+                                                                                    {videoBlock.attributes.caption}
+                                                                                </p>
+                                                                            )}
+                                                                        </div>
+                                                                    ) : (
+                                                                        // EXTERNAL VIDEO (YouTube/Vimeo) - Show URL with play button
+                                                                        <div className="flex items-center gap-2">
+                                                                            <div className="flex items-center gap-2 flex-1 min-w-0 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2">
+                                                                                <Video className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                                                                                <span className="text-sm text-gray-600 dark:text-gray-300 truncate">
+                                                                                    {videoBlock.content || "No URL"}
+                                                                                </span>
+                                                                            </div>
+                                                                            <button
+                                                                                onClick={() => setPreviewVideoUrl(videoBlock.content)}
+                                                                                className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors flex-shrink-0"
+                                                                                title="Preview video"
+                                                                            >
+                                                                                <Play className="w-4 h-4" />
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => handleDeleteBlock(module.id, item.id, videoBlock.id)}
+                                                                                className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors flex-shrink-0"
+                                                                                title="Remove video"
+                                                                            >
+                                                                                <Trash2 className="w-4 h-4" />
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             )}
 
