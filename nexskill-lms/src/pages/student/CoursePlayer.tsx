@@ -314,7 +314,10 @@ const CoursePlayer: React.FC = () => {
           <div className="flex-1 min-w-0">
             {/* Render content blocks (lessons store all content as content_blocks jsonb) */}
             <div className="bg-white dark:bg-dark-background-card rounded-2xl p-6 shadow-md border border-gray-100 dark:border-gray-700">
-              <ContentBlockRenderer contentBlocks={currentLesson.content_blocks || []} />
+              <ContentBlockRenderer 
+                  contentBlocks={currentLesson.content_blocks || []} 
+                  onQuizClick={(quizId) => navigate(`/student/courses/${courseId}/quizzes/${quizId}/take`)}
+                />
             </div>
 
             {/* Next / Previous Navigation */}
