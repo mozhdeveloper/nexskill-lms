@@ -12,34 +12,26 @@ export const useCourses = () => {
     }, []);
 
     const fetchCourses = async () => {
-        try {
-            setLoading(true);
-            // Fetch courses with related category information if possible
-            // Note: we might need to adjust the query based on exact foreign key names
-            // For now, simple fetch
-            const { data, error } = await supabase
-                .from('courses')
-                .select(`
-          *,
-          category:categories(name)
-        `)
-                .eq('visibility', 'public');
+    try {
+        setLoading(true);
+        const { data, error } = await supabase
+            .from('courses')
+            .select(`
+                *,
+                category:categories(name)
+            `)
+            .eq('visibility', 'public')
+            .eq('verification_status', 'approved'); // ← ADD THIS
 
-            if (error) throw error;
-
-            // Transform data if necessary, or just set it
-            // Supabase returns nested data for joined tables.
-            // We might want to map it to our Course interface slightly if structure differs.
-            // For now, assuming strict match or tolerant UI.
-
-            setCourses(data as unknown as Course[]);
-        } catch (err: any) {
-            console.error('Error fetching courses:', err);
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
+        if (error) throw error;
+        setCourses(data as unknown as Course[]);
+    } catch (err: any) {
+        console.error('Error fetching courses:', err);
+        setError(err.message);
+    } finally {
+        setLoading(false);
+    }
+};
 
     return { courses, loading, error, refetch: fetchCourses };
 };
@@ -55,44 +47,45 @@ export const useCourse = (courseId: string | undefined) => {
     }, [courseId]);
 
     const fetchCourse = async () => {
-        if (!courseId) return;
+    if (!courseId) return;
 
-        try {
-            setLoading(true);
+    try {
+        setLoading(true);
 
-            // Fetch course with modules and content items (lessons linked via module_content_items)
-            const { data, error } = await supabase
-                .from('courses')
-                .select(`
-          *,
-          modules (
-            *,
-            module_content_items (*)
-          )
-        `)
-                .eq('id', courseId)
-                .single();
+        const { data, error } = await supabase
+            .from('courses')
+            .select(`
+                *,
+                modules (
+                    *,
+                    module_content_items (*)
+                )
+            `)
+            .eq('id', courseId)
+            .eq('visibility', 'public')           // ← ENSURE THIS IS PRESENT
+            .eq('verification_status', 'approved') // ← ADD THIS
+            .single();
 
-            if (error) throw error;
+        if (error) throw error;
 
-            // Sort modules by position
-            if (data && data.modules) {
-                data.modules.sort((a: any, b: any) => (a.position || 0) - (b.position || 0));
-                data.modules.forEach((mod: any) => {
-                    if (mod.module_content_items) {
-                        mod.module_content_items.sort((a: any, b: any) => (a.position || 0) - (b.position || 0));
-                    }
-                });
-            }
-
-            setCourse(data as unknown as Course);
-        } catch (err: any) {
-            console.error('Error fetching course:', err);
-            setError(err.message);
-        } finally {
-            setLoading(false);
+        // Sort modules by position
+        if (data && data.modules) {
+            data.modules.sort((a: any, b: any) => (a.position || 0) - (b.position || 0));
+            data.modules.forEach((mod: any) => {
+                if (mod.module_content_items) {
+                    mod.module_content_items.sort((a: any, b: any) => (a.position || 0) - (b.position || 0));
+                }
+            });
         }
-    };
+
+        setCourse(data as unknown as Course);
+    } catch (err: any) {
+        console.error('Error fetching course:', err);
+        setError(err.message);
+    } finally {
+        setLoading(false);
+    }
+};
 
     return { course, loading, error };
 };
