@@ -12,7 +12,7 @@ import CourseCoachTab from "../../components/courses/tabs/CourseCoachTab";
 
 /**
  * CourseDetail Page - Clean component focused on presentation
- *
+ *na
  * Responsibilities:
  * - Page layout and structure
  * - Coordinating child components
