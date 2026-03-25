@@ -24,14 +24,13 @@ import {
 import type { Lesson, Module } from "../../../types/lesson";
 import type { ContentItem } from "../../../types/content-item";
 import { CloudinaryVideoUploadService } from "../../../services/cloudinaryVideoUpload.service";
-import { supabase } from "../../../lib/supabaseClient";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface CurriculumEditorProps {
     curriculum: Module[];
     onChange: (updatedCurriculum: Module[]) => void;
-    onEditLesson: (moduleId: string, lessonId: string) => void;
+    onEditLesson?: (moduleId: string, lessonId: string) => void;
     onEditQuiz?: (moduleId: string, lessonId: string, quizId: string) => void;
     onCreateQuiz?: (moduleId: string, lessonId: string, quizTitle: string) => Promise<string>;
     onAddLesson?: (moduleId: string, newLesson: Lesson) => Promise<void>;
@@ -371,7 +370,7 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
     const handleSaveQuizTitle = async (moduleId: string, lessonId: string) => {
         if (!contentOptions?.quizTitle.trim()) return;
 
-        let quizId = crypto.randomUUID();
+        let quizId: string = crypto.randomUUID();
 
         if (onCreateQuiz) {
             try {

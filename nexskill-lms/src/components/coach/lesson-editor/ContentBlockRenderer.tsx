@@ -123,7 +123,7 @@ const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({ block }) =>
       // ============================================
       if (isUploadedVideo && !isExternalVideo) {
         const metadata = block.attributes?.media_metadata;
-        const videoUrl = metadata?.secure_url || metadata?.source_url || block.content;
+        const videoUrl = metadata?.secure_url || (metadata as any)?.source_url || block.content;
         
         console.log('Rendering UPLOADED video inline:', videoUrl);
         
@@ -247,7 +247,6 @@ const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({ block }) =>
                       title="Video player"
                       allowFullScreen
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      autoPlay
                     />
                   </div>
                 </div>

@@ -12,11 +12,10 @@ interface VideoBlockEditorProps {
 
 type VideoSourceType = "link" | "upload";
 
-const VideoBlockEditor: React.FC<VideoBlockEditorProps> = ({ 
-    block, 
+const VideoBlockEditor: React.FC<VideoBlockEditorProps> = ({
+    block,
     onChange,
     lessonId,
-    moduleId 
 }) => {
     const [sourceType, setSourceType] = useState<VideoSourceType>(
         block.attributes?.is_external || block.attributes?.external_url ? "link" : "upload"

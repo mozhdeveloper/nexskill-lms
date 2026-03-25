@@ -46,17 +46,11 @@ export const MediaPreview: React.FC<MediaPreviewProps> = ({
         return null;
     }
 
-    // Check if it's a Cloudinary video URL
-    const isCloudinaryVideo = url.includes('res.cloudinary.com') && url.includes('/video/upload/');
-    
     // Check if it's a YouTube video
     const isYouTube = url.includes("youtube.com") || url.includes("youtu.be");
-    
+
     // Check if it's a Vimeo video
     const isVimeo = url.includes("vimeo.com");
-
-    // Check if it's an external video (YouTube/Vimeo)
-    const isExternalVideo = isYouTube || isVimeo;
 
     // For Cloudinary videos, use the secure_url directly
     const videoSrc = metadata?.secure_url || metadata?.source_url || url;

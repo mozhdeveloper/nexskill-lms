@@ -539,15 +539,15 @@ const CourseBuilder: React.FC = () => {
     }
   };
 
-  const handleUpdateLessonTitle = async (moduleId: string, lessonId: string, title: string) => {
+  const handleUpdateLessonTitle = async (_moduleId: string, lessonId: string, title: string) => {
     if (!lessonId || lessonId.startsWith('lesson-')) return;
-    
+
     try {
       const { error } = await supabase
         .from("lessons")
         .update({ title: title, updated_at: new Date().toISOString() })
         .eq("id", lessonId);
-      
+
       if (error) {
         console.error("Error updating lesson title:", error);
       }
@@ -556,13 +556,13 @@ const CourseBuilder: React.FC = () => {
     }
   };
 
-  const handleUpdateLessonContent = async (moduleId: string, lessonId: string, contentBlocks: any[]) => {
+  const handleUpdateLessonContent = async (_moduleId: string, lessonId: string, contentBlocks: any[]) => {
     if (!lessonId || lessonId.startsWith('lesson-')) return;
-    
+
     try {
       const { error } = await supabase
         .from("lessons")
-        .update({ 
+        .update({
           content_blocks: contentBlocks, 
           updated_at: new Date().toISOString() 
         })
@@ -641,9 +641,9 @@ const CourseBuilder: React.FC = () => {
     }
   };
 
-  const handleAddQuiz = async (moduleId: string) => {
-    let resolvedModuleId = moduleId;
-    try { resolvedModuleId = await resolveModuleId(moduleId); } catch (e) { return; }
+  const handleAddQuiz = async (_moduleId: string) => {
+    let resolvedModuleId = _moduleId;
+    try { resolvedModuleId = await resolveModuleId(_moduleId); } catch (e) { return; }
 
     const newQuiz: Quiz = {
       id: uuidv4(), title: "New Quiz", description: "", instructions: "",
@@ -666,14 +666,14 @@ const CourseBuilder: React.FC = () => {
       }]);
 
       const newQuizItem: ContentItem = { ...newQuiz, type: 'quiz' };
-      setCurriculum(curriculum.map((m) => m.id === moduleId ? { ...m, lessons: [...m.lessons, newQuizItem] } : m));
-      setEditingQuiz({ moduleId, lessonId: "", quiz: newQuiz, questions: [] });
+      setCurriculum(curriculum.map((m) => m.id === _moduleId ? { ...m, lessons: [...m.lessons, newQuizItem] } : m));
+      setEditingQuiz({ moduleId: _moduleId, lessonId: "", quiz: newQuiz, questions: [] });
     } catch (err) {
       alert("Error adding quiz");
     }
   };
 
-  const handleCreateQuizWithTitle = async (moduleId: string, lessonId: string, quizTitle: string): Promise<string> => {
+  const handleCreateQuizWithTitle = async (moduleId: string, _lessonId: string, quizTitle: string): Promise<string> => {
     let resolvedModuleId = moduleId;
     try { resolvedModuleId = await resolveModuleId(moduleId); } catch (e) { throw new Error("Failed to resolve module"); }
 
