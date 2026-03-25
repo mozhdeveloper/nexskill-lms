@@ -340,7 +340,9 @@ const CoursePlayer: React.FC = () => {
 
           {/* Right: Secondary Panels */}
           <aside className="w-80 flex-shrink-0 space-y-4">
-            <DownloadCenter resources={[]} />\n            <LessonNotesPanel activeLessonId={lessonId || ''} />\n            <AskAIWidget activeLessonId={lessonId || ''} />
+            <DownloadCenter resources={[]} />
+            <LessonNotesPanel activeLessonId={lessonId || ''} />
+            <AskAIWidget activeLessonId={lessonId || ''} />
 
             {/* AI Summary Button */}
             <button

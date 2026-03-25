@@ -129,7 +129,9 @@ const CourseBuilder: React.FC = () => {
           learningObjectives: [],
         }));
 
-        setCourseStatus(courseData.verification_status === 'approved' ? "published" : "draft");
+        // Only set to published if verification_status is approved
+        const isPublished = courseData.verification_status === 'approved';
+        setCourseStatus(isPublished ? "published" : "draft");
         setVerificationStatus(courseData.verification_status || "draft");
 
         const dbPrice = courseData.price ?? 0;
@@ -169,6 +171,9 @@ const CourseBuilder: React.FC = () => {
                   if (item.content_type === 'lesson' && item.lesson_id) {
                     const contentBlocks = item.content_blocks || [];
                     const lessonType = contentBlocks.length > 0 ? contentBlocks[0].type : "text";
+                    const duration = item.lesson_estimated_duration_minutes 
+                      ? `${item.lesson_estimated_duration_minutes} min` 
+                      : "Lesson";
                     return {
                       id: item.lesson_id,
                       type: "lesson" as const,
@@ -180,8 +185,8 @@ const CourseBuilder: React.FC = () => {
                       created_at: item.lesson_created_at,
                       updated_at: item.lesson_updated_at,
                       type_attr: lessonType,
-                      duration: item.lesson_duration,
-                      summary: item.lesson_summary,
+                      duration: duration,
+                      summary: item.lesson_summary || "",
                     };
                   } else if (item.content_type === 'quiz' && item.quiz_id) {
                     return {
@@ -201,6 +206,7 @@ const CourseBuilder: React.FC = () => {
                       due_date: item.due_date,
                       late_submission_allowed: item.late_submission_allowed,
                       late_penalty_percent: item.late_penalty_percent,
+                      duration: "Quiz",
                     };
                   }
                   return null;
@@ -398,7 +404,9 @@ const CourseBuilder: React.FC = () => {
         id: lessonId, 
         type: 'lesson',
         title: newLesson.title || "Untitled Lesson",
-        content_blocks: newLesson.content_blocks || []
+        content_blocks: newLesson.content_blocks || [],
+        duration: `${newLesson.estimated_duration_minutes || 15} min`,
+        summary: newLesson.summary || "",
       };
       
       setCurriculum(curriculum.map((m) =>
@@ -453,11 +461,20 @@ const CourseBuilder: React.FC = () => {
         let allContent: ContentItem[] = [];
         if (lessonIds.length > 0) {
           const { data: lData } = await supabase.from("lessons").select("*").in("id", lessonIds);
-          if (lData) allContent = allContent.concat(lData.map(l => ({ ...l, type: 'lesson' } as ContentItem)));
+          if (lData) allContent = allContent.concat(lData.map(l => ({ 
+            ...l, 
+            type: 'lesson' as const,
+            duration: `${l.estimated_duration_minutes || 15} min`,
+            summary: l.summary || "",
+          })));
         }
         if (quizIds.length > 0) {
           const { data: qData } = await supabase.from("quizzes").select("*").in("id", quizIds);
-          if (qData) allContent = allContent.concat(qData.map(q => ({ ...q, type: 'quiz' } as ContentItem)));
+          if (qData) allContent = allContent.concat(qData.map(q => ({ 
+            ...q, 
+            type: 'quiz' as const,
+            duration: "Quiz",
+          })));
         }
 
         const sortedContent = allContentItemsData
@@ -508,12 +525,17 @@ const CourseBuilder: React.FC = () => {
   const handleSaveLesson = async (updatedLesson: Lesson) => {
     if (!editingLesson || !updatedLesson.id) return;
 
-    setEditingLesson({ ...editingLesson, lesson: updatedLesson });
+    const lessonWithDuration = {
+      ...updatedLesson,
+      duration: `${updatedLesson.estimated_duration_minutes || 15} min`,
+    };
+
+    setEditingLesson({ ...editingLesson, lesson: lessonWithDuration });
     setCurriculum(curriculum.map((mod) =>
       mod.id === editingLesson.moduleId
         ? { 
             ...mod, 
-            lessons: mod.lessons.map((l) => l.id === updatedLesson.id ? { ...updatedLesson, type: 'lesson' } as ContentItem : l) 
+            lessons: mod.lessons.map((l) => l.id === updatedLesson.id ? { ...lessonWithDuration, type: 'lesson' } as ContentItem : l) 
           }
         : mod
     ));
@@ -528,6 +550,7 @@ const CourseBuilder: React.FC = () => {
         content_blocks: updatedLesson.content_blocks || [],
         estimated_duration_minutes: updatedLesson.estimated_duration_minutes, 
         is_published: updatedLesson.is_published,
+        summary: updatedLesson.summary || "",
       }, { onConflict: "id" });
       
       if (error) throw error;
@@ -665,7 +688,7 @@ const CourseBuilder: React.FC = () => {
         position: newPosition, is_published: newQuiz.is_published,
       }]);
 
-      const newQuizItem: ContentItem = { ...newQuiz, type: 'quiz' };
+      const newQuizItem: ContentItem = { ...newQuiz, type: 'quiz', duration: "Quiz" };
       setCurriculum(curriculum.map((m) => m.id === moduleId ? { ...m, lessons: [...m.lessons, newQuizItem] } : m));
       setEditingQuiz({ moduleId, lessonId: "", quiz: newQuiz, questions: [] });
     } catch (err) {
@@ -704,7 +727,7 @@ const CourseBuilder: React.FC = () => {
 
       setCurriculum(curriculum.map((mod) =>
         mod.id === editingQuiz.moduleId
-          ? { ...mod, lessons: mod.lessons.map((l) => l.id === updatedQuiz.id ? { ...updatedQuiz, type: 'quiz' } as ContentItem : l) }
+          ? { ...mod, lessons: mod.lessons.map((l) => l.id === updatedQuiz.id ? { ...updatedQuiz, type: 'quiz', duration: "Quiz" } as ContentItem : l) }
           : mod
       ));
       setEditingQuiz({ ...editingQuiz, quiz: updatedQuiz });
@@ -748,27 +771,36 @@ const CourseBuilder: React.FC = () => {
 
   const handlePublish = async () => {
     try {
-      const { error } = await supabase.from('courses').update({
-        verification_status: 'approved', visibility: 'public', updated_at: new Date().toISOString(),
-      }).eq('id', courseId);
-      if (error) throw error;
-      setVerificationStatus('approved');
-      setCourseStatus("published");
-      alert("Course Published Successfully!");
+        const { error } = await supabase.from('courses').update({
+            verification_status: 'pending_review', // ← CHANGED from 'approved'
+            visibility: 'public', 
+            updated_at: new Date().toISOString(),
+        }).eq('id', courseId);
+        
+        if (error) throw error;
+        
+        setVerificationStatus('pending_review'); // ← Update local state
+        setCourseStatus("draft"); // ← Keep as draft until actually approved
+        
+        alert("Course submitted for admin review! It will be visible to students once approved.");
     } catch (error: any) {
-      alert(`Failed to publish: ${error.message}`);
+        alert(`Failed to submit for review: ${error.message}`);
     }
-  };
+};
 
   const handleUnpublish = async () => {
     try {
       const { error } = await supabase.from('courses').update({
-        verification_status: 'draft', visibility: 'private', updated_at: new Date().toISOString(),
+        verification_status: 'draft',
+        visibility: 'private',
+        updated_at: new Date().toISOString(),
       }).eq('id', courseId);
+      
       if (error) throw error;
+      
       setVerificationStatus('draft');
       setCourseStatus("draft");
-      alert("Course Unpublished.");
+      alert("Course Unpublished. Students can no longer access the course.");
     } catch (error: any) {
       alert(`Failed to unpublish: ${error.message}`);
     }
@@ -777,17 +809,40 @@ const CourseBuilder: React.FC = () => {
   const handleSavePricing = async () => {
     if (!courseId) return;
     const { error } = await supabase.from('courses').update({
-      price: pricing.mode === 'free' ? 0 : pricing.price, updated_at: new Date().toISOString(),
+      price: pricing.mode === 'free' ? 0 : pricing.price,
+      updated_at: new Date().toISOString(),
     }).eq('id', courseId);
     if (error) throw error;
   };
 
   const handleSubmitForReview = async () => {
     try {
-      const { error } = await supabase.from('courses').update({ verification_status: 'pending_review' }).eq('id', courseId);
+      // Check if course has required content before submitting
+      if (!settings.title.trim()) {
+        alert("Please add a course title before submitting for review.");
+        return;
+      }
+      
+      if (curriculum.length === 0) {
+        alert("Please add at least one module before submitting for review.");
+        return;
+      }
+      
+      const hasLessons = curriculum.some(m => m.lessons && m.lessons.length > 0);
+      if (!hasLessons) {
+        alert("Please add at least one lesson or quiz before submitting for review.");
+        return;
+      }
+      
+      const { error } = await supabase.from('courses').update({
+        verification_status: 'pending_review',
+        updated_at: new Date().toISOString(),
+      }).eq('id', courseId);
+      
       if (error) throw error;
+      
       setVerificationStatus('pending_review');
-      alert("Course submitted for review successfully!");
+      alert("Course submitted for review successfully! The admin will review your course and notify you once approved.");
     } catch (error: any) {
       alert(`Failed to submit: ${error.message}`);
     }
@@ -828,13 +883,24 @@ const CourseBuilder: React.FC = () => {
       }
 
       await supabase.from("courses").update({
-        title: settings.title, subtitle: settings.subtitle,
-        short_description: settings.shortDescription, long_description: settings.longDescription,
-        visibility: settings.visibility, language: settings.language,
-        category_id: categoryId, level: settings.level, updated_at: new Date().toISOString(),
+        title: settings.title,
+        subtitle: settings.subtitle,
+        short_description: settings.shortDescription,
+        long_description: settings.longDescription,
+        visibility: settings.visibility,
+        language: settings.language,
+        category_id: categoryId,
+        level: settings.level,
+        updated_at: new Date().toISOString(),
       }).eq("id", courseId);
 
-      setCourseStatus(settings.visibility === "public" ? "published" : "draft");
+      // Only set to published if verification is approved
+      if (verificationStatus === 'approved' && settings.visibility === 'public') {
+        setCourseStatus("published");
+      } else {
+        setCourseStatus("draft");
+      }
+      
       alert("Settings saved successfully");
     } catch (error) {
       alert("Failed to save settings");
@@ -845,7 +911,9 @@ const CourseBuilder: React.FC = () => {
     try {
       const updates = drip.map(async (dripModule) => {
         const { error } = await supabase.from("modules").update({
-          drip_mode: dripModule.mode, drip_days: dripModule.daysAfter, drip_date: dripModule.specificDate,
+          drip_mode: dripModule.mode,
+          drip_days: dripModule.daysAfter,
+          drip_date: dripModule.specificDate,
         }).eq("id", dripModule.moduleId);
         if (error) throw error;
       });
@@ -894,11 +962,11 @@ const CourseBuilder: React.FC = () => {
         return <CoursePricingForm pricing={pricing} onChange={setPricing} onSave={handleSavePricing} />;
       case "goals":
         return <CourseGoalsPanel courseId={courseId!} />;
-      case "publish":
-        return (
-          <CoursePublishWorkflow
+     case "publish":
+    return (
+        <CoursePublishWorkflow
             courseStatus={courseStatus}
-            verificationStatus={verificationStatus}
+            verificationStatus={verificationStatus} // ← ADD THIS PROP
             adminFeedback={adminFeedback}
             onPublish={handlePublish}
             onUnpublish={handleUnpublish}
@@ -907,8 +975,8 @@ const CourseBuilder: React.FC = () => {
             hasModules={curriculum.length > 0}
             hasLessons={curriculum.some(m => m.lessons && m.lessons.length > 0)}
             hasPricing={pricing.mode === 'free' || pricing.price > 0}
-          />
-        );
+        />
+    );
       case "preview":
         return (
           <CoursePreviewPane
