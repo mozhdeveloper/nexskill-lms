@@ -252,66 +252,231 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     setTransactionError(null);
 
     try {
-      // 1. Insert a `pending` transaction first so we have a record
-      //    even if something goes wrong mid-flight.
-      // Insert returns an array — avoid .single() which causes a 400
-      // when RLS SELECT policy is absent even if INSERT succeeds.
-      const { data: insertedRows, error: insertError } = await supabase
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('💳 PAYMENT PROCESS STARTED');
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('📋 Payment Details:');
+      console.log('   - Course ID:', courseId);
+      console.log('   - Course Title:', courseTitle);
+      console.log('   - Price:', price);
+      console.log('   - User ID:', userId);
+      console.log('   - Payment Method:', paymentMethod);
+      console.log('═══════════════════════════════════════════════════════');
+
+      // 1. Fetch course details to get coach_id and course title
+      console.log('📚 Step 1: Fetching course details...');
+      const { data: courseData, error: courseError } = await supabase
+        .from("courses")
+        .select("coach_id, title")
+        .eq("id", courseId)
+        .single();
+
+      console.log('   Response:', { 
+        data: courseData, 
+        error: courseError 
+      });
+
+      if (courseError) {
+        console.error('❌ Step 1 FAILED:', courseError);
+        throw courseError;
+      }
+      if (!courseData) {
+        console.error('❌ Step 1 FAILED: Course not found');
+        throw new Error("Course not found");
+      }
+      console.log('✅ Step 1 SUCCESS - Coach ID:', courseData.coach_id);
+
+      // 2. Fetch student profile for name
+      console.log('👤 Step 2: Fetching student profile...');
+      const { data: studentProfile, error: profileError } = await supabase
+        .from("profiles")
+        .select("first_name, last_name, email")
+        .eq("id", userId)
+        .single();
+
+      console.log('   Response:', { 
+        data: studentProfile, 
+        error: profileError 
+      });
+
+      if (profileError) {
+        console.error('❌ Step 2 FAILED:', profileError);
+        throw profileError;
+      }
+      console.log('✅ Step 2 SUCCESS - Student:', studentProfile?.first_name);
+
+      const studentName = studentProfile 
+        ? `${studentProfile.first_name || ""} ${studentProfile.last_name || ""}`.trim() || "Student"
+        : "Student";
+
+      // 3. Create transaction record FIRST (before enrollment)
+      console.log('💳 Step 3: Creating transaction record...');
+      const transactionPayload = {
+        coach_id: courseData.coach_id,
+        course_id: courseId,
+        student_id: userId,
+        student_name: studentName,
+        student_email: studentProfile?.email,
+        course_title: courseData.title,
+        type: "sale",
+        amount: Number(price),
+        currency: "PHP",
+        status: "pending",
+        description: `Course purchase: ${courseTitle}`,
+        payment_method: paymentMethod,
+        payment_reference: `TXN-${Date.now()}`,
+        platform_fee: Number(price) * 0.05,
+        net_amount: Number(price) * 0.95,
+        created_at: new Date().toISOString(),
+      };
+
+      console.log('   Payload:', JSON.stringify(transactionPayload, null, 2));
+
+      const { data: transactionData, error: transactionError } = await supabase
         .from("transactions")
-        .insert({
-          user_id: userId,
-          type: "course_purchase",
-          amount: Number(price),           // ensure numeric, never a string
-          currency: "PHP",
-          status: "pending",
-          description: `Course purchase: ${courseTitle}`,
-          reference_id: courseId,          // links back to the course
-          payment_method: paymentMethod,   // 'card' | 'paypal'
-        })
-        .select("id");
+        .insert(transactionPayload)
+        .select("id, status")
+        .single();
 
-      if (insertError) throw insertError;
+      console.log('   Response:', { 
+        data: transactionData, 
+        error: transactionError 
+      });
 
-      const pendingTx = insertedRows?.[0];
-      if (!pendingTx) throw new Error("Transaction record was not created.");
+      if (transactionError) {
+        console.error('❌ Step 3 FAILED - Transaction Insert Error:');
+        console.error('   Code:', transactionError.code);
+        console.error('   Message:', transactionError.message);
+        console.error('   Details:', transactionError.details);
+        console.error('   Hint:', transactionError.hint);
+        console.error('');
+        console.error('   🔍 LIKELY CAUSE: RLS Policy is blocking INSERT');
+        console.error('   ✅ SOLUTION: Run this SQL in Supabase:');
+        console.error('   ────────────────────────────────────────────────');
+        console.error('   DROP POLICY IF EXISTS "Anyone can insert transactions" ON transactions;');
+        console.error('   CREATE POLICY "Anyone can insert transactions" ON transactions');
+        console.error('       FOR INSERT');
+        console.error('       WITH CHECK (true);');
+        console.error('   ────────────────────────────────────────────────');
+        throw transactionError;
+      }
 
-      // 2. Simulate payment-gateway round-trip (replace with real gateway call).
-      //    In production: call your Stripe / PayMongo / etc. endpoint here,
-      //    passing pendingTx.id as the idempotency key.
+      if (!transactionData) {
+        console.error('❌ Step 3 FAILED: No data returned');
+        throw new Error("Failed to create transaction record");
+      }
+
+      console.log('✅ Step 3 SUCCESS - Transaction ID:', transactionData.id);
+
+      // 4. Simulate payment processing
+      console.log('⏳ Step 4: Processing payment (simulating gateway)...');
       await new Promise((res) => setTimeout(res, 2000));
-      const paymentGatewaySucceeded = true; // ← replace with real result
+      
+      // In production: Call real payment gateway (Stripe, PayMongo, etc.)
+      const paymentGatewaySucceeded = true;
+      console.log('   Payment Gateway Result:', paymentGatewaySucceeded);
 
       if (!paymentGatewaySucceeded) {
-        // Mark the transaction as failed and surface the error
+        console.log('   ❌ Payment failed, marking transaction as failed...');
         await supabase
           .from("transactions")
           .update({ status: "failed" })
-          .eq("id", pendingTx.id);
+          .eq("id", transactionData.id);
 
         throw new Error("Payment was declined. Please check your details and try again.");
       }
 
-      // 3. Mark the transaction as succeeded
+      // 5. Update transaction to completed
+      console.log('✅ Step 5: Marking transaction as completed...');
       const { error: updateError } = await supabase
         .from("transactions")
-        .update({ status: "succeeded" })
-        .eq("id", pendingTx.id);
+        .update({ 
+          status: "completed",
+          processed_at: new Date().toISOString()
+        })
+        .eq("id", transactionData.id);
 
-      if (updateError) throw updateError;
+      console.log('   Update Response:', { error: updateError });
 
-      // 4. Show success UI then call parent callback (which handles enrollment)
+      if (updateError) {
+        console.error('❌ Step 5 FAILED:', updateError);
+        throw updateError;
+      }
+      console.log('✅ Step 5 SUCCESS');
+
+      // 6. Verify transaction is completed before enrolling
+      console.log('🔍 Step 6: Verifying transaction status...');
+      const { data: verifiedTransaction, error: verifyError } = await supabase
+        .from("transactions")
+        .select("status, id")
+        .eq("id", transactionData.id)
+        .single();
+
+      console.log('   Verification Response:', { 
+        data: verifiedTransaction, 
+        error: verifyError 
+      });
+
+      if (verifyError) {
+        console.error('❌ Step 6 FAILED:', verifyError);
+        throw verifyError;
+      }
+
+      if (!verifiedTransaction || verifiedTransaction.status !== "completed") {
+        console.error('❌ Step 6 FAILED: Transaction not completed');
+        console.error('   Status:', verifiedTransaction?.status);
+        throw new Error("Transaction verification failed. Payment not confirmed.");
+      }
+
+      console.log('✅ Step 6 SUCCESS - Transaction Verified:', verifiedTransaction.id);
+
+      // 7. NOW create the enrollment (only after successful payment)
+      console.log('🎓 Step 7: Creating enrollment...');
+      const { data: enrollmentData, error: enrollmentError } = await supabase
+        .from("enrollments")
+        .insert({
+          profile_id: userId,
+          course_id: courseId,
+          enrolled_at: new Date().toISOString(),
+        })
+        .select("profile_id, course_id, enrolled_at")
+        .single();
+
+      console.log('   Enrollment Response:', { 
+        data: enrollmentData, 
+        error: enrollmentError 
+      });
+
+      if (enrollmentError) {
+        console.error('❌ Step 7 FAILED:', enrollmentError);
+        throw enrollmentError;
+      }
+      console.log('✅ Step 7 SUCCESS - Enrollment Created');
+
+      // 8. Show success and call parent callback
+      console.log('🎉 Step 8: Payment complete!');
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('✅ PAYMENT SUCCESSFUL');
+      console.log('   Transaction ID:', transactionData.id);
+      console.log('   Enrollment:', enrollmentData);
+      console.log('═══════════════════════════════════════════════════════');
+      
       setProcessing(false);
       setSuccess(true);
       await new Promise((res) => setTimeout(res, 1200));
       onPaymentSuccess();
 
     } catch (err: unknown) {
+      console.log('❌ PAYMENT FAILED');
+      console.log('═══════════════════════════════════════════════════════');
       setProcessing(false);
       const message =
         err instanceof Error
           ? err.message
           : "Something went wrong. Please try again.";
       setTransactionError(message);
+      console.error("Full Error:", err);
+      console.log('═══════════════════════════════════════════════════════');
     }
   };
 
