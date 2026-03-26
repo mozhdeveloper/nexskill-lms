@@ -2,8 +2,14 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import type { Course } from '../types/db';
 
+export interface CourseWithReviews extends Course {
+  reviewCount?: number;
+  rating?: number;
+  studentsCount?: number;
+}
+
 export const useCourses = () => {
-    const [courses, setCourses] = useState<Course[]>([]);
+    const [courses, setCourses] = useState<CourseWithReviews[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -21,10 +27,44 @@ export const useCourses = () => {
                 category:categories(name)
             `)
             .eq('visibility', 'public')
-            .eq('verification_status', 'approved'); // ← ADD THIS
+            .eq('verification_status', 'approved');
 
         if (error) throw error;
-        setCourses(data as unknown as Course[]);
+
+        // Fetch review counts and enrollment counts for all courses
+        const coursesWithReviews = await Promise.all(
+            (data || []).map(async (course: any) => {
+                // Fetch review count and rating
+                const { count: reviewCount } = await supabase
+                    .from('reviews')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('course_id', course.id);
+
+                const { data: reviewsData } = await supabase
+                    .from('reviews')
+                    .select('rating')
+                    .eq('course_id', course.id);
+
+                const avgRating = reviewsData && reviewsData.length > 0
+                    ? Math.round((reviewsData.reduce((sum, r) => sum + r.rating, 0) / reviewsData.length) * 10) / 10
+                    : 0;
+
+                // Fetch enrollment count
+                const { count: enrollmentCount } = await supabase
+                    .from('enrollments')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('course_id', course.id);
+
+                return {
+                    ...course,
+                    reviewCount: reviewCount || 0,
+                    rating: avgRating,
+                    studentsCount: enrollmentCount || 0,
+                };
+            })
+        );
+
+        setCourses(coursesWithReviews as unknown as CourseWithReviews[]);
     } catch (err: any) {
         console.error('Error fetching courses:', err);
         setError(err.message);
@@ -62,8 +102,8 @@ export const useCourse = (courseId: string | undefined) => {
                 )
             `)
             .eq('id', courseId)
-            .eq('visibility', 'public')           // ← ENSURE THIS IS PRESENT
-            .eq('verification_status', 'approved') // ← ADD THIS
+            .eq('visibility', 'public')
+            .eq('verification_status', 'approved')
             .single();
 
         if (error) throw error;

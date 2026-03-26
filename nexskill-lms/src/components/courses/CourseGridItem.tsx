@@ -6,6 +6,7 @@ interface Course {
   category: string;
   level: 'Beginner' | 'Intermediate' | 'Advanced';
   rating: number;
+  reviewCount?: number;
   studentsCount: number;
   duration: string;
   price: number;
@@ -14,6 +15,10 @@ interface Course {
   isNew?: boolean;
   thumbnail: string;
   shortDescription: string;
+  isEnrolled?: boolean;
+  progressPercent?: number;
+  completedLessons?: number;
+  totalLessons?: number;
 }
 
 interface CourseGridItemProps {
@@ -35,6 +40,10 @@ const CourseGridItem: React.FC<CourseGridItemProps> = ({ course, onClick }) => {
     'gradient-green-blue': 'from-green-100 to-blue-100',
     'gradient-orange-red': 'from-orange-100 to-red-100',
   };
+
+  const reviewCount = course.reviewCount || 0;
+  const isEnrolled = course.isEnrolled || false;
+  const progressPercent = course.progressPercent || 0;
 
   return (
     <div
@@ -61,6 +70,11 @@ const CourseGridItem: React.FC<CourseGridItemProps> = ({ course, onClick }) => {
               New
             </span>
           )}
+          {isEnrolled && (
+            <span className="px-3 py-1 bg-green-500 text-white rounded-full text-xs font-medium">
+              Enrolled
+            </span>
+          )}
         </div>
 
         {/* Placeholder Icon */}
@@ -79,15 +93,24 @@ const CourseGridItem: React.FC<CourseGridItemProps> = ({ course, onClick }) => {
           {course.shortDescription}
         </p>
 
+        {/* Rating with Reviews */}
+        <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-1">
+            <span className="text-yellow-500 text-sm">★</span>
+            <span className="font-semibold text-text-primary dark:text-white">{course.rating.toFixed(1)}</span>
+          </div>
+          {reviewCount > 0 && (
+            <span className="text-xs text-text-muted dark:text-slate-500">
+              ({reviewCount} {reviewCount === 1 ? 'review' : 'reviews'})
+            </span>
+          )}
+        </div>
+
         {/* Meta Row */}
         <div className="flex items-center gap-4 mb-4 text-xs text-text-muted dark:text-slate-500">
           <div className="flex items-center gap-1">
-            <span className="text-yellow-500">★</span>
-            <span className="font-medium text-text-primary dark:text-white">{course.rating}</span>
-          </div>
-          <div className="flex items-center gap-1">
             <span>👥</span>
-            <span>{course.studentsCount.toLocaleString()}</span>
+            <span>{course.studentsCount.toLocaleString()} students</span>
           </div>
           <div className="flex items-center gap-1">
             <span>⏱️</span>
@@ -95,18 +118,57 @@ const CourseGridItem: React.FC<CourseGridItemProps> = ({ course, onClick }) => {
           </div>
         </div>
 
-        {/* Pricing & CTA */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-baseline gap-2">
-            <span className="text-xl font-bold text-text-primary dark:text-white">₱{course.price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
-            {course.originalPrice && (
-              <span className="text-sm text-text-muted dark:text-slate-500 line-through">₱{course.originalPrice.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
+        {/* Progress Bar for Enrolled Courses */}
+        {isEnrolled && (
+          <div className="mb-4">
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="font-medium text-text-primary dark:text-white">Your Progress</span>
+              <span className="text-text-muted dark:text-slate-500">{progressPercent}%</span>
+            </div>
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+              <div
+                className={`h-2 rounded-full transition-all duration-500 ${
+                  progressPercent === 100 
+                    ? 'bg-green-500' 
+                    : 'bg-gradient-to-r from-brand-primary to-brand-primary-light'
+                }`}
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            {course.completedLessons !== undefined && course.totalLessons !== undefined && (
+              <p className="text-xs text-text-muted dark:text-slate-500 mt-1">
+                {course.completedLessons} of {course.totalLessons} lessons completed
+              </p>
+            )}
+            {progressPercent === 100 && (
+              <p className="text-xs text-green-600 dark:text-green-400 font-medium mt-1">
+                🎉 Course completed!
+              </p>
             )}
           </div>
-          <button className="px-4 py-2 bg-brand-primary-soft text-brand-primary text-sm font-medium rounded-full hover:bg-brand-primary hover:text-white transition-colors">
-            View details
+        )}
+
+        {/* Pricing & CTA */}
+        {!isEnrolled && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-text-primary dark:text-white">₱{course.price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
+              {course.originalPrice && (
+                <span className="text-sm text-text-muted dark:text-slate-500 line-through">₱{course.originalPrice.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
+              )}
+            </div>
+            <button className="px-4 py-2 bg-brand-primary-soft text-brand-primary text-sm font-medium rounded-full hover:bg-brand-primary hover:text-white transition-colors">
+              View details
+            </button>
+          </div>
+        )}
+
+        {/* Continue Learning Button for Enrolled */}
+        {isEnrolled && (
+          <button className="w-full px-4 py-2 bg-gradient-to-r from-brand-primary to-brand-primary-light text-white text-sm font-medium rounded-full hover:shadow-lg transition-all">
+            {progressPercent === 100 ? 'View Certificate' : 'Continue Learning'}
           </button>
-        </div>
+        )}
       </div>
     </div>
   );

@@ -3,9 +3,15 @@ import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import type { Course } from '../types/db';
 
+export interface EnrolledCourse extends Course {
+  reviewCount?: number;
+  rating?: number;
+  studentsCount?: number;
+}
+
 export const useEnrolledCourses = () => {
     const { user } = useAuth();
-    const [courses, setCourses] = useState<Course[]>([]);
+    const [courses, setCourses] = useState<EnrolledCourse[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -35,13 +41,43 @@ export const useEnrolledCourses = () => {
 
             if (error) throw error;
 
-            // 2. Transform to Course[]
-            const enrolledCourses = data.map((item: any) => ({
-                ...item.course,
-                enrolled_at: item.enrolled_at
-            }));
+            // 2. Fetch review counts, ratings, and student counts for all enrolled courses
+            const enrolledCourses = await Promise.all(
+                (data || []).map(async (item: any) => {
+                    const course = item.course;
+                    
+                    // Fetch review count and rating
+                    const { count: reviewCount } = await supabase
+                        .from('reviews')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('course_id', course.id);
 
-            setCourses(enrolledCourses as unknown as Course[]);
+                    const { data: reviewsData } = await supabase
+                        .from('reviews')
+                        .select('rating')
+                        .eq('course_id', course.id);
+
+                    const avgRating = reviewsData && reviewsData.length > 0
+                        ? Math.round((reviewsData.reduce((sum, r) => sum + r.rating, 0) / reviewsData.length) * 10) / 10
+                        : 0;
+
+                    // Fetch total enrollment count
+                    const { count: enrollmentCount } = await supabase
+                        .from('enrollments')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('course_id', course.id);
+
+                    return {
+                        ...course,
+                        enrolled_at: item.enrolled_at,
+                        reviewCount: reviewCount || 0,
+                        rating: avgRating,
+                        studentsCount: enrollmentCount || 0,
+                    };
+                })
+            );
+
+            setCourses(enrolledCourses as unknown as EnrolledCourse[]);
         } catch (err: any) {
             console.error('Error fetching enrolled courses:', err);
             setError(err.message);

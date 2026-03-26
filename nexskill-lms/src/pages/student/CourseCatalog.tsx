@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import StudentAppLayout from "../../layouts/StudentAppLayout";
 import CourseFilterBar from "../../components/courses/CourseFilterBar";
@@ -6,6 +6,8 @@ import CourseCategorySidebar from "../../components/courses/CourseCategorySideba
 import CourseGridItem from "../../components/courses/CourseGridItem";
 import { useCourses } from '../../hooks/useCourses';
 import { useEnrolledCourses } from '../../hooks/useEnrolledCourses';
+import { supabase } from '../../lib/supabaseClient';
+import { useAuth } from '../../context/AuthContext';
 
 // Categories for the filter sidebar
 const categories = [
@@ -27,6 +29,8 @@ const formatDuration = (hours: number) => {
 
 const CourseCatalog: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  
   // Fetch ALL courses
   const { courses: dbCourses, loading: loadingAll } = useCourses();
   // Fetch ENROLLED courses
@@ -37,29 +41,113 @@ const CourseCatalog: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedLevel, setSelectedLevel] = useState("All");
   const [sortOption, setSortOption] = useState("Most popular");
+  const [enrolledCourseIds, setEnrolledCourseIds] = useState<Set<string>>(new Set());
+  const [courseProgress, setCourseProgress] = useState<Record<string, { percent: number; completed: number; total: number }>>({});
 
   // Determine which source data to use
   const sourceCourses = activeTab === 'browse' ? dbCourses : enrolledCourses;
   const isLoading = activeTab === 'browse' ? loadingAll : loadingEnrolled;
 
+  // Fetch enrolled course IDs and progress
+  useEffect(() => {
+    const fetchEnrollmentsAndProgress = async () => {
+      if (!user) {
+        setEnrolledCourseIds(new Set());
+        setCourseProgress({});
+        return;
+      }
+
+      try {
+        // Fetch enrolled course IDs
+        const { data: enrollments } = await supabase
+          .from('enrollments')
+          .select('course_id')
+          .eq('profile_id', user.id);
+
+        const enrolledIds = new Set((enrollments || []).map(e => e.course_id));
+        setEnrolledCourseIds(enrolledIds);
+
+        // Fetch progress for each enrolled course
+        const progressMap: Record<string, { percent: number; completed: number; total: number }> = {};
+        
+        for (const courseId of enrolledIds) {
+          // Get all lesson IDs for this course
+          const { data: modules } = await supabase
+            .from('modules')
+            .select('id')
+            .eq('course_id', courseId);
+
+          if (!modules || modules.length === 0) continue;
+
+          const moduleIds = modules.map(m => m.id);
+
+          // Get content items for these modules (published only)
+          const { data: contentItems } = await supabase
+            .from('module_content_items')
+            .select('content_type, content_id')
+            .in('module_id', moduleIds)
+            .eq('is_published', true);
+
+          const lessonIds = (contentItems || [])
+            .filter(i => i.content_type === 'lesson')
+            .map(i => i.content_id);
+
+          if (lessonIds.length === 0) continue;
+
+          // Fetch completed lessons
+          const { data: lessonProgress } = await supabase
+            .from('user_lesson_progress')
+            .select('lesson_id, is_completed')
+            .eq('user_id', user.id)
+            .in('lesson_id', lessonIds);
+
+          const completedCount = (lessonProgress || []).filter(l => l.is_completed).length;
+          const percent = lessonIds.length > 0 ? Math.round((completedCount / lessonIds.length) * 100) : 0;
+
+          progressMap[courseId] = {
+            percent,
+            completed: completedCount,
+            total: lessonIds.length,
+          };
+        }
+
+        setCourseProgress(progressMap);
+      } catch (error) {
+        console.error('Error fetching enrollments and progress:', error);
+      }
+    };
+
+    fetchEnrollmentsAndProgress();
+  }, [user]);
+
   // Map DB courses to UI format
   const mappedCourses = useMemo(() => {
-    return sourceCourses.map(course => ({
-      id: course.id,
-      title: course.title,
-      category: (course as any).category?.name || 'Uncategorized', // Handle joined data
-      level: course.level || 'Beginner',
-      rating: 0,
-      studentsCount: 0,
-      duration: formatDuration(course.duration_hours || 0),
-      price: course.price || 0,
-      originalPrice: undefined,
-      isBestseller: false,
-      isNew: new Date(course.created_at).getTime() > Date.now() - 7 * 24 * 60 * 60 * 1000,
-      thumbnail: 'gradient-blue-purple', // Could vary based on ID
-      shortDescription: course.short_description || '',
-    }));
-  }, [sourceCourses]);
+    return sourceCourses.map(course => {
+      const isEnrolled = enrolledCourseIds.has(course.id);
+      const progress = courseProgress[course.id];
+
+      return {
+        id: course.id,
+        title: course.title,
+        category: (course as any).category?.name || 'Uncategorized',
+        level: course.level || 'Beginner',
+        rating: (course as any).rating || 0,
+        reviewCount: (course as any).reviewCount || 0,
+        studentsCount: (course as any).studentsCount || 0,
+        duration: formatDuration(course.duration_hours || 0),
+        price: course.price || 0,
+        originalPrice: undefined,
+        isBestseller: false,
+        isNew: new Date(course.created_at).getTime() > Date.now() - 7 * 24 * 60 * 60 * 1000,
+        thumbnail: 'gradient-blue-purple',
+        shortDescription: course.short_description || '',
+        isEnrolled,
+        progressPercent: progress?.percent || 0,
+        completedLessons: progress?.completed || 0,
+        totalLessons: progress?.total || 0,
+      };
+    });
+  }, [sourceCourses, enrolledCourseIds, courseProgress]);
 
   // Filter and sort courses
   const filteredCourses = useMemo(() => {
