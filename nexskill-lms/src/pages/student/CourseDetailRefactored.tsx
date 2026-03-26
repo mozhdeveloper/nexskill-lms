@@ -10,22 +10,20 @@ import CourseCurriculumTab from "../../components/courses/tabs/CourseCurriculumT
 import CourseReviewsTab from "../../components/courses/tabs/CourseReviewsTab";
 import CourseCoachTab from "../../components/courses/tabs/CourseCoachTab";
 
-/**
- * CourseDetail Page - Clean component focused on presentation
- *na
- * Responsibilities:
- * - Page layout and structure
- * - Coordinating child components
- * - User feedback (alerts, navigation)
- *
- * NOT responsible for:
- * - Data fetching (delegated to hooks)
- * - Business logic (delegated to hooks)
- * - Complex state management
- */
 const CourseDetailRefactored: React.FC = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
+
+  // ── Auth user id ──────────────────────────────────────────────────────────
+  // Resolved once from Supabase auth so PaymentModal always has the real UID
+  // that matches auth.uid() in RLS policies.
+  const [userId, setUserId] = useState<string>("");
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserId(user.id);
+    });
+  }, []);
 
   // Tab State
   const [activeTab, setActiveTab] = useState<
@@ -73,7 +71,6 @@ const CourseDetailRefactored: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Get all lesson IDs for this course via modules → module_content_items
       const { data: modules } = await supabase
         .from('modules')
         .select('id')
@@ -82,17 +79,19 @@ const CourseDetailRefactored: React.FC = () => {
 
       const moduleIds = modules.map((m: { id: string }) => m.id);
 
-      // Get content items for these modules (published only)
       const { data: contentItems } = await supabase
         .from('module_content_items')
         .select('content_type, content_id')
         .in('module_id', moduleIds)
         .eq('is_published', true);
 
-      const lessonIds = (contentItems || []).filter((i: { content_type: string }) => i.content_type === 'lesson').map((i: { content_id: string }) => i.content_id);
-      const quizIds = (contentItems || []).filter((i: { content_type: string }) => i.content_type === 'quiz').map((i: { content_id: string }) => i.content_id);
+      const lessonIds = (contentItems || [])
+        .filter((i: { content_type: string }) => i.content_type === 'lesson')
+        .map((i: { content_id: string }) => i.content_id);
+      const quizIds = (contentItems || [])
+        .filter((i: { content_type: string }) => i.content_type === 'quiz')
+        .map((i: { content_id: string }) => i.content_id);
 
-      // Fetch completed lessons
       if (lessonIds.length > 0) {
         const { data: lessonProgress } = await supabase
           .from('user_lesson_progress')
@@ -103,7 +102,6 @@ const CourseDetailRefactored: React.FC = () => {
         setCompletedLessonIds(new Set((lessonProgress || []).map((p: { lesson_id: string }) => p.lesson_id)));
       }
 
-      // Fetch completed quizzes (passed)
       if (quizIds.length > 0) {
         const { data: quizAttempts } = await supabase
           .from('quiz_attempts')
@@ -117,7 +115,6 @@ const CourseDetailRefactored: React.FC = () => {
     fetchProgress();
   }, [courseId, isEnrolled]);
 
-  // Simple event handlers that delegate to hooks
   const showFeedback = (type: 'success' | 'error', text: string) => {
     setFeedbackMessage({ type, text });
     setTimeout(() => setFeedbackMessage(null), 4000);
@@ -125,7 +122,6 @@ const CourseDetailRefactored: React.FC = () => {
 
   const handleEnroll = async () => {
     const result = await enroll();
-
     if (result.success) {
       showFeedback('success', `Successfully enrolled in ${course?.title}!`);
     } else {
@@ -142,11 +138,9 @@ const CourseDetailRefactored: React.FC = () => {
       "• Community features\n\n" +
       "You can re-enroll at any time.",
     );
-
     if (!confirmed) return;
 
     const result = await unenroll();
-
     if (result.success) {
       showFeedback('success', `You have been unenrolled from ${course?.title}.`);
     } else {
@@ -184,7 +178,6 @@ const CourseDetailRefactored: React.FC = () => {
     );
   }
 
-  // Error state
   if (error) {
     return (
       <StudentAppLayout>
@@ -204,7 +197,6 @@ const CourseDetailRefactored: React.FC = () => {
     );
   }
 
-  // Not found state
   if (!course) {
     return (
       <StudentAppLayout>
@@ -230,7 +222,6 @@ const CourseDetailRefactored: React.FC = () => {
     );
   }
 
-  // Main render - clean and focused
   return (
     <StudentAppLayout>
       {/* Feedback banner */}
@@ -239,24 +230,15 @@ const CourseDetailRefactored: React.FC = () => {
           {feedbackMessage.text}
         </div>
       )}
+
       {/* Header */}
       <div className="px-8 py-6 border-b border-[#EDF0FB] dark:border-gray-700">
         <button
           onClick={() => navigate("/student/courses")}
           className="flex items-center gap-2 text-sm text-text-secondary hover:text-brand-primary mb-4 transition-colors"
         >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 19l-7-7 7-7"
-            />
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
           Back to catalog
         </button>
@@ -306,12 +288,8 @@ const CourseDetailRefactored: React.FC = () => {
               return (
                 <div className="mt-4">
                   <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="font-medium text-text-primary dark:text-dark-text-primary">
-                      Your Progress
-                    </span>
-                    <span className="text-text-muted dark:text-dark-text-muted">
-                      {totalDone}/{totalItems} lessons · {pct}%
-                    </span>
+                    <span className="font-medium text-text-primary dark:text-dark-text-primary">Your Progress</span>
+                    <span className="text-text-muted dark:text-dark-text-muted">{totalDone}/{totalItems} lessons · {pct}%</span>
                   </div>
                   <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
                     <div
@@ -338,20 +316,19 @@ const CourseDetailRefactored: React.FC = () => {
           <div className="flex-1 min-w-0">
             {/* Tab Bar */}
             <div className="flex gap-4 mb-6 border-b border-[#EDF0FB] dark:border-gray-700">
-              {(["overview", "curriculum", "reviews", "coach"] as const).map(
-                (tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-4 py-3 text-sm font-medium capitalize transition-all border-b-2 ${activeTab === tab
+              {(["overview", "curriculum", "reviews", "coach"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-3 text-sm font-medium capitalize transition-all border-b-2 ${
+                    activeTab === tab
                       ? "text-brand-primary border-brand-primary"
                       : "text-text-secondary border-transparent hover:text-brand-primary"
-                      }`}
-                  >
-                    {tab}
-                  </button>
-                ),
-              )}
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
             </div>
 
             <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-card p-8">
@@ -363,7 +340,6 @@ const CourseDetailRefactored: React.FC = () => {
                   isEnrolled={isEnrolled}
                 />
               )}
-
               {activeTab === "curriculum" && (
                 <CourseCurriculumTab
                   curriculum={course.curriculum || []}
@@ -373,7 +349,6 @@ const CourseDetailRefactored: React.FC = () => {
                   completedQuizIds={completedQuizIds}
                 />
               )}
-
               {activeTab === "reviews" && (
                 <CourseReviewsTab
                   courseId={course.id}
@@ -382,7 +357,6 @@ const CourseDetailRefactored: React.FC = () => {
                   initialReviewCount={course.reviewCount}
                 />
               )}
-
               {activeTab === "coach" && (
                 <CourseCoachTab coach={course.coach || null} />
               )}
@@ -393,6 +367,8 @@ const CourseDetailRefactored: React.FC = () => {
           <div className="w-80 flex-shrink-0">
             <CourseEnrollmentCard
               courseId={course.id}
+              courseTitle={course.title}
+              userId={userId}
               price={course.price}
               originalPrice={course.originalPrice}
               includes={course.includes}

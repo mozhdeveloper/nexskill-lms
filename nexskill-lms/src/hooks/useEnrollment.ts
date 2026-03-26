@@ -8,27 +8,33 @@ export const useEnrollment = (courseId: string | undefined) => {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
 
-  // Check enrollment status
+  // ── Check enrollment status ──────────────────────────────────────────────
   useEffect(() => {
     if (!user || !courseId) return;
 
     const checkEnrollment = async () => {
       try {
         setChecking(true);
+
+        // FIX: .single() returns 406 when no row exists (PostgREST requires
+        // exactly one row). .maybeSingle() returns null cleanly — no error.
         const { data, error } = await supabase
           .from("enrollments")
-          .select("*")
+          .select("profile_id")   // only fetch what we need, not *
           .eq("profile_id", user.id)
           .eq("course_id", courseId)
-          .single();
+          .maybeSingle();
 
-        if (error && error.code !== "PGRST116") {
-          console.error("Error checking enrollment:", error);
-        } else if (data) {
-          setIsEnrolled(true);
+        if (error) {
+          // A real error (network, RLS, etc.) — log but don't crash
+          console.error("[useEnrollment] Error checking enrollment:", error);
+          return;
         }
+
+        // data is null → not enrolled, data is an object → enrolled
+        setIsEnrolled(data !== null);
       } catch (err) {
-        console.error("Unexpected error checking enrollment:", err);
+        console.error("[useEnrollment] Unexpected error:", err);
       } finally {
         setChecking(false);
       }
@@ -37,7 +43,7 @@ export const useEnrollment = (courseId: string | undefined) => {
     checkEnrollment();
   }, [user, courseId]);
 
-  // Enroll in course
+  // ── Enroll ───────────────────────────────────────────────────────────────
   const enroll = useCallback(async (): Promise<{
     success: boolean;
     error?: string;
@@ -55,6 +61,7 @@ export const useEnrollment = (courseId: string | undefined) => {
       });
 
       if (error) {
+        console.error("[useEnrollment] Enroll error:", error);
         return { success: false, error: error.message };
       }
 
@@ -70,7 +77,7 @@ export const useEnrollment = (courseId: string | undefined) => {
     }
   }, [user, courseId]);
 
-  // Unenroll from course
+  // ── Unenroll ─────────────────────────────────────────────────────────────
   const unenroll = useCallback(async (): Promise<{
     success: boolean;
     error?: string;
@@ -89,6 +96,7 @@ export const useEnrollment = (courseId: string | undefined) => {
         .eq("course_id", courseId);
 
       if (error) {
+        console.error("[useEnrollment] Unenroll error:", error);
         return { success: false, error: error.message };
       }
 
