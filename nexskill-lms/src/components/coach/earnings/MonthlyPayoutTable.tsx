@@ -46,7 +46,7 @@ const MonthlyPayoutTable: React.FC<MonthlyPayoutTableProps> = ({ payouts, curren
   };
 
   const years = ['2025', '2024', '2023'];
-  const filteredPayouts = payouts.filter((p) => p.monthLabel.includes(selectedYear));
+  const filteredPayouts = payouts.filter((p) => p.monthLabel && p.monthLabel.includes(selectedYear));
 
   return (
     <div className="bg-white rounded-2xl border border-[#EDF0FB] p-6 shadow-md">

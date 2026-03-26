@@ -49,7 +49,7 @@ const CoachAppLayout: React.FC<CoachAppLayoutProps> = ({ children }) => {
         { path: "/coach/quizzes", label: "Quizzes & Assessments" },
         { path: "/coach/coaching-tools", label: "Coaching Tools" },
         { path: "/coach/students", label: "Students" },
-        { path: "/coach/subcoach-management", label: "Sub-Coaches" },
+        { path: "/coach/subcoach-management", label: "Sub-Coaches", comingSoon: true },
         { path: "/coach/earnings", label: "Earnings" },
         { path: "/coach/messages", label: "Messages" },
         { path: "/coach/profile", label: "Profile" },
@@ -100,17 +100,30 @@ const CoachAppLayout: React.FC<CoachAppLayoutProps> = ({ children }) => {
                 {/* Navigation */}
                 <nav className="flex-1 overflow-y-auto scrollbar-hidden px-4 py-2 space-y-1">
                     {navItems.map((item) => (
-                        <Link
-                            key={item.path}
-                            to={item.path}
-                            onClick={() => setSidebarOpen(false)}
-                            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all ${isActive(item.path)
-                                    ? "bg-gradient-to-r from-[color:var(--color-brand-neon)] to-[color:var(--color-brand-electric)] text-white font-medium shadow-md"
-                                    : "text-[color:var(--text-secondary)] hover:bg-[color:var(--bg-glass-hover)] hover:text-[color:var(--color-brand-electric)]"
-                                }`}
-                        >
-                            <span className="text-sm">{item.label}</span>
-                        </Link>
+                        item.comingSoon ? (
+                            <div
+                                key={item.path}
+                                className="group relative flex items-center gap-3 px-4 py-2.5 rounded-xl text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60"
+                                title="Coming Soon - This feature is under development"
+                            >
+                                <span className="text-sm">{item.label}</span>
+                                <span className="ml-auto px-2 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs rounded-full font-medium">
+                                    Soon
+                                </span>
+                            </div>
+                        ) : (
+                            <Link
+                                key={item.path}
+                                to={item.path}
+                                onClick={() => setSidebarOpen(false)}
+                                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all ${isActive(item.path)
+                                        ? "bg-gradient-to-r from-[color:var(--color-brand-neon)] to-[color:var(--color-brand-electric)] text-white font-medium shadow-md"
+                                        : "text-[color:var(--text-secondary)] hover:bg-[color:var(--bg-glass-hover)] hover:text-[color:var(--color-brand-electric)]"
+                                    }`}
+                            >
+                                <span className="text-sm">{item.label}</span>
+                            </Link>
+                        )
                     ))}
                 </nav>
 

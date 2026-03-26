@@ -142,12 +142,13 @@ const CourseStudents: React.FC = () => {
         console.log('📝 Quiz attempts for students:', attemptRows.length, attemptRows);
       }
 
-      // 6b. Fetch quiz statistics for StudentScoresPanel
+      // 6b. Fetch quiz statistics for StudentScoresPanel - ONLY for enrolled students in this course
       let quizStatsData: QuizStat[] = [];
       if (quizIds.length > 0) {
         console.log('\n=== QUIZ STATS DEBUG ===');
         console.log('🔍 Quiz IDs to fetch:', quizIds);
-        console.log('👥 Student IDs:', studentIds);
+        console.log('👥 Student IDs (enrolled only):', studentIds);
+        console.log('📚 Has enrolled students:', studentIds.length > 0);
 
         // Fetch quiz titles
         const { data: quizzesData, error: quizError } = await supabase
@@ -161,21 +162,27 @@ const CourseStudents: React.FC = () => {
 
         console.log('📚 Quizzes data:', quizzesData);
 
-        // Fetch ALL quiz attempts for these quizzes (from all users)
-        // Include ALL statuses for counting, but only use submitted/graded for scores
-        const { data: allAttempts, error: attemptsError } = await supabase
-          .from('quiz_attempts')
-          .select('id, quiz_id, user_id, score, max_score, status, created_at')
-          .in('quiz_id', quizIds);
+        // Fetch quiz attempts ONLY for enrolled students in this course
+        let allAttempts: any[] = [];
+        if (studentIds.length > 0) {
+          const { data: attemptsData, error: attemptsError } = await supabase
+            .from('quiz_attempts')
+            .select('id, quiz_id, user_id, score, max_score, status, created_at')
+            .in('quiz_id', quizIds)
+            .in('user_id', studentIds); // Only enrolled students
 
-        if (attemptsError) {
-          console.error('❌ Error fetching all attempts:', attemptsError);
-          console.error('Error details:', JSON.stringify(attemptsError));
-        }
+          if (attemptsError) {
+            console.error('❌ Error fetching all attempts:', attemptsError);
+            console.error('Error details:', JSON.stringify(attemptsError));
+          }
 
-        console.log('📊 All quiz attempts fetched:', allAttempts?.length || 0);
-        if (allAttempts && allAttempts.length > 0) {
-          console.log('📝 Sample attempts:', allAttempts.slice(0, 3));
+          allAttempts = attemptsData || [];
+          console.log('📊 All quiz attempts fetched:', allAttempts.length);
+          if (allAttempts.length > 0) {
+            console.log('📝 Sample attempts:', allAttempts.slice(0, 3));
+          }
+        } else {
+          console.log('⚠️ No enrolled students, skipping attempts fetch');
         }
 
         // Fetch ALL quiz responses for detailed scoring
@@ -183,12 +190,12 @@ const CourseStudents: React.FC = () => {
         if (allAttempts && allAttempts.length > 0) {
           const attemptIds = allAttempts.map(a => a.id);
           console.log('🔍 Fetching responses for attempt IDs:', attemptIds);
-          
+
           const { data: responsesData, error: responsesError } = await supabase
             .from('quiz_responses')
             .select('attempt_id, question_id, points_earned, points_possible, is_correct')
             .in('attempt_id', attemptIds);
-          
+
           if (responsesError) {
             console.error('❌ Error fetching quiz responses:', responsesError);
           }
@@ -196,14 +203,18 @@ const CourseStudents: React.FC = () => {
           console.log('📝 All quiz responses:', allResponses.length);
         }
 
-        // Build stats per quiz
+        // Build stats per quiz - ONLY for enrolled students
         quizStatsData = quizIds.map(quizId => {
           const quiz = quizzesData?.find(q => q.id === quizId);
-          const quizAttempts = allAttempts?.filter(a => a.quiz_id === quizId) || [];
+          // Filter attempts for this quiz AND enrolled students only
+          const quizAttempts = allAttempts?.filter(a => 
+            a.quiz_id === quizId && 
+            (studentIds.length === 0 || studentIds.includes(a.user_id))
+          ) || [];
           const quizAttemptIds = quizAttempts.map(a => a.id);
-          
+
           // Get responses for this quiz's attempts
-          const quizResponses = (allResponses || []).filter(r => 
+          const quizResponses = (allResponses || []).filter(r =>
             quizAttemptIds.includes(r.attempt_id)
           );
 
@@ -220,17 +231,19 @@ const CourseStudents: React.FC = () => {
           console.log('   - Completed attempts (submitted/graded):', completedAttempts.length);
           console.log('   - Quiz responses:', quizResponses.length);
           if (quizAttempts.length > 0) {
-            console.log('   - Attempt details:', quizAttempts.map(a => ({ 
-                id: a.id, 
-                score: a.score, 
-                max: a.max_score, 
-                status: a.status 
+            console.log('   - Attempt details:', quizAttempts.map(a => ({
+                id: a.id,
+                score: a.score,
+                max: a.max_score,
+                status: a.status
               })));
+          } else {
+            console.log('   - ⚠️ No attempts yet for this quiz');
           }
 
-          // Total attempts count (all statuses)
+          // Total attempts count (all statuses for enrolled students)
           const totalAttemptsCount = quizAttempts.length;
-          
+
           // Calculate average score from completed attempts
           let avgScore = 0;
           if (completedAttempts.length > 0) {
@@ -291,6 +304,8 @@ const CourseStudents: React.FC = () => {
         });
 
         console.log('\n📊 FINAL Quiz Stats:', quizStatsData);
+      } else {
+        console.log('⚠️ No quiz IDs found for this course');
       }
       setQuizStats(quizStatsData);
 
