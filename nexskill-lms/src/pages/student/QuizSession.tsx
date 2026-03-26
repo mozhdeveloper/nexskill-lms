@@ -543,6 +543,12 @@ const QuizSession: React.FC = () => {
   const handleStartAttempt = async (resume: boolean = false) => {
     if (!quizMeta || !user) return;
 
+    // Check if attempts remaining
+    if (quizMeta.max_attempts !== null && attemptsRemaining !== null && attemptsRemaining <= 0) {
+      alert('You have used all attempts for this quiz.');
+      return;
+    }
+
     setShowResumeDialog(false);
 
     if (resume && currentAttempt) {
@@ -974,13 +980,20 @@ const QuizSession: React.FC = () => {
                       }
                     </p>
                   </div>
-                  <button
-                    onClick={() => handleStartAttempt()}
-                    className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-semibold bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all"
-                  >
-                    <Play className="w-5 h-5" />
-                    Start Attempt {attemptsUsed + 1} of {displayMaxAttempts}
-                  </button>
+                  {attemptsRemaining === null || attemptsRemaining > 0 ? (
+                    <button
+                      onClick={() => handleStartAttempt()}
+                      className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-semibold bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all"
+                    >
+                      <Play className="w-5 h-5" />
+                      Start Attempt {attemptsUsed + 1} of {displayMaxAttempts}
+                    </button>
+                  ) : (
+                    <div className="text-center text-text-secondary">
+                      <p className="font-medium">No attempts remaining</p>
+                      <p className="text-sm mt-2">You have used all {quizMeta.max_attempts} attempts for this quiz.</p>
+                    </div>
+                  )}
                 </div>
               )}
 
