@@ -126,7 +126,7 @@ const LiveSessionManager: React.FC = () => {
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-1">
-                                <label className="text-sm font-medium text-slate-700">Title</label>
+                                <label className="text-sm font-medium text-slate-700">Title <span className="text-red-500">*</span></label>
                                 <input
                                     className="w-full px-3 py-2 border rounded-lg"
                                     required
@@ -135,7 +135,7 @@ const LiveSessionManager: React.FC = () => {
                                 />
                             </div>
                             <div className="space-y-1">
-                                <label className="text-sm font-medium text-slate-700">Date & Time</label>
+                                <label className="text-sm font-medium text-slate-700">Date & Time <span className="text-red-500">*</span></label>
                                 <input
                                     type="datetime-local"
                                     className="w-full px-3 py-2 border rounded-lg"
@@ -154,11 +154,12 @@ const LiveSessionManager: React.FC = () => {
                                 />
                             </div>
                             <div className="space-y-1">
-                                <label className="text-sm font-medium text-slate-700">Meeting Link (Zoom/Google Meet)</label>
+                                <label className="text-sm font-medium text-slate-700">Meeting Link (Zoom/Google Meet) <span className="text-red-500">*</span></label>
                                 <input
                                     type="url"
                                     className="w-full px-3 py-2 border rounded-lg"
                                     placeholder="https://..."
+                                    required
                                     value={formData.meeting_link || ''}
                                     onChange={e => setFormData({ ...formData, meeting_link: e.target.value })}
                                 />

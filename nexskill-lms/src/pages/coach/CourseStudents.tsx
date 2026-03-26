@@ -7,7 +7,7 @@ import StudentExportBar from '../../components/coach/students/StudentExportBar';
 import GroupAnnouncementPanel from '../../components/coach/students/GroupAnnouncementPanel';
 import StudentScoresPanel from '../../components/coach/students/StudentScoresPanel';
 import { supabase } from '../../lib/supabaseClient';
-import { Loader2 } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 
 interface Student {
   id: string;
@@ -38,188 +38,339 @@ const CourseStudents: React.FC = () => {
   const [courseTitle, setCourseTitle] = useState('Course');
   const [isLoading, setIsLoading] = useState(true);
   const [quizStats, setQuizStats] = useState<QuizStat[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
-    if (!courseId) return;
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        // 1. Course title
-        const { data: courseRow } = await supabase
-          .from('courses').select('title').eq('id', courseId).single();
-        if (courseRow) setCourseTitle(courseRow.title);
+  const fetchCourseData = async (showRefreshIndicator = false) => {
+    if (showRefreshIndicator) setIsRefreshing(true);
+    
+    try {
+      // 1. Course title
+      const { data: courseRow } = await supabase
+        .from('courses').select('title').eq('id', courseId).single();
+      if (courseRow) setCourseTitle(courseRow.title);
 
-        // 2. Enrollments for this course
-        const { data: enrollments } = await supabase
-          .from('enrollments')
-          .select('profile_id, enrolled_at')
-          .eq('course_id', courseId);
+      // 2. Enrollments for this course
+      const { data: enrollments } = await supabase
+        .from('enrollments')
+        .select('profile_id, enrolled_at')
+        .eq('course_id', courseId);
 
-        if (!enrollments?.length) { setStudents([]); return; }
+      if (!enrollments?.length) { 
+        setStudents([]); 
+        setQuizStats([]);
+        return; 
+      }
 
-        const studentIds = enrollments.map(e => e.profile_id);
+      const studentIds = enrollments.map(e => e.profile_id);
 
-        // 3. Student profiles
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, email, first_name, last_name, updated_at')
-          .in('id', studentIds);
+      // 3. Student profiles
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, email, first_name, last_name, updated_at')
+        .in('id', studentIds);
 
-        // 4. Lesson ids for this course (published only - matches student side)
-        const { data: modules } = await supabase
-          .from('modules').select('id').eq('course_id', courseId);
-        const moduleIds = (modules || []).map(m => m.id);
+      // 4. Lesson ids for this course (published only - matches student side)
+      const { data: modules } = await supabase
+        .from('modules').select('id').eq('course_id', courseId);
+      const moduleIds = (modules || []).map(m => m.id);
 
-        let lessonIds: string[] = [];
-        if (moduleIds.length) {
-          const { data: items } = await supabase
-            .from('module_content_items')
-            .select('content_id')
-            .in('module_id', moduleIds)
-            .eq('content_type', 'lesson')
-            .eq('is_published', true);
-          lessonIds = (items || []).map(i => i.content_id);
+      let lessonIds: string[] = [];
+      if (moduleIds.length) {
+        const { data: items } = await supabase
+          .from('module_content_items')
+          .select('content_id')
+          .in('module_id', moduleIds)
+          .eq('content_type', 'lesson')
+          .eq('is_published', true);
+        lessonIds = (items || []).map(i => i.content_id);
+      }
+
+      // 5. Lesson progress per student
+      let progressRows: { user_id: string; is_completed: boolean; updated_at?: string }[] = [];
+      if (lessonIds.length) {
+        const { data } = await supabase
+          .from('user_lesson_progress')
+          .select('user_id, is_completed, updated_at')
+          .in('user_id', studentIds)
+          .in('lesson_id', lessonIds);
+        progressRows = data || [];
+      }
+
+      // 6. Quiz IDs for this course (published only) - MUST come from module_content_items
+      let quizIds: string[] = [];
+      
+      // Get quizzes from module_content_items (this is the ONLY way quizzes are linked to courses)
+      if (moduleIds.length) {
+        const { data: qi, error: quizItemError } = await supabase
+          .from('module_content_items')
+          .select('content_id')
+          .in('module_id', moduleIds)
+          .eq('content_type', 'quiz')
+          .eq('is_published', true);
+        
+        if (quizItemError) {
+          console.error('❌ Error fetching quiz content items:', quizItemError);
+        }
+        
+        quizIds = (qi || []).map(q => q.content_id);
+      }
+
+      console.log('📊 Module IDs:', moduleIds);
+      console.log('📊 Quiz IDs from module_content_items:', quizIds);
+      console.log('📝 Student IDs:', studentIds.length);
+      
+      // Show helpful message if no quizzes found
+      if (quizIds.length === 0) {
+        console.warn('⚠️ WARNING: No published quizzes found in this course\'s modules!');
+        console.warn('💡 To add quizzes: Go to Course Editor → Curriculum → Add Content to a lesson → Quiz');
+      }
+
+      // 6a. Fetch quiz attempts for student average scores
+      let attemptRows: { user_id: string; score: number; max_score: number; created_at?: string }[] = [];
+      if (quizIds.length && studentIds.length) {
+        const { data, error: attemptError } = await supabase
+          .from('quiz_attempts')
+          .select('user_id, score, max_score, created_at')
+          .in('user_id', studentIds)
+          .in('quiz_id', quizIds)
+          .in('status', ['submitted', 'graded']);
+        
+        if (attemptError) {
+          console.error('❌ Error fetching quiz attempts:', attemptError);
+        }
+        attemptRows = data || [];
+        console.log('📝 Quiz attempts for students:', attemptRows.length, attemptRows);
+      }
+
+      // 6b. Fetch quiz statistics for StudentScoresPanel
+      let quizStatsData: QuizStat[] = [];
+      if (quizIds.length > 0) {
+        console.log('\n=== QUIZ STATS DEBUG ===');
+        console.log('🔍 Quiz IDs to fetch:', quizIds);
+        console.log('👥 Student IDs:', studentIds);
+
+        // Fetch quiz titles
+        const { data: quizzesData, error: quizError } = await supabase
+          .from('quizzes')
+          .select('id, title')
+          .in('id', quizIds);
+
+        if (quizError) {
+          console.error('❌ Error fetching quizzes:', quizError);
         }
 
-        // 5. Lesson progress per student
-        let progressRows: { user_id: string; is_completed: boolean; updated_at?: string }[] = [];
-        if (lessonIds.length) {
-          const { data } = await supabase
-            .from('user_lesson_progress')
-            .select('user_id, is_completed, updated_at')
-            .in('user_id', studentIds)
-            .in('lesson_id', lessonIds);
-          progressRows = data || [];
+        console.log('📚 Quizzes data:', quizzesData);
+
+        // Fetch ALL quiz attempts for these quizzes (from all users)
+        // Include ALL statuses for counting, but only use submitted/graded for scores
+        const { data: allAttempts, error: attemptsError } = await supabase
+          .from('quiz_attempts')
+          .select('id, quiz_id, user_id, score, max_score, status, created_at')
+          .in('quiz_id', quizIds);
+
+        if (attemptsError) {
+          console.error('❌ Error fetching all attempts:', attemptsError);
+          console.error('Error details:', JSON.stringify(attemptsError));
         }
 
-        // 6. Quiz scores per student (published only - matches student side)
-        let quizIds: string[] = [];
-        if (moduleIds.length) {
-          const { data: qi } = await supabase
-            .from('module_content_items')
-            .select('content_id')
-            .in('module_id', moduleIds)
-            .eq('content_type', 'quiz')
-            .eq('is_published', true);
-          quizIds = (qi || []).map(q => q.content_id);
-        }
-        let attemptRows: { user_id: string; score: number; max_score: number; created_at?: string }[] = [];
-        if (quizIds.length) {
-          const { data } = await supabase
-            .from('quiz_attempts')
-            .select('user_id, score, max_score, created_at')
-            .in('user_id', studentIds)
-            .in('quiz_id', quizIds)
-            .in('status', ['submitted', 'graded']);
-          attemptRows = data || [];
+        console.log('📊 All quiz attempts fetched:', allAttempts?.length || 0);
+        if (allAttempts && allAttempts.length > 0) {
+          console.log('📝 Sample attempts:', allAttempts.slice(0, 3));
         }
 
-        // 6b. Fetch quiz statistics for StudentScoresPanel
-        let quizStatsData: QuizStat[] = [];
-        if (quizIds.length > 0) {
-          // Fetch quiz titles
-          const { data: quizzesData } = await supabase
-            .from('quizzes')
-            .select('id, title')
-            .in('id', quizIds);
+        // Fetch ALL quiz responses for detailed scoring
+        let allResponses: any[] = [];
+        if (allAttempts && allAttempts.length > 0) {
+          const attemptIds = allAttempts.map(a => a.id);
+          console.log('🔍 Fetching responses for attempt IDs:', attemptIds);
           
-          // Fetch all quiz attempts for stats
-          const { data: allAttempts } = await supabase
-            .from('quiz_attempts')
-            .select('quiz_id, user_id, score, max_score, status')
-            .in('quiz_id', quizIds);
-
-          // Build stats per quiz
-          quizStatsData = quizIds.map(quizId => {
-            const quiz = quizzesData?.find(q => q.id === quizId);
-            const quizAttempts = allAttempts?.filter(a => a.quiz_id === quizId) || [];
-            const completedAttempts = quizAttempts.filter(a => a.status === 'submitted' || a.status === 'graded');
-
-            // Calculate average score
-            const avgScore = completedAttempts.length > 0
-              ? Math.round(completedAttempts.reduce((sum, a) => sum + (a.max_score > 0 ? (a.score / a.max_score) * 100 : 0), 0) / completedAttempts.length)
-              : 0;
-
-            // Calculate completion rate (students who attempted / total enrolled)
-            const studentsWhoAttempted = new Set(quizAttempts.map(a => a.user_id)).size;
-            const completionRate = studentIds.length > 0
-              ? Math.round((studentsWhoAttempted / studentIds.length) * 100)
-              : 0;
-
-            return {
-              id: quizId,
-              title: quiz?.title || 'Untitled Quiz',
-              averageScore: avgScore,
-              completionRate,
-              totalAttempts: quizAttempts.length,
-            };
-          });
+          const { data: responsesData, error: responsesError } = await supabase
+            .from('quiz_responses')
+            .select('attempt_id, question_id, points_earned, points_possible, is_correct')
+            .in('attempt_id', attemptIds);
+          
+          if (responsesError) {
+            console.error('❌ Error fetching quiz responses:', responsesError);
+          }
+          allResponses = responsesData || [];
+          console.log('📝 All quiz responses:', allResponses.length);
         }
 
-        setQuizStats(quizStatsData);
-
-        // 7. Map to Student shape
-        const totalLessons = lessonIds.length;
-        const mapped: Student[] = (profiles || []).map(p => {
-          const enr = enrollments.find(e => e.profile_id === p.id);
-          const pRows = progressRows.filter(r => r.user_id === p.id);
-          const completed = pRows.filter(r => r.is_completed).length;
-          const progress = totalLessons > 0 ? Math.round((completed / totalLessons) * 100) : 0;
-
-          const aRows = attemptRows.filter(r => r.user_id === p.id);
-          const avgScore = aRows.length > 0
-            ? Math.round(aRows.reduce((s, r) => s + (r.max_score > 0 ? (r.score / r.max_score) * 100 : 0), 0) / aRows.length)
-            : 0;
-
-          // Calculate last active date based on course-specific activity (lesson progress or quiz attempts)
-          const lessonActivityDates = pRows
-            .filter(r => r.updated_at)
-            .map(r => new Date(r.updated_at!).getTime());
-          const quizActivityDates = aRows
-            .filter(r => r.created_at)
-            .map(r => new Date(r.created_at!).getTime());
-          const allActivityDates = [...lessonActivityDates, ...quizActivityDates];
+        // Build stats per quiz
+        quizStatsData = quizIds.map(quizId => {
+          const quiz = quizzesData?.find(q => q.id === quizId);
+          const quizAttempts = allAttempts?.filter(a => a.quiz_id === quizId) || [];
+          const quizAttemptIds = quizAttempts.map(a => a.id);
           
-          const lastActiveTime = allActivityDates.length > 0
-            ? Math.max(...allActivityDates)
-            : new Date(p.updated_at || Date.now()).getTime();
-          
-          const lastActive = new Date(lastActiveTime);
-          const diffDays = Math.floor((Date.now() - lastActive.getTime()) / 86400000);
-          const lastActiveStr = diffDays === 0 ? 'Today'
-            : diffDays === 1 ? '1 day ago'
-            : diffDays < 7 ? `${diffDays} days ago`
-            : lastActive.toLocaleDateString();
+          // Get responses for this quiz's attempts
+          const quizResponses = (allResponses || []).filter(r => 
+            quizAttemptIds.includes(r.attempt_id)
+          );
 
-          // Status logic: Completed if 100% progress, Active if activity within 7 days, At risk otherwise
-          let status: 'Active' | 'Completed' | 'At risk' = 'At risk';
-          if (progress === 100) {
-            status = 'Completed';
-          } else if (diffDays <= 7) {
-            status = 'Active';
+          // Only use submitted or graded attempts for score calculation
+          const completedAttempts = quizAttempts.filter(a =>
+            (a.status === 'submitted' || a.status === 'graded') &&
+            a.score !== null &&
+            a.max_score !== null &&
+            a.max_score > 0
+          );
+
+          console.log(`\n📋 Quiz "${quiz?.title || 'Unknown'}" (${quizId}):`);
+          console.log('   - Total attempts:', quizAttempts.length);
+          console.log('   - Completed attempts (submitted/graded):', completedAttempts.length);
+          console.log('   - Quiz responses:', quizResponses.length);
+          if (quizAttempts.length > 0) {
+            console.log('   - Attempt details:', quizAttempts.map(a => ({ 
+                id: a.id, 
+                score: a.score, 
+                max: a.max_score, 
+                status: a.status 
+              })));
           }
 
+          // Total attempts count (all statuses)
+          const totalAttemptsCount = quizAttempts.length;
+          
+          // Calculate average score from completed attempts
+          let avgScore = 0;
+          if (completedAttempts.length > 0) {
+            const scorePercentages = completedAttempts.map(a => (a.score! / a.max_score!) * 100);
+            console.log('   - Score percentages:', scorePercentages);
+            avgScore = Math.round(
+              scorePercentages.reduce((sum, pct) => sum + pct, 0) / completedAttempts.length
+            );
+          }
+
+          // Fallback: Calculate from quiz_responses if no completed attempts
+          if (completedAttempts.length === 0 && quizResponses.length > 0) {
+            console.log('   - ⚠️ No completed attempts, calculating from responses...');
+            const responsesByAttempt: Record<string, typeof quizResponses> = {};
+            quizResponses.forEach(r => {
+              if (!responsesByAttempt[r.attempt_id]) {
+                responsesByAttempt[r.attempt_id] = [];
+              }
+              responsesByAttempt[r.attempt_id].push(r);
+            });
+
+            console.log('   - Responses by attempt:', Object.keys(responsesByAttempt).length, 'attempts');
+
+            const attemptScores = Object.values(responsesByAttempt).map(responses => {
+              const totalEarned = responses.reduce((sum, r) => sum + (r.points_earned || 0), 0);
+              const totalPossible = responses.reduce((sum, r) => sum + (r.points_possible || 0), 0);
+              const pct = totalPossible > 0 ? (totalEarned / totalPossible) * 100 : 0;
+              console.log('     - Attempt score:', totalEarned, '/', totalPossible, '=', pct.toFixed(1) + '%');
+              return pct;
+            });
+
+            if (attemptScores.length > 0) {
+              avgScore = Math.round(
+                attemptScores.reduce((sum, score) => sum + score, 0) / attemptScores.length
+              );
+            }
+          }
+
+          // Calculate completion rate (students who attempted / total enrolled)
+          const studentsWhoAttempted = new Set(quizAttempts.map(a => a.user_id)).size;
+          const completionRate = studentIds.length > 0
+            ? Math.round((studentsWhoAttempted / studentIds.length) * 100)
+            : 0;
+
+          console.log('   - ✅ Final stats:', {
+            totalAttempts: totalAttemptsCount,
+            avgScore,
+            completionRate
+          });
+
           return {
-            id: p.id,
-            name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.email,
-            email: p.email,
-            enrollmentDate: enr ? new Date(enr.enrolled_at).toLocaleDateString() : 'N/A',
-            status,
-            progressPercent: progress,
-            lastActiveAt: lastActiveStr,
+            id: quizId,
+            title: quiz?.title || 'Untitled Quiz',
             averageScore: avgScore,
+            completionRate,
+            totalAttempts: totalAttemptsCount,
           };
         });
 
-        setStudents(mapped);
-      } catch (err) {
-        console.error('Error fetching course students:', err);
-      } finally {
-        setIsLoading(false);
+        console.log('\n📊 FINAL Quiz Stats:', quizStatsData);
       }
+      setQuizStats(quizStatsData);
+
+      // 7. Map to Student shape
+      const totalLessons = lessonIds.length;
+      const mapped: Student[] = (profiles || []).map(p => {
+        const enr = enrollments.find(e => e.profile_id === p.id);
+        const pRows = progressRows.filter(r => r.user_id === p.id);
+        const completed = pRows.filter(r => r.is_completed).length;
+        const progress = totalLessons > 0 ? Math.round((completed / totalLessons) * 100) : 0;
+
+        const aRows = attemptRows.filter(r => r.user_id === p.id);
+        const avgScore = aRows.length > 0
+          ? Math.round(aRows.reduce((s, r) => s + (r.max_score > 0 ? (r.score / r.max_score) * 100 : 0), 0) / aRows.length)
+          : 0;
+
+        // Calculate last active date based on course-specific activity
+        const lessonActivityDates = pRows
+          .filter(r => r.updated_at)
+          .map(r => new Date(r.updated_at!).getTime());
+        const quizActivityDates = aRows
+          .filter(r => r.created_at)
+          .map(r => new Date(r.created_at!).getTime());
+        const allActivityDates = [...lessonActivityDates, ...quizActivityDates];
+        
+        const lastActiveTime = allActivityDates.length > 0
+          ? Math.max(...allActivityDates)
+          : new Date(p.updated_at || Date.now()).getTime();
+        
+        const lastActive = new Date(lastActiveTime);
+        const diffDays = Math.floor((Date.now() - lastActive.getTime()) / 86400000);
+        const lastActiveStr = diffDays === 0 ? 'Today'
+          : diffDays === 1 ? '1 day ago'
+          : diffDays < 7 ? `${diffDays} days ago`
+          : lastActive.toLocaleDateString();
+
+        // Status logic
+        let status: 'Active' | 'Completed' | 'At risk' = 'At risk';
+        if (progress === 100) {
+          status = 'Completed';
+        } else if (diffDays <= 7) {
+          status = 'Active';
+        }
+
+        return {
+          id: p.id,
+          name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.email,
+          email: p.email,
+          enrollmentDate: enr ? new Date(enr.enrolled_at).toLocaleDateString() : 'N/A',
+          status,
+          progressPercent: progress,
+          lastActiveAt: lastActiveStr,
+          averageScore: avgScore,
+        };
+      });
+
+      setStudents(mapped);
+    } catch (err) {
+      console.error('Error fetching course students:', err);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!courseId) return;
+    
+    const initialFetch = async () => {
+      setIsLoading(true);
+      await fetchCourseData();
     };
-    fetchData();
+    
+    initialFetch();
   }, [courseId]);
+
+  const handleManualRefresh = async () => {
+    setIsLoading(true);
+    await fetchCourseData(true);
+  };
 
   const totalEnrolled = students.length;
   const averageCompletion = students.length > 0
@@ -290,6 +441,15 @@ const CourseStudents: React.FC = () => {
                 </span>
               </div>
             </div>
+            <button
+              onClick={handleManualRefresh}
+              disabled={isRefreshing}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-[#EDF0FB] rounded-xl hover:bg-[#F5F7FF] transition-colors disabled:opacity-50"
+              title="Refresh data"
+            >
+              <RefreshCw className={`w-4 h-4 text-[#304DB5] ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span className="text-sm font-medium text-[#304DB5]">Refresh</span>
+            </button>
           </div>
         </div>
 

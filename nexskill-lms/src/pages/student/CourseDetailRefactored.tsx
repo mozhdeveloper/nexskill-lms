@@ -376,9 +376,10 @@ const CourseDetailRefactored: React.FC = () => {
 
               {activeTab === "reviews" && (
                 <CourseReviewsTab
-                  reviews={course.reviews || []}
-                  rating={course.rating}
-                  reviewCount={course.reviewCount}
+                  courseId={course.id}
+                  isEnrolled={isEnrolled}
+                  initialRating={course.rating}
+                  initialReviewCount={course.reviewCount}
                 />
               )}
 

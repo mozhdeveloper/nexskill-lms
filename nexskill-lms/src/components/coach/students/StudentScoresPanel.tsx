@@ -23,7 +23,7 @@ const StudentScoresPanel: React.FC<StudentScoresPanelProps> = ({
           quizzes.reduce((sum, q) => sum + q.averageScore, 0) / quizzes.length
         )
       : 0;
-  const belowThreshold = quizzes.filter((q) => q.averageScore < 60).length;
+  const belowThreshold = quizzes.filter((q) => q.averageScore < 60 && q.totalAttempts > 0).length;
 
   const needsAttention = (score: number) => score < 60;
 
@@ -35,13 +35,14 @@ const StudentScoresPanel: React.FC<StudentScoresPanelProps> = ({
 
   const handleViewDetails = (quizId: string) => {
     console.log('View detailed results for quiz:', quizId);
+    // TODO: Navigate to quiz detail page or open modal with student-by-student breakdown
   };
 
   return (
     <div className="bg-white rounded-2xl shadow-md p-6">
       <h3 className="text-xl font-bold text-[#111827] mb-6">Scores & Quiz Results</h3>
 
-      {/* KPI Row */}
+      {/* KPI Row - Real-time data from database */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="text-center">
           <div className="text-3xl font-bold text-[#304DB5] mb-1">{averageScore}%</div>
@@ -79,7 +80,7 @@ const StudentScoresPanel: React.FC<StudentScoresPanelProps> = ({
                       <span>{quiz.completionRate}% completion</span>
                     </div>
                   </div>
-                  {needsAttention(quiz.averageScore) && (
+                  {needsAttention(quiz.averageScore) && quiz.totalAttempts > 0 && (
                     <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full whitespace-nowrap ml-2">
                       Needs attention
                     </span>
@@ -141,6 +142,13 @@ const StudentScoresPanel: React.FC<StudentScoresPanelProps> = ({
           </div>
         </div>
       )}
+
+      {/* Data freshness indicator */}
+      <div className="mt-4 pt-4 border-t border-[#EDF0FB]">
+        <p className="text-xs text-[#9CA3B5] text-center">
+          🔄 Real-time data from quiz attempts
+        </p>
+      </div>
     </div>
   );
 };
