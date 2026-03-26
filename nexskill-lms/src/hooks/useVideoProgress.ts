@@ -188,9 +188,10 @@ export const useVideoProgress = ({
           }
 
           // Trigger completion callback
+          // Only trigger if newly completed (not if already completed before)
           if (isCompleted && !hasCompletedRef.current && onComplete) {
             hasCompletedRef.current = true;
-            console.log('[VideoProgress] Calling onComplete callback');
+            console.log('[VideoProgress] Calling onComplete callback (debounced save)');
             onComplete();
           }
 
@@ -269,13 +270,29 @@ export const useVideoProgress = ({
     }
   }, [onDurationLoaded, saveProgress]);
 
-  // Mark as complete manually (for testing or fallback)
+  // Mark as complete manually (called when video ends - should ALWAYS trigger completion)
   const markAsComplete = useCallback(async () => {
-    if (!user || !lessonId || !videoUrl) return;
+    if (!user || !lessonId || !videoUrl) {
+      console.log('[VideoProgress] markAsComplete: Missing required params');
+      return;
+    }
 
-    await saveProgress(state.duration, state.duration, state.duration, true);
+    console.log('[VideoProgress] markAsComplete called - current state:', state);
+    console.log('[VideoProgress] markAsComplete: hasCompletedRef =', hasCompletedRef.current);
+    
+    // Use the actual duration from the player, not state
+    const finalDuration = state.duration || 1; // Fallback to 1 to avoid division by zero
+    const finalTime = finalDuration; // Set to end of video
+    
+    // ALWAYS save and mark complete, even if already completed before
+    // This ensures the lesson gets marked complete even if the debounced save didn't trigger it
+    await saveProgress(finalTime, finalDuration, finalDuration, true, false);
+    
     setState((prev) => ({ ...prev, isCompleted: true }));
     hasCompletedRef.current = true;
+    
+    console.log('[VideoProgress] markAsComplete - calling onComplete');
+    // Always call onComplete when video ends (don't check hasCompletedRef)
     if (onComplete) {
       onComplete();
     }

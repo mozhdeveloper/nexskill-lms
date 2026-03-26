@@ -28,6 +28,7 @@ const VideoBlockEditor: React.FC<VideoBlockEditorProps> = ({
     const [uploadError, setUploadError] = useState<string | null>(null);
     const [uploadedVideoPreview, setUploadedVideoPreview] = useState<string | null>(null);
     const [uploadedMetadata, setUploadedMetadata] = useState<any>(null);
+    const [isFetchingDuration, setIsFetchingDuration] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Load existing video metadata from block
@@ -37,6 +38,75 @@ const VideoBlockEditor: React.FC<VideoBlockEditorProps> = ({
             setUploadedVideoPreview(block.content || null);
         }
     }, [block.attributes?.media_metadata, block.content]);
+
+    // Fetch YouTube video duration using YouTube Data API v3
+    const fetchYouTubeDuration = useCallback(async (url: string): Promise<number | null> => {
+        const videoId = url.match(/(?:v=|\/)([a-zA-Z0-9_-]{11})/)?.[1];
+        if (!videoId) {
+            console.log('[VideoBlockEditor] No valid YouTube video ID found in URL:', url);
+            return null;
+        }
+
+        try {
+            setIsFetchingDuration(true);
+            
+            // Get API key from environment variable
+            const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY;
+            
+            console.log('[VideoBlockEditor] Fetching duration for video ID:', videoId);
+            console.log('[VideoBlockEditor] API key present:', !!apiKey);
+            
+            if (!apiKey) {
+                console.warn('[VideoBlockEditor] YouTube API key not configured. Add VITE_YOUTUBE_API_KEY to .env.local');
+                return null;
+            }
+
+            // Fetch video details from YouTube Data API v3
+            const response = await fetch(
+                `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${videoId}&key=${apiKey}`
+            );
+            
+            console.log('[VideoBlockEditor] API response status:', response.status);
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                console.error('[VideoBlockEditor] YouTube API error:', errorData);
+                return null;
+            }
+            
+            const data = await response.json();
+            console.log('[VideoBlockEditor] YouTube API response:', data);
+            
+            if (!data.items || data.items.length === 0) {
+                console.log('[VideoBlockEditor] Video not found or private');
+                return null;
+            }
+
+            // Parse ISO 8601 duration (e.g., "PT2M45S" = 2 minutes 45 seconds)
+            const isoDuration = data.items[0].contentDetails.duration;
+            const duration = parseISODuration(isoDuration);
+            
+            console.log('[VideoBlockEditor] Parsed duration:', duration, 'seconds from ISO:', isoDuration);
+            return duration;
+        } catch (err) {
+            console.error('[VideoBlockEditor] Error fetching YouTube duration:', err);
+            return null;
+        } finally {
+            setIsFetchingDuration(false);
+        }
+    }, []);
+
+    // Parse ISO 8601 duration format (PT1H2M10S = 1 hour 2 minutes 10 seconds)
+    const parseISODuration = (isoDuration: string): number => {
+        const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+        if (!match) return 0;
+
+        const hours = parseInt(match[1] || '0', 10);
+        const minutes = parseInt(match[2] || '0', 10);
+        const seconds = parseInt(match[3] || '0', 10);
+
+        return (hours * 3600) + (minutes * 60) + seconds;
+    };
 
     const handleSourceTypeChange = (type: VideoSourceType) => {
         setSourceType(type);
@@ -66,10 +136,13 @@ const VideoBlockEditor: React.FC<VideoBlockEditorProps> = ({
         }
     };
 
-    const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const newUrl = e.target.value;
+        console.log('[VideoBlockEditor] handleUrlChange called with URL:', newUrl);
         setVideoUrl(newUrl);
-        onChange({
+        
+        // Start with basic update (without duration)
+        const baseUpdate = {
             ...block,
             content: newUrl,
             attributes: {
@@ -79,7 +152,30 @@ const VideoBlockEditor: React.FC<VideoBlockEditorProps> = ({
                 source_url: undefined,
                 media_metadata: undefined,
             },
-        });
+        };
+        
+        // Fetch duration if it's a YouTube URL
+        if (newUrl.includes('youtube.com') || newUrl.includes('youtu.be')) {
+            const duration = await fetchYouTubeDuration(newUrl);
+            
+            if (duration) {
+                // Update with duration once fetched
+                onChange({
+                    ...baseUpdate,
+                    attributes: {
+                        ...baseUpdate.attributes,
+                        media_metadata: {
+                            duration,
+                            thumbnail_url: `https://img.youtube.com/vi/${newUrl.match(/(?:v=|\/)([a-zA-Z0-9_-]{11})/)?.[1]}/maxresdefault.jpg`,
+                        },
+                    },
+                });
+                return;
+            }
+        }
+        
+        // No duration found, save without it
+        onChange(baseUpdate);
     };
 
     const handleFileSelect = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {

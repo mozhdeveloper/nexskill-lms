@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
     BookOpen,
     Plus,
@@ -41,6 +41,7 @@ interface CurriculumEditorProps {
     onUpdateLessonTitle?: (moduleId: string, lessonId: string, title: string) => Promise<void>;
     onUpdateLessonContent?: (moduleId: string, lessonId: string, contentBlocks: any[]) => Promise<void>;
     onSaveVideoBlock?: (moduleId: string, lessonId: string, videoUrl: string) => Promise<void>;
+    onRefreshLesson?: (moduleId: string, lessonId: string) => void;
 }
 
 interface ActivePlusMenu {
@@ -58,6 +59,11 @@ interface ContentOptions {
     uploadProgress: number;
     uploadedVideoPreview?: string;
     uploadError?: string;
+    videoDuration?: number; // Duration in seconds
+    videoMetadata?: {
+        duration: number;
+        thumbnail_url?: string;
+    };
 }
 
 interface VideoPreviewModalProps {
@@ -67,6 +73,7 @@ interface VideoPreviewModalProps {
 
 // Video Preview Modal Component
 const VideoPreviewModal: React.FC<VideoPreviewModalProps> = ({ videoUrl, onClose }) => {
+
     const getEmbedUrl = (url: string): string | null => {
         const trimmedUrl = url.trim();
         
@@ -136,6 +143,9 @@ const VideoPreviewModal: React.FC<VideoPreviewModalProps> = ({ videoUrl, onClose
                         <ExternalLink className="w-3.5 h-3.5 inline-block mr-1" />
                         Preview mode - This is how students will see the video
                     </p>
+                    <p className="text-xs text-blue-500 font-medium mt-2">
+                      💡 To show video duration: Open the lesson preview and play the video for 2 seconds
+                    </p>
                 </div>
             </div>
         </div>
@@ -200,6 +210,62 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
     const [activePlusMenu, setActivePlusMenu]   = useState<ActivePlusMenu | null>(null);
     const [contentOptions, setContentOptions]   = useState<ContentOptions | null>(null);
     const [previewVideoUrl, setPreviewVideoUrl] = useState<string | null>(null);
+    const [isFetchingDuration, setIsFetchingDuration] = useState(false);
+
+    // Parse ISO 8601 duration format (PT1H2M10S = 1 hour 2 minutes 10 seconds)
+    const parseISODuration = (isoDuration: string): number => {
+        const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+        if (!match) return 0;
+
+        const hours = parseInt(match[1] || '0', 10);
+        const minutes = parseInt(match[2] || '0', 10);
+        const seconds = parseInt(match[3] || '0', 10);
+
+        return (hours * 3600) + (minutes * 60) + seconds;
+    };
+
+    // Fetch YouTube video duration using YouTube Data API v3
+    const fetchYouTubeDuration = useCallback(async (url: string): Promise<number | null> => {
+        const videoId = url.match(/(?:v=|\/)([a-zA-Z0-9_-]{11})/)?.[1];
+        if (!videoId) return null;
+
+        try {
+            setIsFetchingDuration(true);
+            const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY;
+            
+            console.log('[CurriculumEditor] Fetching YouTube duration for:', videoId);
+            console.log('[CurriculumEditor] API key present:', !!apiKey);
+            
+            if (!apiKey) {
+                console.warn('[CurriculumEditor] YouTube API key not configured');
+                return null;
+            }
+
+            const response = await fetch(
+                `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${videoId}&key=${apiKey}`
+            );
+            
+            console.log('[CurriculumEditor] API response status:', response.status);
+            
+            if (!response.ok) return null;
+            
+            const data = await response.json();
+            console.log('[CurriculumEditor] YouTube API response:', data);
+            
+            if (!data.items || data.items.length === 0) return null;
+
+            const isoDuration = data.items[0].contentDetails.duration;
+            const duration = parseISODuration(isoDuration);
+            
+            console.log('[CurriculumEditor] Parsed duration:', duration, 'seconds from ISO:', isoDuration);
+            return duration;
+        } catch (err) {
+            console.error('[CurriculumEditor] Error fetching YouTube duration:', err);
+            return null;
+        } finally {
+            setIsFetchingDuration(false);
+        }
+    }, []);
 
     const plusMenuRef = useRef<HTMLDivElement>(null);
 
@@ -326,7 +392,13 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
 
     const handleSaveVideoUrl = async (moduleId: string, lessonId: string) => {
         if (!contentOptions?.videoUrl.trim()) return;
-        
+
+        console.log('[CurriculumEditor] Saving video:', {
+            url: contentOptions.videoUrl,
+            duration: contentOptions.videoDuration,
+            metadata: contentOptions.videoMetadata,
+        });
+
         // First update the local state
         const updatedCurriculum = curriculum.map((m) =>
             m.id === moduleId ? {
@@ -340,14 +412,22 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                         content: contentOptions.videoUrl,
                         position: blocks.length,
                         title: "",
+                        attributes: contentOptions.videoMetadata ? {
+                            media_metadata: contentOptions.videoMetadata,
+                            is_external: true,
+                            external_url: contentOptions.videoUrl,
+                        } : {
+                            is_external: true,
+                            external_url: contentOptions.videoUrl,
+                        },
                     };
                     return { ...l, content_blocks: [...blocks, newBlock] };
                 }),
             } : m
         );
-        
+
         onChange(updatedCurriculum);
-        
+
         // Save to database
         if (!lessonId.startsWith('lesson-')) {
             if (onUpdateLessonContent) {
@@ -362,9 +442,14 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                 await onSaveVideoBlock(moduleId, lessonId, contentOptions.videoUrl);
             }
         }
-        
+
         setContentOptions(null);
         setExpandedLessons((prev) => { const next = new Set(prev); next.delete(lessonId); return next; });
+        
+        // Trigger refresh to update sidebar durations
+        if (onRefreshLesson) {
+            onRefreshLesson(moduleId, lessonId);
+        }
     };
 
     const handleSaveQuizTitle = async (moduleId: string, lessonId: string) => {
@@ -900,9 +985,30 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                                                             <input
                                                                                 type="text"
                                                                                 value={contentOptions.videoUrl}
-                                                                                onChange={(e) =>
-                                                                                    setContentOptions((c) => c ? { ...c, videoUrl: e.target.value } : c)
-                                                                                }
+                                                                                onChange={async (e) => {
+                                                                                    const newUrl = e.target.value;
+                                                                                    console.log('[CurriculumEditor] Video URL changed:', newUrl);
+                                                                                    
+                                                                                    // Fetch duration if it's a YouTube URL
+                                                                                    if (newUrl.includes('youtube.com') || newUrl.includes('youtu.be')) {
+                                                                                        const duration = await fetchYouTubeDuration(newUrl);
+                                                                                        if (duration) {
+                                                                                            setContentOptions((c) => c ? { 
+                                                                                                ...c, 
+                                                                                                videoUrl: newUrl,
+                                                                                                videoDuration: duration,
+                                                                                                videoMetadata: {
+                                                                                                    duration,
+                                                                                                    thumbnail_url: `https://img.youtube.com/vi/${newUrl.match(/(?:v=|\/)([a-zA-Z0-9_-]{11})/)?.[1]}/maxresdefault.jpg`,
+                                                                                                }
+                                                                                            } : c);
+                                                                                            return;
+                                                                                        }
+                                                                                    }
+                                                                                    
+                                                                                    // No duration, just update URL
+                                                                                    setContentOptions((c) => c ? { ...c, videoUrl: newUrl } : c);
+                                                                                }}
                                                                                 className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-sm text-gray-800 dark:text-gray-200 placeholder-gray-400"
                                                                                 placeholder="Paste YouTube, Vimeo, or direct video URL..."
                                                                                 autoFocus

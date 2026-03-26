@@ -217,10 +217,17 @@ const CoursePlayer: React.FC = () => {
   // Callback for video completion - refreshes the completed lessons list
   const handleVideoComplete = useCallback(() => {
     console.log('[CoursePlayer] Video complete - refreshing completion status');
-    // Re-fetch completed lessons to update UI
+    
+    // IMMEDIATELY update UI to show checkmark
+    if (lessonId && !completedLessons.includes(lessonId)) {
+      setCompletedLessons(prev => [...prev, lessonId]);
+      console.log('[CoursePlayer] Immediately added lesson to completed:', lessonId);
+    }
+    
+    // Re-fetch completed lessons to update UI (background refresh)
     const refreshCompletedLessons = async () => {
       if (!courseId) return;
-      
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -249,7 +256,7 @@ const CoursePlayer: React.FC = () => {
             .eq('user_id', user.id)
             .eq('is_completed', true)
             .in('lesson_id', lessonIds);
-          
+
           setCompletedLessons((progressRows || []).map((r: any) => r.lesson_id));
           console.log('[CoursePlayer] Completed lessons updated:', progressRows);
         }
@@ -257,7 +264,7 @@ const CoursePlayer: React.FC = () => {
     };
 
     refreshCompletedLessons();
-  }, [courseId]);
+  }, [courseId, lessonId, completedLessons]);
 
   // Show graduation banner when all lessons are complete
   useEffect(() => {

@@ -10,11 +10,10 @@ import CoursePricingForm from "../../components/coach/course-builder/CoursePrici
 import CoursePublishWorkflow from "../../components/coach/course-builder/CoursePublishWorkflow";
 import CoursePreviewPane from "../../components/coach/course-builder/CoursePreviewPane";
 import DeleteCourseModal from "../../components/courses/DeleteCourseModal";
-import LessonEditorPanel from "../../components/coach/lesson-editor/LessonEditorPanel";
 import LiveSessionManager from "../../components/coach/live-sessions/LiveSessionManager";
 import QuizEditorPanel from "../../components/quiz/QuizEditorPanel";
 import CourseGoalsPanel from "../../components/coach/course-builder/CourseGoalsPanel";
-import type { Lesson, Module } from "../../types/lesson";
+import type { Module } from "../../types/lesson";
 import type { Quiz, QuizQuestion } from "../../types/quiz";
 import type { ContentItem } from "../../types/content-item";
 import { supabase } from "../../lib/supabaseClient";
@@ -64,7 +63,6 @@ const CourseBuilder: React.FC = () => {
   const navigate = useNavigate();
 
   const saveQuizQuestionsTimeoutRef = useRef<any>(null);
-  const saveLessonTimeoutRef = useRef<any>(null);
   const saveCurriculumTimeoutRef = useRef<any>(null);
 
   const initialData = location.state as CourseSettings | undefined;
@@ -129,7 +127,6 @@ const CourseBuilder: React.FC = () => {
           learningObjectives: [],
         }));
 
-        // Only set to published if verification_status is approved
         const isPublished = courseData.verification_status === 'approved';
         setCourseStatus(isPublished ? "published" : "draft");
         setVerificationStatus(courseData.verification_status || "draft");
@@ -171,8 +168,8 @@ const CourseBuilder: React.FC = () => {
                   if (item.content_type === 'lesson' && item.lesson_id) {
                     const contentBlocks = item.content_blocks || [];
                     const lessonType = contentBlocks.length > 0 ? contentBlocks[0].type : "text";
-                    const duration = item.lesson_estimated_duration_minutes 
-                      ? `${item.lesson_estimated_duration_minutes} min` 
+                    const duration = item.lesson_estimated_duration_minutes
+                      ? `${item.lesson_estimated_duration_minutes} min`
                       : "Lesson";
                     return {
                       id: item.lesson_id,
@@ -226,12 +223,14 @@ const CourseBuilder: React.FC = () => {
   useEffect(() => {
     return () => {
       if (saveQuizQuestionsTimeoutRef.current) clearTimeout(saveQuizQuestionsTimeoutRef.current);
-      if (saveLessonTimeoutRef.current) clearTimeout(saveLessonTimeoutRef.current);
       if (saveCurriculumTimeoutRef.current) clearTimeout(saveCurriculumTimeoutRef.current);
     };
   }, []);
 
   const [curriculum, setCurriculum] = useState<Module[]>([]);
+  const [editingQuiz, setEditingQuiz] = useState<{ moduleId: string; lessonId: string; quiz: Quiz; questions: QuizQuestion[] } | null>(null);
+  const [drip, setDrip] = useState<ModuleDrip[]>([]);
+  const [pricing, setPricing] = useState<PricingData>({ mode: "one-time", price: 99, currency: "USD" });
 
   const handleCurriculumChange = (updatedCurriculum: Module[]) => {
     setCurriculum(updatedCurriculum);
@@ -259,10 +258,6 @@ const CourseBuilder: React.FC = () => {
     }, 1000);
   };
 
-  const [editingLesson, setEditingLesson] = useState<{ moduleId: string; lesson: Lesson } | null>(null);
-  const [editingQuiz, setEditingQuiz] = useState<{ moduleId: string; lessonId: string; quiz: Quiz; questions: QuizQuestion[] } | null>(null);
-  const [drip, setDrip] = useState<ModuleDrip[]>([]);
-
   useEffect(() => {
     setDrip((prevDrip) => {
       const existingMap = new Map(prevDrip.map(d => [d.moduleId, d]));
@@ -279,9 +274,7 @@ const CourseBuilder: React.FC = () => {
     });
   }, [curriculum]);
 
-  const [pricing, setPricing] = useState<PricingData>({ mode: "one-time", price: 99, currency: "USD" });
-
-  // ─── Helpers ──────────────────────────────────────────────────────────────
+  // ─── Helpers ───────────────────────────────────────────────────────────────
 
   const resolveModuleId = async (tempModuleId: string): Promise<string> => {
     if (tempModuleId.startsWith("module-")) {
@@ -314,7 +307,7 @@ const CourseBuilder: React.FC = () => {
     return tempModuleId;
   };
 
-  // ─── Handlers ─────────────────────────────────────────────────────────────
+  // ─── Handlers ──────────────────────────────────────────────────────────────
 
   const handleDeleteLesson = async (moduleId: string, contentId: string) => {
     const module = curriculum.find(m => m.id === moduleId);
@@ -346,31 +339,28 @@ const CourseBuilder: React.FC = () => {
     }
   };
 
-  const handleAddLesson = async (moduleId: string, newLesson: Lesson) => {
+  const handleAddLesson = async (moduleId: string, newLesson: any) => {
     let resolvedModuleId = moduleId;
-    try { 
-      resolvedModuleId = await resolveModuleId(moduleId); 
-    } catch (error) { 
-      alert(`Error resolving module: ${(error as Error).message}`); 
-      return; 
+    try {
+      resolvedModuleId = await resolveModuleId(moduleId);
+    } catch (error) {
+      alert(`Error resolving module: ${(error as Error).message}`);
+      return;
     }
 
     const lessonId = uuidv4();
-    
+
     try {
       const { error: lessonError } = await supabase.from("lessons").insert([{
-        id: lessonId, 
-        title: newLesson.title || "Untitled Lesson", 
+        id: lessonId,
+        title: newLesson.title || "Untitled Lesson",
         description: newLesson.description || "",
         content_blocks: newLesson.content_blocks || [],
-        estimated_duration_minutes: newLesson.estimated_duration_minutes || 15, 
+        estimated_duration_minutes: newLesson.estimated_duration_minutes || 15,
         is_published: newLesson.is_published || false,
       }]);
-      
-      if (lessonError) { 
-        alert(`Error adding lesson: ${lessonError.message}`); 
-        return; 
-      }
+
+      if (lessonError) { alert(`Error adding lesson: ${lessonError.message}`); return; }
 
       const { data: maxPositionData } = await supabase
         .from("module_content_items")
@@ -378,18 +368,18 @@ const CourseBuilder: React.FC = () => {
         .eq("module_id", resolvedModuleId)
         .order("position", { ascending: false })
         .limit(1);
-      
-      const newPosition = maxPositionData && maxPositionData.length > 0 
-        ? maxPositionData[0].position + 1 
+
+      const newPosition = maxPositionData && maxPositionData.length > 0
+        ? maxPositionData[0].position + 1
         : 0;
 
       const { error: linkError } = await supabase
         .from("module_content_items")
         .insert([{
-          module_id: resolvedModuleId, 
-          content_type: "lesson", 
+          module_id: resolvedModuleId,
+          content_type: "lesson",
           content_id: lessonId,
-          position: newPosition, 
+          position: newPosition,
           is_published: newLesson.is_published || false,
         }]);
 
@@ -399,20 +389,19 @@ const CourseBuilder: React.FC = () => {
         return;
       }
 
-      const updatedNewLesson: ContentItem = { 
-        ...newLesson, 
-        id: lessonId, 
+      const updatedNewLesson: ContentItem = {
+        ...newLesson,
+        id: lessonId,
         type: 'lesson',
         title: newLesson.title || "Untitled Lesson",
         content_blocks: newLesson.content_blocks || [],
         duration: `${newLesson.estimated_duration_minutes || 15} min`,
         summary: newLesson.summary || "",
       };
-      
+
       setCurriculum(curriculum.map((m) =>
         m.id === moduleId ? { ...m, lessons: [...m.lessons, updatedNewLesson] } : m
       ));
-      
     } catch (err) {
       console.error("Error adding lesson:", err);
       alert("An unexpected error occurred while adding the lesson");
@@ -461,8 +450,8 @@ const CourseBuilder: React.FC = () => {
         let allContent: ContentItem[] = [];
         if (lessonIds.length > 0) {
           const { data: lData } = await supabase.from("lessons").select("*").in("id", lessonIds);
-          if (lData) allContent = allContent.concat(lData.map(l => ({ 
-            ...l, 
+          if (lData) allContent = allContent.concat(lData.map(l => ({
+            ...l,
             type: 'lesson' as const,
             duration: `${l.estimated_duration_minutes || 15} min`,
             summary: l.summary || "",
@@ -470,8 +459,8 @@ const CourseBuilder: React.FC = () => {
         }
         if (quizIds.length > 0) {
           const { data: qData } = await supabase.from("quizzes").select("*").in("id", quizIds);
-          if (qData) allContent = allContent.concat(qData.map(q => ({ 
-            ...q, 
+          if (qData) allContent = allContent.concat(qData.map(q => ({
+            ...q,
             type: 'quiz' as const,
             duration: "Quiz",
           })));
@@ -486,12 +475,6 @@ const CourseBuilder: React.FC = () => {
     } catch (err) {
       alert(`An unexpected error occurred while moving the ${contentType}`);
     }
-  };
-
-  const handleEditLesson = (moduleId: string, lessonId: string) => {
-    const module = curriculum.find((m) => m.id === moduleId);
-    const lesson = module?.lessons.find((l) => l.id === lessonId && !('instructions' in l));
-    if (lesson) setEditingLesson({ moduleId, lesson: lesson as Lesson });
   };
 
   const handleEditQuiz = (moduleId: string, lessonId: string, quizId: string) => {
@@ -522,58 +505,14 @@ const CourseBuilder: React.FC = () => {
     fetchAndOpenQuiz();
   };
 
-  const handleSaveLesson = async (updatedLesson: Lesson) => {
-    if (!editingLesson || !updatedLesson.id) return;
-
-    const lessonWithDuration = {
-      ...updatedLesson,
-      duration: `${updatedLesson.estimated_duration_minutes || 15} min`,
-    };
-
-    setEditingLesson({ ...editingLesson, lesson: lessonWithDuration });
-    setCurriculum(curriculum.map((mod) =>
-      mod.id === editingLesson.moduleId
-        ? { 
-            ...mod, 
-            lessons: mod.lessons.map((l) => l.id === updatedLesson.id ? { ...lessonWithDuration, type: 'lesson' } as ContentItem : l) 
-          }
-        : mod
-    ));
-
-    if (saveLessonTimeoutRef.current) clearTimeout(saveLessonTimeoutRef.current);
-
-    try {
-      const { error } = await supabase.from("lessons").upsert({
-        id: updatedLesson.id, 
-        title: updatedLesson.title, 
-        description: updatedLesson.description,
-        content_blocks: updatedLesson.content_blocks || [],
-        estimated_duration_minutes: updatedLesson.estimated_duration_minutes, 
-        is_published: updatedLesson.is_published,
-        summary: updatedLesson.summary || "",
-      }, { onConflict: "id" });
-      
-      if (error) throw error;
-
-      await supabase.from("module_content_items").update({ is_published: updatedLesson.is_published })
-        .match({ module_id: editingLesson.moduleId, content_id: updatedLesson.id, content_type: "lesson" });
-    } catch (err) {
-      console.error("Error saving lesson:", err);
-    }
-  };
-
   const handleUpdateLessonTitle = async (_moduleId: string, lessonId: string, title: string) => {
     if (!lessonId || lessonId.startsWith('lesson-')) return;
-
     try {
       const { error } = await supabase
         .from("lessons")
-        .update({ title: title, updated_at: new Date().toISOString() })
+        .update({ title, updated_at: new Date().toISOString() })
         .eq("id", lessonId);
-
-      if (error) {
-        console.error("Error updating lesson title:", error);
-      }
+      if (error) console.error("Error updating lesson title:", error);
     } catch (err) {
       console.error("Error in handleUpdateLessonTitle:", err);
     }
@@ -581,19 +520,12 @@ const CourseBuilder: React.FC = () => {
 
   const handleUpdateLessonContent = async (_moduleId: string, lessonId: string, contentBlocks: any[]) => {
     if (!lessonId || lessonId.startsWith('lesson-')) return;
-
     try {
       const { error } = await supabase
         .from("lessons")
-        .update({
-          content_blocks: contentBlocks, 
-          updated_at: new Date().toISOString() 
-        })
+        .update({ content_blocks: contentBlocks, updated_at: new Date().toISOString() })
         .eq("id", lessonId);
-      
-      if (error) {
-        console.error("Error updating lesson content:", error);
-      }
+      if (error) console.error("Error updating lesson content:", error);
     } catch (err) {
       console.error("Error in handleUpdateLessonContent:", err);
     }
@@ -603,11 +535,7 @@ const CourseBuilder: React.FC = () => {
     try {
       const module = curriculum.find(m => m.id === moduleId);
       const lesson = module?.lessons.find(l => l.id === lessonId);
-      
-      if (!lesson) {
-        console.error("[CourseBuilder] Lesson not found:", lessonId);
-        return;
-      }
+      if (!lesson) return;
 
       const currentBlocks = (lesson as any).content_blocks || [];
       const newBlock = {
@@ -627,9 +555,32 @@ const CourseBuilder: React.FC = () => {
       if (error) {
         console.error("[CourseBuilder] Error saving video block:", error);
         alert(`Failed to save video: ${error.message}`);
+      } else {
+        handleRefreshLesson(moduleId, lessonId);
       }
     } catch (err) {
       console.error("[CourseBuilder] Error saving video block:", err);
+    }
+  };
+
+  const handleRefreshLesson = async (moduleId: string, lessonId: string) => {
+    const { data: lessonData } = await supabase
+      .from('lessons')
+      .select('content_blocks')
+      .eq('id', lessonId)
+      .single();
+
+    if (lessonData) {
+      setCurriculum(prev => prev.map(m => {
+        if (m.id !== moduleId) return m;
+        return {
+          ...m,
+          lessons: m.lessons.map(l => {
+            if (l.id !== lessonId) return l;
+            return { ...l, content_blocks: lessonData.content_blocks };
+          }),
+        };
+      }));
     }
   };
 
@@ -664,48 +615,11 @@ const CourseBuilder: React.FC = () => {
     }
   };
 
-  const handleAddQuiz = async (_moduleId: string, _lessonId?: string) => {
-    let resolvedModuleId = _moduleId;
-    try { resolvedModuleId = await resolveModuleId(_moduleId); } catch (e) { return; }
-
-    const newQuiz: Quiz = {
-      id: uuidv4(), title: "New Quiz", description: "", instructions: "",
-      passing_score: 70, time_limit_minutes: 30, max_attempts: 3,
-      requires_manual_grading: false, is_published: false,
-      late_submission_allowed: true, late_penalty_percent: 10,
-    };
-
-    try {
-      // Insert quiz with lesson_id if provided (for quizzes tied to specific lessons)
-      const { error: quizError } = await supabase.from("quizzes").insert([{
-        ...newQuiz,
-        lesson_id: _lessonId || null, // Link to lesson if provided, otherwise null for standalone quizzes
-      }]);
-      if (quizError) throw quizError;
-
-      const { data: maxPositionData } = await supabase.from("module_content_items")
-        .select("position").eq("module_id", resolvedModuleId).order("position", { ascending: false }).limit(1);
-      const newPosition = maxPositionData && maxPositionData.length > 0 ? maxPositionData[0].position + 1 : 0;
-
-      await supabase.from("module_content_items").insert([{
-        module_id: resolvedModuleId, content_type: "quiz", content_id: newQuiz.id,
-        position: newPosition, is_published: newQuiz.is_published,
-      }]);
-
-      const newQuizItem: ContentItem = { ...newQuiz, type: 'quiz', duration: "Quiz" };
-      setCurriculum(curriculum.map((m) => m.id === _moduleId ? { ...m, lessons: [...m.lessons, newQuizItem] } : m));
-      setEditingQuiz({ moduleId: _moduleId, lessonId: _lessonId || "", quiz: newQuiz, questions: [] });
-    } catch (err) {
-      alert("Error adding quiz");
-    }
-  };
-
   const handleCreateQuizWithTitle = async (moduleId: string, lessonId: string, quizTitle: string): Promise<string> => {
     let resolvedModuleId = moduleId;
     try { resolvedModuleId = await resolveModuleId(moduleId); } catch (e) { throw new Error("Failed to resolve module"); }
 
     const quizId = uuidv4();
-
     const newQuiz: Quiz = {
       id: quizId, title: quizTitle, description: "", instructions: "",
       passing_score: 70, time_limit_minutes: 30, max_attempts: 3,
@@ -713,10 +627,9 @@ const CourseBuilder: React.FC = () => {
       late_submission_allowed: true, late_penalty_percent: 10,
     };
 
-    // Insert quiz WITH lesson_id since quizzes are created inside lessons
     const { error: quizError } = await supabase.from("quizzes").insert([{
       ...newQuiz,
-      lesson_id: lessonId, // Link quiz to the lesson it was created in
+      lesson_id: lessonId,
     }]);
     if (quizError) throw new Error(quizError.message);
 
@@ -779,22 +692,21 @@ const CourseBuilder: React.FC = () => {
 
   const handlePublish = async () => {
     try {
-        const { error } = await supabase.from('courses').update({
-            verification_status: 'pending_review', // ← CHANGED from 'approved'
-            visibility: 'public', 
-            updated_at: new Date().toISOString(),
-        }).eq('id', courseId);
-        
-        if (error) throw error;
-        
-        setVerificationStatus('pending_review'); // ← Update local state
-        setCourseStatus("draft"); // ← Keep as draft until actually approved
-        
-        alert("Course submitted for admin review! It will be visible to students once approved.");
+      const { error } = await supabase.from('courses').update({
+        verification_status: 'pending_review',
+        visibility: 'public',
+        updated_at: new Date().toISOString(),
+      }).eq('id', courseId);
+
+      if (error) throw error;
+
+      setVerificationStatus('pending_review');
+      setCourseStatus("draft");
+      alert("Course submitted for admin review! It will be visible to students once approved.");
     } catch (error: any) {
-        alert(`Failed to submit for review: ${error.message}`);
+      alert(`Failed to submit for review: ${error.message}`);
     }
-};
+  };
 
   const handleUnpublish = async () => {
     try {
@@ -803,9 +715,9 @@ const CourseBuilder: React.FC = () => {
         visibility: 'private',
         updated_at: new Date().toISOString(),
       }).eq('id', courseId);
-      
+
       if (error) throw error;
-      
+
       setVerificationStatus('draft');
       setCourseStatus("draft");
       alert("Course Unpublished. Students can no longer access the course.");
@@ -825,30 +737,27 @@ const CourseBuilder: React.FC = () => {
 
   const handleSubmitForReview = async () => {
     try {
-      // Check if course has required content before submitting
       if (!settings.title.trim()) {
         alert("Please add a course title before submitting for review.");
         return;
       }
-      
       if (curriculum.length === 0) {
         alert("Please add at least one module before submitting for review.");
         return;
       }
-      
       const hasLessons = curriculum.some(m => m.lessons && m.lessons.length > 0);
       if (!hasLessons) {
         alert("Please add at least one lesson or quiz before submitting for review.");
         return;
       }
-      
+
       const { error } = await supabase.from('courses').update({
         verification_status: 'pending_review',
         updated_at: new Date().toISOString(),
       }).eq('id', courseId);
-      
+
       if (error) throw error;
-      
+
       setVerificationStatus('pending_review');
       alert("Course submitted for review successfully! The admin will review your course and notify you once approved.");
     } catch (error: any) {
@@ -902,13 +811,12 @@ const CourseBuilder: React.FC = () => {
         updated_at: new Date().toISOString(),
       }).eq("id", courseId);
 
-      // Only set to published if verification is approved
       if (verificationStatus === 'approved' && settings.visibility === 'public') {
         setCourseStatus("published");
       } else {
         setCourseStatus("draft");
       }
-      
+
       alert("Settings saved successfully");
     } catch (error) {
       alert("Failed to save settings");
@@ -949,7 +857,6 @@ const CourseBuilder: React.FC = () => {
           <CurriculumEditor
             curriculum={curriculum}
             onChange={handleCurriculumChange}
-            onEditLesson={handleEditLesson}
             onEditQuiz={handleEditQuiz}
             onCreateQuiz={handleCreateQuizWithTitle}
             onAddLesson={handleAddLesson}
@@ -960,6 +867,7 @@ const CourseBuilder: React.FC = () => {
             onUpdateLessonTitle={handleUpdateLessonTitle}
             onUpdateLessonContent={handleUpdateLessonContent}
             onSaveVideoBlock={handleSaveVideoBlock}
+            onRefreshLesson={handleRefreshLesson}
           />
         );
       case "live-sessions":
@@ -970,11 +878,11 @@ const CourseBuilder: React.FC = () => {
         return <CoursePricingForm pricing={pricing} onChange={setPricing} onSave={handleSavePricing} />;
       case "goals":
         return <CourseGoalsPanel courseId={courseId!} />;
-     case "publish":
-    return (
-        <CoursePublishWorkflow
+      case "publish":
+        return (
+          <CoursePublishWorkflow
             courseStatus={courseStatus}
-            verificationStatus={verificationStatus} // ← ADD THIS PROP
+            verificationStatus={verificationStatus}
             adminFeedback={adminFeedback}
             onPublish={handlePublish}
             onUnpublish={handleUnpublish}
@@ -983,8 +891,8 @@ const CourseBuilder: React.FC = () => {
             hasModules={curriculum.length > 0}
             hasLessons={curriculum.some(m => m.lessons && m.lessons.length > 0)}
             hasPricing={pricing.mode === 'free' || pricing.price > 0}
-        />
-    );
+          />
+        );
       case "preview":
         return (
           <CoursePreviewPane
@@ -1028,14 +936,6 @@ const CourseBuilder: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {editingLesson && (
-        <LessonEditorPanel
-          lesson={editingLesson.lesson}
-          onChange={handleSaveLesson}
-          onClose={() => setEditingLesson(null)}
-        />
-      )}
 
       {editingQuiz && (
         <QuizEditorPanel

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 
 interface ContentItem {
@@ -24,6 +24,66 @@ interface LessonSidebarProps {
   completedQuizIds?: string[];
 }
 
+// ─── YouTube Duration Helpers ─────────────────────────────────────────────────
+
+const parseISODuration = (isoDuration: string): number => {
+  const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) return 0;
+  const hours   = parseInt(match[1] || '0', 10);
+  const minutes = parseInt(match[2] || '0', 10);
+  const seconds = parseInt(match[3] || '0', 10);
+  return hours * 3600 + minutes * 60 + seconds;
+};
+
+const extractYouTubeId = (url: string): string | null =>
+  url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1] ?? null;
+
+const formatDuration = (seconds: number): string => {
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+};
+
+/** Fetch durations for multiple YouTube video IDs in one API call. */
+const fetchYouTubeDurations = async (
+  videoIds: string[]
+): Promise<Map<string, number>> => {
+  const result = new Map<string, number>();
+  if (videoIds.length === 0) return result;
+
+  const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY;
+  if (!apiKey) {
+    console.warn('[LessonSidebar] VITE_YOUTUBE_API_KEY not set — cannot fetch YouTube durations');
+    return result;
+  }
+
+  try {
+    // YouTube API accepts up to 50 IDs per request
+    const chunks: string[][] = [];
+    for (let i = 0; i < videoIds.length; i += 50) {
+      chunks.push(videoIds.slice(i, i + 50));
+    }
+
+    for (const chunk of chunks) {
+      const response = await fetch(
+        `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${chunk.join(',')}&key=${apiKey}`
+      );
+      if (!response.ok) continue;
+      const data = await response.json();
+      for (const item of data.items ?? []) {
+        const secs = parseISODuration(item.contentDetails.duration);
+        result.set(item.id, secs);
+      }
+    }
+  } catch (err) {
+    console.error('[LessonSidebar] Error fetching YouTube durations:', err);
+  }
+
+  return result;
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 const LessonSidebar: React.FC<LessonSidebarProps> = ({
   courseId,
   activeLessonId,
@@ -35,87 +95,175 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
   const [expandedModules, setExpandedModules] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchModules = useCallback(async () => {
     if (!courseId) return;
-    const fetchModules = async () => {
-      try {
-        setLoading(true);
-        const { data: modulesData } = await supabase
-          .from('modules')
-          .select('id, title, position')
-          .eq('course_id', courseId)
-          .eq('is_published', true)
-          .order('position', { ascending: true });
 
-        if (!modulesData || modulesData.length === 0) {
-          setSidebarModules([]);
+    try {
+      setLoading(true);
+
+      // ── 1. Modules ────────────────────────────────────────────────────────
+      const { data: modulesData } = await supabase
+        .from('modules')
+        .select('id, title, position')
+        .eq('course_id', courseId)
+        .eq('is_published', true)
+        .order('position', { ascending: true });
+
+      if (!modulesData || modulesData.length === 0) {
+        setSidebarModules([]);
+        return;
+      }
+
+      const moduleIds = modulesData.map((m) => m.id);
+
+      // ── 2. Content items + lessons + quizzes + watch progress ─────────────
+      const { data: itemsData } = await supabase
+        .from('module_content_items')
+        .select('module_id, content_id, content_type, position')
+        .in('module_id', moduleIds)
+        .eq('is_published', true)
+        .order('position', { ascending: true });
+
+      const lessonIds = (itemsData ?? []).filter((i) => i.content_type === 'lesson').map((i) => i.content_id);
+      const quizIds   = (itemsData ?? []).filter((i) => i.content_type === 'quiz').map((i) => i.content_id);
+
+      const [lessonsRes, quizzesRes, videoProgressRes] = await Promise.all([
+        lessonIds.length > 0
+          ? supabase.from('lessons').select('id, title, estimated_duration_minutes, content_blocks').in('id', lessonIds)
+          : Promise.resolve({ data: [] }),
+        quizIds.length > 0
+          ? supabase.from('quizzes').select('id, title, time_limit_minutes').in('id', quizIds)
+          : Promise.resolve({ data: [] }),
+        lessonIds.length > 0
+          ? supabase.from('lesson_video_progress').select('lesson_id, duration_seconds').in('lesson_id', lessonIds)
+          : Promise.resolve({ data: [] }),
+      ]);
+
+      const lessonsMap  = new Map((lessonsRes.data  ?? []).map((l: any) => [l.id, l]));
+      const quizzesMap  = new Map((quizzesRes.data  ?? []).map((q: any) => [q.id, q]));
+
+      // Watch-progress durations (fallback)
+      const watchedDurationMap = new Map<string, number>();
+      (videoProgressRes.data ?? []).forEach((v: any) => {
+        if (v.duration_seconds > 0 && !watchedDurationMap.has(v.lesson_id)) {
+          watchedDurationMap.set(v.lesson_id, v.duration_seconds);
+        }
+      });
+
+      // ── 3. Extract durations already stored in content_blocks ─────────────
+      // Covers: Cloudinary uploads (media_metadata.duration) and
+      //         previously-fetched YouTube metadata stored on save.
+      const storedDurationMap = new Map<string, number>();
+      // Also collect YouTube video IDs that still have NO stored duration
+      const youtubeIdsToFetch: string[] = []; // video IDs
+      const lessonIdForYouTubeId = new Map<string, string>(); // ytId → lessonId
+
+      (lessonsRes.data ?? []).forEach((l: any) => {
+        if (!Array.isArray(l.content_blocks)) return;
+
+        const videoBlock = l.content_blocks.find(
+          (b: any) => b.type === 'video' || b.block_type === 'video'
+        );
+        if (!videoBlock) return;
+
+        // A) Duration already stored in metadata (Cloudinary or previously-saved YouTube)
+        const metaDuration =
+          videoBlock.attributes?.media_metadata?.duration ??
+          videoBlock.attributes?.duration ??
+          null;
+
+        if (typeof metaDuration === 'number' && metaDuration > 0) {
+          storedDurationMap.set(l.id, metaDuration);
           return;
         }
 
-        const moduleIds = modulesData.map((m) => m.id);
-        const { data: itemsData } = await supabase
-          .from('module_content_items')
-          .select('module_id, content_id, content_type, position')
-          .in('module_id', moduleIds)
-          .eq('is_published', true)
-          .order('position', { ascending: true });
+        // B) YouTube URL with no stored duration → queue for API fetch
+        const url: string = videoBlock.content ?? videoBlock.url ?? '';
+        const ytId = extractYouTubeId(url);
+        if (ytId) {
+          youtubeIdsToFetch.push(ytId);
+          lessonIdForYouTubeId.set(ytId, l.id);
+        }
+      });
 
-        const lessonIds = (itemsData || []).filter((i) => i.content_type === 'lesson').map((i) => i.content_id);
-        const quizIds = (itemsData || []).filter((i) => i.content_type === 'quiz').map((i) => i.content_id);
+      // ── 4. Batch-fetch missing YouTube durations ───────────────────────────
+      const youtubeDurationMap = await fetchYouTubeDurations(
+        // deduplicate
+        [...new Set(youtubeIdsToFetch)]
+      );
 
-        const [lessonsRes, quizzesRes] = await Promise.all([
-          lessonIds.length > 0
-            ? supabase.from('lessons').select('id, title, estimated_duration_minutes').in('id', lessonIds)
-            : Promise.resolve({ data: [] }),
-          quizIds.length > 0
-            ? supabase.from('quizzes').select('id, title, time_limit_minutes').in('id', quizIds)
-            : Promise.resolve({ data: [] }),
-        ]);
+      // Map YouTube durations back to lesson IDs
+      const youtubeLessonDurationMap = new Map<string, number>();
+      lessonIdForYouTubeId.forEach((lessonId, ytId) => {
+        const secs = youtubeDurationMap.get(ytId);
+        if (secs) youtubeLessonDurationMap.set(lessonId, secs);
+      });
 
-        const lessonsMap = new Map((lessonsRes.data || []).map((l: any) => [l.id, l]));
-        const quizzesMap = new Map((quizzesRes.data || []).map((q: any) => [q.id, q]));
+      // ── 5. Build sidebar structure ────────────────────────────────────────
+      const built: SidebarModule[] = modulesData.map((mod) => {
+        const modItems = (itemsData ?? []).filter((i) => i.module_id === mod.id);
 
-        const built: SidebarModule[] = modulesData.map((mod) => {
-          const modItems = (itemsData || []).filter((i) => i.module_id === mod.id);
-          const items: ContentItem[] = modItems
-            .map((item) => {
-              if (item.content_type === 'lesson') {
-                const l = lessonsMap.get(item.content_id);
-                if (!l) return null;
-                return {
-                  id: l.id,
-                  title: l.title,
-                  type: 'lesson' as const,
-                  duration: `${l.estimated_duration_minutes || 15}m`,
-                  isCompleted: completedLessonIds.includes(l.id),
-                };
-              }
-              const q = quizzesMap.get(item.content_id);
-              if (!q) return null;
+        const items: ContentItem[] = modItems
+          .map((item) => {
+            if (item.content_type === 'lesson') {
+              const l = lessonsMap.get(item.content_id);
+              if (!l) return null;
+
+              // Priority:
+              // 1. YouTube API (freshly fetched)
+              // 2. Stored in content_blocks metadata (Cloudinary / prev-saved)
+              // 3. Watch-progress table
+              // 4. Estimated duration fallback
+              const ytSecs      = youtubeLessonDurationMap.get(l.id);
+              const storedSecs  = storedDurationMap.get(l.id);
+              const watchedSecs = watchedDurationMap.get(l.id);
+              const videoDuration = ytSecs ?? storedSecs ?? watchedSecs;
+
+              const duration = videoDuration && videoDuration > 0
+                ? formatDuration(videoDuration)
+                : `${(l.estimated_duration_minutes ?? 15).toString().padStart(2, '0')}:00`;
+
               return {
-                id: q.id,
-                title: q.title,
-                type: 'quiz' as const,
-                duration: `${q.time_limit_minutes || 30}m`,
-                isCompleted: completedQuizIds.includes(q.id),
+                id:          l.id,
+                title:       l.title,
+                type:        'lesson' as const,
+                duration,
+                isCompleted: completedLessonIds.includes(l.id),
               };
-            })
-            .filter(Boolean) as ContentItem[];
-          return { id: mod.id, title: mod.title, items };
-        });
+            }
 
-        setSidebarModules(built);
-        // expand module containing active lesson by default
-        const activeModule = built.find((m) => m.items.some((i) => i.id === activeLessonId));
-        setExpandedModules(activeModule ? [activeModule.id] : built.length > 0 ? [built[0].id] : []);
-      } catch (err) {
-        console.error('Error fetching sidebar modules:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchModules();
+            const q = quizzesMap.get(item.content_id);
+            if (!q) return null;
+            return {
+              id:          q.id,
+              title:       q.title,
+              type:        'quiz' as const,
+              duration:    `${q.time_limit_minutes ?? 30}m`,
+              isCompleted: completedQuizIds.includes(q.id),
+            };
+          })
+          .filter(Boolean) as ContentItem[];
+
+        return { id: mod.id, title: mod.title, items };
+      });
+
+      setSidebarModules(built);
+
+      // Auto-expand the module containing the active lesson
+      const activeModule = built.find((m) => m.items.some((i) => i.id === activeLessonId));
+      setExpandedModules(
+        activeModule ? [activeModule.id] : built.length > 0 ? [built[0].id] : []
+      );
+    } catch (err) {
+      console.error('[LessonSidebar] Error fetching sidebar modules:', err);
+    } finally {
+      setLoading(false);
+    }
   }, [courseId, activeLessonId, completedLessonIds.length, completedQuizIds.length]);
+
+  useEffect(() => {
+    fetchModules();
+  }, [fetchModules]);
 
   const toggleModule = (moduleId: string) => {
     setExpandedModules((prev) =>
@@ -123,10 +271,10 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
     );
   };
 
-  const allItems = sidebarModules.flatMap((m) => m.items);
+  const allItems      = sidebarModules.flatMap((m) => m.items);
   const completedCount = allItems.filter((i) => i.isCompleted).length;
-  const totalCount = allItems.length;
-  const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+  const totalCount     = allItems.length;
+  const progress       = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   if (loading) {
     return (
@@ -146,7 +294,7 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
 
       <div className="flex-1 overflow-y-auto space-y-2">
         {sidebarModules.map((module) => {
-          const isExpanded = expandedModules.includes(module.id);
+          const isExpanded  = expandedModules.includes(module.id);
           const modCompleted = module.items.filter((i) => i.isCompleted).length;
 
           return (
