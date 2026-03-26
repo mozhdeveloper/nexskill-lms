@@ -248,6 +248,20 @@ export const useCourse = (courseId: string | undefined) => {
                 studentsCount = enrollmentCount || 0;
               }
 
+              // Fetch real coach rating from course reviews (average across all coach's courses)
+              let coachRating = 0;
+              if (coachCourses && coachCourses.length > 0) {
+                const courseIds = coachCourses.map(c => c.id);
+                const { data: reviewData } = await supabase
+                  .from("reviews")
+                  .select("rating")
+                  .in("course_id", courseIds);
+                if (reviewData && reviewData.length > 0) {
+                  const sum = reviewData.reduce((acc, r) => acc + r.rating, 0);
+                  coachRating = Math.round((sum / reviewData.length) * 10) / 10;
+                }
+              }
+
               coachDetails = {
                 id: coachProfile.id,
                 name: `${coachProfile.first_name || ""} ${coachProfile.last_name || ""}`.trim() || coachProfile.email || "Instructor",
@@ -261,8 +275,7 @@ export const useCourse = (courseId: string | undefined) => {
                 portfolioUrl: coachProfileExt?.portfolio_url || undefined,
                 studentsCount: studentsCount,
                 coursesCount: coursesCount || 0,
-                rating: 4.9,
-                ratingIsHardcoded: true,
+                rating: coachRating,
               };
             } else {
               // Profile not found but coach_id exists - create minimal coach from ID

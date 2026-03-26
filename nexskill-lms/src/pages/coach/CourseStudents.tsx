@@ -20,6 +20,14 @@ interface Student {
   averageScore: number;
 }
 
+interface QuizStat {
+  id: string;
+  title: string;
+  averageScore: number;
+  completionRate: number;
+  totalAttempts: number;
+}
+
 const CourseStudents: React.FC = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const [searchQuery, setSearchQuery] = useState('');
@@ -29,6 +37,7 @@ const CourseStudents: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [courseTitle, setCourseTitle] = useState('Course');
   const [isLoading, setIsLoading] = useState(true);
+  const [quizStats, setQuizStats] = useState<QuizStat[]>([]);
 
   useEffect(() => {
     if (!courseId) return;
@@ -56,7 +65,7 @@ const CourseStudents: React.FC = () => {
           .select('id, email, first_name, last_name, updated_at')
           .in('id', studentIds);
 
-        // 4. Lesson ids for this course
+        // 4. Lesson ids for this course (published only - matches student side)
         const { data: modules } = await supabase
           .from('modules').select('id').eq('course_id', courseId);
         const moduleIds = (modules || []).map(m => m.id);
@@ -67,41 +76,87 @@ const CourseStudents: React.FC = () => {
             .from('module_content_items')
             .select('content_id')
             .in('module_id', moduleIds)
-            .eq('content_type', 'lesson');
+            .eq('content_type', 'lesson')
+            .eq('is_published', true);
           lessonIds = (items || []).map(i => i.content_id);
         }
 
         // 5. Lesson progress per student
-        let progressRows: { user_id: string; is_completed: boolean }[] = [];
+        let progressRows: { user_id: string; is_completed: boolean; updated_at?: string }[] = [];
         if (lessonIds.length) {
           const { data } = await supabase
             .from('user_lesson_progress')
-            .select('user_id, is_completed')
+            .select('user_id, is_completed, updated_at')
             .in('user_id', studentIds)
             .in('lesson_id', lessonIds);
           progressRows = data || [];
         }
 
-        // 6. Quiz scores per student
+        // 6. Quiz scores per student (published only - matches student side)
         let quizIds: string[] = [];
         if (moduleIds.length) {
           const { data: qi } = await supabase
             .from('module_content_items')
             .select('content_id')
             .in('module_id', moduleIds)
-            .eq('content_type', 'quiz');
+            .eq('content_type', 'quiz')
+            .eq('is_published', true);
           quizIds = (qi || []).map(q => q.content_id);
         }
-        let attemptRows: { user_id: string; score: number; max_score: number }[] = [];
+        let attemptRows: { user_id: string; score: number; max_score: number; created_at?: string }[] = [];
         if (quizIds.length) {
           const { data } = await supabase
             .from('quiz_attempts')
-            .select('user_id, score, max_score')
+            .select('user_id, score, max_score, created_at')
             .in('user_id', studentIds)
             .in('quiz_id', quizIds)
             .in('status', ['submitted', 'graded']);
           attemptRows = data || [];
         }
+
+        // 6b. Fetch quiz statistics for StudentScoresPanel
+        let quizStatsData: QuizStat[] = [];
+        if (quizIds.length > 0) {
+          // Fetch quiz titles
+          const { data: quizzesData } = await supabase
+            .from('quizzes')
+            .select('id, title')
+            .in('id', quizIds);
+          
+          // Fetch all quiz attempts for stats
+          const { data: allAttempts } = await supabase
+            .from('quiz_attempts')
+            .select('quiz_id, user_id, score, max_score, status')
+            .in('quiz_id', quizIds);
+
+          // Build stats per quiz
+          quizStatsData = quizIds.map(quizId => {
+            const quiz = quizzesData?.find(q => q.id === quizId);
+            const quizAttempts = allAttempts?.filter(a => a.quiz_id === quizId) || [];
+            const completedAttempts = quizAttempts.filter(a => a.status === 'submitted' || a.status === 'graded');
+
+            // Calculate average score
+            const avgScore = completedAttempts.length > 0
+              ? Math.round(completedAttempts.reduce((sum, a) => sum + (a.max_score > 0 ? (a.score / a.max_score) * 100 : 0), 0) / completedAttempts.length)
+              : 0;
+
+            // Calculate completion rate (students who attempted / total enrolled)
+            const studentsWhoAttempted = new Set(quizAttempts.map(a => a.user_id)).size;
+            const completionRate = studentIds.length > 0
+              ? Math.round((studentsWhoAttempted / studentIds.length) * 100)
+              : 0;
+
+            return {
+              id: quizId,
+              title: quiz?.title || 'Untitled Quiz',
+              averageScore: avgScore,
+              completionRate,
+              totalAttempts: quizAttempts.length,
+            };
+          });
+        }
+
+        setQuizStats(quizStatsData);
 
         // 7. Map to Student shape
         const totalLessons = lessonIds.length;
@@ -116,16 +171,33 @@ const CourseStudents: React.FC = () => {
             ? Math.round(aRows.reduce((s, r) => s + (r.max_score > 0 ? (r.score / r.max_score) * 100 : 0), 0) / aRows.length)
             : 0;
 
-          const lastActive = new Date(p.updated_at || new Date());
+          // Calculate last active date based on course-specific activity (lesson progress or quiz attempts)
+          const lessonActivityDates = pRows
+            .filter(r => r.updated_at)
+            .map(r => new Date(r.updated_at!).getTime());
+          const quizActivityDates = aRows
+            .filter(r => r.created_at)
+            .map(r => new Date(r.created_at!).getTime());
+          const allActivityDates = [...lessonActivityDates, ...quizActivityDates];
+          
+          const lastActiveTime = allActivityDates.length > 0
+            ? Math.max(...allActivityDates)
+            : new Date(p.updated_at || Date.now()).getTime();
+          
+          const lastActive = new Date(lastActiveTime);
           const diffDays = Math.floor((Date.now() - lastActive.getTime()) / 86400000);
           const lastActiveStr = diffDays === 0 ? 'Today'
             : diffDays === 1 ? '1 day ago'
             : diffDays < 7 ? `${diffDays} days ago`
             : lastActive.toLocaleDateString();
 
+          // Status logic: Completed if 100% progress, Active if activity within 7 days, At risk otherwise
           let status: 'Active' | 'Completed' | 'At risk' = 'At risk';
-          if (progress === 100) status = 'Completed';
-          else if (diffDays < 14) status = 'Active';
+          if (progress === 100) {
+            status = 'Completed';
+          } else if (diffDays <= 7) {
+            status = 'Active';
+          }
 
           return {
             id: p.id,
@@ -321,7 +393,7 @@ const CourseStudents: React.FC = () => {
           {/* Right Column: Overview Cards (narrower) */}
           <div className="space-y-6">
             <StudentProgressOverview students={students} />
-            <StudentScoresPanel />
+            <StudentScoresPanel quizzes={quizStats} />
           </div>
         </div>
         )}

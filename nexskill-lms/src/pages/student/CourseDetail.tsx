@@ -4,7 +4,6 @@ import StudentAppLayout from '../../layouts/StudentAppLayout';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 
-// Keep dummy data for fallback or development if DB is empty
 // coursesData removed - using live Supabase data
 
 // Define CourseDisplay interface
@@ -294,18 +293,14 @@ const CourseDetail: React.FC = () => {
             price: courseData.price || 0,
             originalPrice: undefined,
             description: courseData.long_description || courseData.short_description || 'No description available',
-            whatYouLearn: goals.length > 0 ? goals : [
-              'Master key concepts and practical skills',
-              'Apply methodologies to real-world problems',
-              'Build a professional portfolio'
-            ],
+            whatYouLearn: goals,
             tools: [],
             curriculum: structuredCurriculum,
             reviews: [],
             coach: courseData.coach ? {
               name: `${courseData.coach.first_name} ${courseData.coach.last_name || ''}`,
               avatar: '👨‍🏫',
-              bio: coachBio || 'Expert Instructor',
+              bio: coachBio,
               studentsCount: coachStudentsCount,
               coursesCount: coachCoursesCount,
               rating: coachRating

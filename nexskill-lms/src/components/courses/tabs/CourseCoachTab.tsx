@@ -15,7 +15,6 @@ interface Coach {
     studentsCount: number;
     coursesCount: number;
     rating: number;
-    ratingIsHardcoded?: boolean;
 }
 
 interface CourseCoachTabProps {
@@ -136,23 +135,13 @@ const CourseCoachTab: React.FC<CourseCoachTabProps> = ({ coach }) => {
                 </div>
                 <div className="text-center">
                     <div className="text-2xl font-bold text-text-primary dark:text-dark-text-primary">
-                        {coach.rating.toFixed(1)}
+                        {coach.rating > 0 ? coach.rating.toFixed(1) : "N/A"}
                     </div>
                     <div className="text-xs text-text-muted dark:text-dark-text-muted uppercase tracking-wide">
                         Rating
-                        {coach.ratingIsHardcoded && (
-                            <span className="ml-1 text-orange-400" title="Sample data">*</span>
-                        )}
                     </div>
                 </div>
             </div>
-
-            {/* Rating notice */}
-            {coach.ratingIsHardcoded && (
-                <p className="text-xs text-orange-400 italic">
-                    * Rating is sample data. Rating system coming soon.
-                </p>
-            )}
 
             {/* Content Areas */}
             {coach.contentAreas && coach.contentAreas.length > 0 && (

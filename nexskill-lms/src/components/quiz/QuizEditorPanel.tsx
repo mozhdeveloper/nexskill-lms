@@ -259,27 +259,15 @@ const QuizEditorPanel: React.FC<QuizEditorPanelProps> = React.memo(({
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                                 Questions
                             </h3>
-                            <button
-                                onClick={addQuestion}
-                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                            >
-                                <Plus className="w-4 h-4" />
-                                Add Question
-                            </button>
+                            
                         </div>
 
                         {questions.length === 0 ? (
                             <div className="p-8 text-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
-                                <p className="text-gray-500 dark:text-gray-400 mb-4">
+                                <p className="text-gray-500 dark:text-gray-400">
                                     No questions yet. Add your first question to
                                     get started.
                                 </p>
-                                <button
-                                    onClick={addQuestion}
-                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                                >
-                                    Add Question
-                                </button>
                             </div>
                         ) : (
                             <div className="space-y-4">
@@ -310,6 +298,16 @@ const QuizEditorPanel: React.FC<QuizEditorPanelProps> = React.memo(({
                                     ))}
                             </div>
                         )}
+
+                        <div className="flex justify-center pt-4">
+                            <button
+                                onClick={addQuestion}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Add Question
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
