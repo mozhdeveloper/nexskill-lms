@@ -4,11 +4,16 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { FileQuestion, Clock, CheckCircle, AlertCircle, Play } from 'lucide-react';
 import type { LessonContentBlock } from '../../../types/lesson';
+import { VideoProgressTracker } from './VideoProgressTracker';
+import { YouTubePlayer } from './YouTubePlayer';
+import { HTML5VideoPlayer } from './HTML5VideoPlayer';
 
 interface ContentBlockRendererProps {
   contentBlocks?: LessonContentBlock[];
   block?: LessonContentBlock;
   onQuizClick?: (quizId: string) => void;
+  lessonId?: string; // Added for video progress tracking
+  onVideoComplete?: () => void; // Callback when video is completed
 }
 
 const getEmbedUrl = (url: string): string | null => {
@@ -29,7 +34,7 @@ const getEmbedUrl = (url: string): string | null => {
   return null;
 };
 
-const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({ contentBlocks, block, onQuizClick }) => {
+const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({ contentBlocks, block, onQuizClick, lessonId, onVideoComplete }) => {
   const renderBlock = (b: LessonContentBlock) => {
     switch (b.type) {
       case 'text':
@@ -82,7 +87,7 @@ const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({ contentBloc
 
       case 'video': {
         const embedUrl = getEmbedUrl(b.content);
-        
+
         if (!embedUrl) {
           return (
             <div key={b.id} className="my-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
@@ -91,12 +96,65 @@ const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({ contentBloc
           );
         }
 
-        const isDirect = embedUrl.match(/\.(mp4|webm|ogg|mov)($|\?)/i);
+        const isYouTube = embedUrl.includes('youtube.com/embed/');
+        const isDirectVideo = embedUrl.match(/\.(mp4|webm|ogg|mov)($|\?)/i);
 
+        // If lessonId is provided, enable progress tracking
+        if (lessonId) {
+          return (
+            <VideoProgressTracker
+              key={b.id}
+              lessonId={lessonId}
+              videoUrl={b.content}
+              onComplete={onVideoComplete}
+            >
+              {({ onTimeUpdate, onDurationChange, onVideoComplete: playerOnComplete, isCompleted, progressPercent, startTime }) => (
+                <div className="my-4">
+                  {isYouTube ? (
+                    <YouTubePlayer
+                      videoUrl={b.content}
+                      onTimeUpdate={onTimeUpdate}
+                      onDurationChange={onDurationChange}
+                      onVideoComplete={playerOnComplete}
+                      isCompleted={isCompleted}
+                      startTime={startTime}
+                    />
+                  ) : isDirectVideo ? (
+                    <HTML5VideoPlayer
+                      videoUrl={embedUrl}
+                      onTimeUpdate={onTimeUpdate}
+                      onDurationChange={onDurationChange}
+                      onVideoComplete={playerOnComplete}
+                      isCompleted={isCompleted}
+                      startTime={startTime}
+                    />
+                  ) : (
+                    <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                      <iframe
+                        src={embedUrl}
+                        title="Video player"
+                        className="w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  )}
+                  {b.attributes?.caption && (
+                    <p className="text-center text-sm text-slate-600 dark:text-dark-text-secondary mt-2">
+                      {b.attributes.caption}
+                    </p>
+                  )}
+                </div>
+              )}
+            </VideoProgressTracker>
+          );
+        }
+
+        // Fallback: No progress tracking (legacy behavior)
         return (
           <div key={b.id} className="my-4">
             <div className="aspect-video bg-black rounded-lg overflow-hidden">
-              {isDirect ? (
+              {isDirectVideo ? (
                 <video controls className="w-full h-full">
                   <source src={embedUrl} type="video/mp4" />
                   Your browser does not support the video tag.

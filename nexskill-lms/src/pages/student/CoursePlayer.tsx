@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
@@ -186,7 +186,7 @@ const CoursePlayer: React.FC = () => {
     }
   };
 
-  const handleMarkComplete = async () => {
+  const handleMarkComplete = useCallback(async () => {
     if (!lessonId || !courseId) return;
 
     try {
@@ -212,7 +212,52 @@ const CoursePlayer: React.FC = () => {
       console.error('Error marking lesson as complete:', err);
       alert('Failed to mark lesson as complete. Please try again.');
     }
-  };
+  }, [lessonId, courseId]);
+
+  // Callback for video completion - refreshes the completed lessons list
+  const handleVideoComplete = useCallback(() => {
+    console.log('[CoursePlayer] Video complete - refreshing completion status');
+    // Re-fetch completed lessons to update UI
+    const refreshCompletedLessons = async () => {
+      if (!courseId) return;
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get all modules for this course
+      const { data: mods } = await supabase
+        .from('modules')
+        .select('id')
+        .eq('course_id', courseId)
+        .eq('is_published', true);
+
+      const moduleIds = (mods || []).map((m: any) => m.id);
+
+      if (moduleIds.length > 0) {
+        const { data: contentItems } = await supabase
+          .from('module_content_items')
+          .select('content_id, content_type')
+          .in('module_id', moduleIds)
+          .eq('content_type', 'lesson');
+
+        const lessonIds = (contentItems || []).map((ci: any) => ci.content_id);
+
+        if (lessonIds.length > 0) {
+          const { data: progressRows } = await supabase
+            .from('user_lesson_progress')
+            .select('lesson_id')
+            .eq('user_id', user.id)
+            .eq('is_completed', true)
+            .in('lesson_id', lessonIds);
+          
+          setCompletedLessons((progressRows || []).map((r: any) => r.lesson_id));
+          console.log('[CoursePlayer] Completed lessons updated:', progressRows);
+        }
+      }
+    };
+
+    refreshCompletedLessons();
+  }, [courseId]);
 
   // Show graduation banner when all lessons are complete
   useEffect(() => {
@@ -333,7 +378,9 @@ const CoursePlayer: React.FC = () => {
             <div className="bg-white dark:bg-dark-background-card rounded-2xl p-8 shadow-lg border border-gray-100 dark:border-gray-700">
               <ContentBlockRenderer
                 contentBlocks={currentLesson.content_blocks || []}
+                lessonId={lessonId || ''}
                 onQuizClick={(quizId) => navigate(`/student/courses/${courseId}/quizzes/${quizId}/take`)}
+                onVideoComplete={handleVideoComplete}
               />
             </div>
 
