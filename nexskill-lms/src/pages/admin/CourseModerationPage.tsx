@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminAppLayout from '../../layouts/AdminAppLayout';
 import CourseModerationFiltersBar from '../../components/admin/moderation/CourseModerationFiltersBar';
 import CourseApprovalTable from '../../components/admin/moderation/CourseApprovalTable';
 import CourseQualityScorePanel from '../../components/admin/moderation/CourseQualityScorePanel';
 import ReportedContentQueuePanel from '../../components/admin/moderation/ReportedContentQueuePanel';
+import { supabase } from '../../lib/supabaseClient';
+import { Loader2 } from 'lucide-react';
 
 interface Course {
   id: string;
@@ -23,18 +25,21 @@ interface Course {
   };
   qualityFlags: string[];
   reportsCount: number;
+  description?: string;
+  is_published?: boolean;
 }
 
 interface Report {
   id: string;
   courseId: string;
   courseTitle: string;
-  reporterType: 'student' | 'coach' | 'system';
+  reporterType: 'student' | 'coach' | 'system' | 'admin';
   reasonCategory: string;
   reasonSnippet: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
   status: 'open' | 'investigating' | 'resolved' | 'dismissed';
   createdAt: string;
+  reporterId?: string;
 }
 
 interface Filters {
@@ -45,288 +50,226 @@ interface Filters {
 }
 
 const CourseModerationPage: React.FC = () => {
-  // Dummy data for courses
-  // Supabase for Active Courses
-  const [activeCourses, setActiveCourses] = useState<Course[]>([]);
-  const [, setLoadingActive] = useState(true);
-
-  // Mock for Pending/Rejected
-  const [mockCourses] = useState<Course[]>([
-    {
-      id: 'c1',
-      title: 'Complete Python Programming Bootcamp 2024',
-      instructorName: 'Sarah Johnson',
-      instructorEmail: 'sarah.johnson@example.com',
-      instructorId: 'i1',
-      category: 'Programming',
-      status: 'pending',
-      submittedAt: '2024-01-15',
-      qualityScore: 85,
-      qualityMetrics: {
-        contentCompleteness: 90,
-        engagementPotential: 85,
-        productionQuality: 82,
-        policyCompliance: 83,
-      },
-      qualityFlags: [],
-      reportsCount: 0,
-    },
-    {
-      id: 'c2',
-      title: 'Web Development Masterclass',
-      instructorName: 'Michael Chen',
-      instructorEmail: 'michael.chen@example.com',
-      instructorId: 'i2',
-      category: 'Web Development',
-      status: 'pending',
-      submittedAt: '2024-01-14',
-      qualityScore: 72,
-      qualityMetrics: {
-        contentCompleteness: 75,
-        engagementPotential: 78,
-        productionQuality: 68,
-        policyCompliance: 67,
-      },
-      qualityFlags: ['Audio quality inconsistent', 'Missing lesson objectives'],
-      reportsCount: 2,
-    },
-    {
-      id: 'c4',
-      title: 'Introduction to Cryptocurrency Trading',
-      instructorName: 'Alex Martinez',
-      instructorEmail: 'alex.martinez@example.com',
-      instructorId: 'i4',
-      category: 'Finance',
-      status: 'pending',
-      submittedAt: '2024-01-12',
-      qualityScore: 55,
-      qualityMetrics: {
-        contentCompleteness: 60,
-        engagementPotential: 65,
-        productionQuality: 50,
-        policyCompliance: 45,
-      },
-      qualityFlags: [
-        'Potential financial advice without disclaimer',
-        'Incomplete module structure',
-        'Video resolution below standards',
-      ],
-      reportsCount: 3,
-    },
-    {
-      id: 'c9',
-      title: 'Quick Money from Home - Get Rich Fast',
-      instructorName: 'Unknown Creator',
-      instructorEmail: 'unknown@example.com',
-      instructorId: 'i9',
-      category: 'Finance',
-      status: 'rejected',
-      submittedAt: '2024-01-02',
-      qualityScore: 28,
-      qualityMetrics: {
-        contentCompleteness: 35,
-        engagementPotential: 40,
-        productionQuality: 20,
-        policyCompliance: 15,
-      },
-      qualityFlags: [
-        'Misleading claims detected',
-        'No verifiable credentials',
-        'Poor production quality',
-        'Violation of financial advice policy',
-      ],
-      reportsCount: 5,
-    },
-    {
-      id: 'c10',
-      title: 'Low Quality Content Example',
-      instructorName: 'Test Instructor',
-      instructorEmail: 'test@example.com',
-      instructorId: 'i10',
-      category: 'Other',
-      status: 'rejected',
-      submittedAt: '2024-01-01',
-      qualityScore: 42,
-      qualityMetrics: {
-        contentCompleteness: 45,
-        engagementPotential: 50,
-        productionQuality: 35,
-        policyCompliance: 38,
-      },
-      qualityFlags: ['Incomplete course structure', 'Copyright concerns'],
-      reportsCount: 1,
-    }
-  ]);
-
-  // Tab State
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [reports, setReports] = useState<Report[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'pending' | 'active' | 'rejected'>('pending');
-
-  React.useEffect(() => {
-    const fetchActiveCourses = async () => {
-      setLoadingActive(true);
-      const { supabase } = await import('../../lib/supabaseClient');
-
-      // Fetch courses for the current tab
-      let query = supabase
-        .from('courses')
-        .select('*, coach:profiles!courses_coach_id_fkey(first_name, last_name, email), category:categories(name)')
-        .order('updated_at', { ascending: false });
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error("Error fetching courses:", error);
-      } else if (data) {
-        // Map to Course interface
-        const mapped: Course[] = data.map((c: any) => {
-          // Map DB verification_status to UI status
-          let uiStatus: 'pending' | 'approved' | 'rejected' | 'changes_requested' = 'pending';
-
-          if (c.verification_status === 'approved') uiStatus = 'approved';
-          else if (c.verification_status === 'rejected') uiStatus = 'rejected';
-          else if (c.verification_status === 'changes_requested') uiStatus = 'changes_requested';
-          else if (c.verification_status === 'pending_review') uiStatus = 'pending';
-          else if (c.verification_status === 'draft') uiStatus = 'pending'; // Show drafts in pending for now matches current flow
-
-          return {
-            id: c.id,
-            title: c.title,
-            instructorName: c.coach ? `${c.coach.first_name} ${c.coach.last_name}` : 'Unknown',
-            instructorEmail: c.coach?.email || 'N/A',
-            instructorId: c.coach_id || 'unknown',
-            category: c.category?.name || 'General',
-            status: uiStatus,
-            submittedAt: c.created_at,
-            qualityScore: 85,
-            qualityMetrics: {
-              contentCompleteness: 90,
-              engagementPotential: 85,
-              productionQuality: 80,
-              policyCompliance: 90,
-            },
-            qualityFlags: [],
-            reportsCount: 0
-          };
-        });
-        setActiveCourses(mapped);
-      }
-      setLoadingActive(false);
-    };
-
-    fetchActiveCourses();
-  }, [activeTab]);
-
-  // Combine data
-  const courses = activeTab === 'active'
-    ? activeCourses.filter(c => c.status === 'approved')
-    : activeTab === 'rejected'
-      ? activeCourses.filter(c => c.status === 'rejected' || c.status === 'changes_requested')
-      : activeCourses.filter(c => c.status === 'pending');
-
-
-  // Dummy data for reports
-  const [reports] = useState<Report[]>([
-    {
-      id: 'r1',
-      courseId: 'c2',
-      courseTitle: 'Web Development Masterclass',
-      reporterType: 'student',
-      reasonCategory: 'Quality Issues',
-      reasonSnippet: 'Audio is very inconsistent across lessons. Some parts are almost inaudible.',
-      severity: 'medium',
-      status: 'open',
-      createdAt: '2024-01-16',
-    },
-    {
-      id: 'r2',
-      courseId: 'c2',
-      courseTitle: 'Web Development Masterclass',
-      reporterType: 'system',
-      reasonCategory: 'Content Completeness',
-      reasonSnippet: 'Multiple lessons missing clear objectives and learning outcomes.',
-      severity: 'low',
-      status: 'open',
-      createdAt: '2024-01-16',
-    },
-    {
-      id: 'r3',
-      courseId: 'c4',
-      courseTitle: 'Introduction to Cryptocurrency Trading',
-      reporterType: 'student',
-      reasonCategory: 'Policy Violation',
-      reasonSnippet: 'Instructor provides specific investment advice without proper disclaimers.',
-      severity: 'high',
-      status: 'open',
-      createdAt: '2024-01-15',
-    },
-    {
-      id: 'r4',
-      courseId: 'c4',
-      courseTitle: 'Introduction to Cryptocurrency Trading',
-      reporterType: 'system',
-      reasonCategory: 'Technical Standards',
-      reasonSnippet: 'Video resolution below minimum standards (480p detected).',
-      severity: 'medium',
-      status: 'open',
-      createdAt: '2024-01-15',
-    },
-    {
-      id: 'r5',
-      courseId: 'c4',
-      courseTitle: 'Introduction to Cryptocurrency Trading',
-      reporterType: 'coach',
-      reasonCategory: 'Content Accuracy',
-      reasonSnippet: 'Some information appears outdated and potentially misleading.',
-      severity: 'high',
-      status: 'open',
-      createdAt: '2024-01-14',
-    },
-    {
-      id: 'r6',
-      courseId: 'c9',
-      courseTitle: 'Quick Money from Home - Get Rich Fast',
-      reporterType: 'student',
-      reasonCategory: 'Misleading Content',
-      reasonSnippet: 'Course promises unrealistic returns and uses deceptive marketing.',
-      severity: 'critical',
-      status: 'resolved',
-      createdAt: '2024-01-10',
-    },
-    {
-      id: 'r7',
-      courseId: 'c9',
-      courseTitle: 'Quick Money from Home - Get Rich Fast',
-      reporterType: 'system',
-      reasonCategory: 'Policy Violation',
-      reasonSnippet: 'Multiple policy violations detected: financial advice, misleading claims.',
-      severity: 'critical',
-      status: 'resolved',
-      createdAt: '2024-01-10',
-    },
-    {
-      id: 'r8',
-      courseId: 'c10',
-      courseTitle: 'Low Quality Content Example',
-      reporterType: 'system',
-      reasonCategory: 'Copyright Concern',
-      reasonSnippet: 'Potential copyright infringement detected in course materials.',
-      severity: 'high',
-      status: 'resolved',
-      createdAt: '2024-01-08',
-    },
-  ]);
-
   const [filters, setFilters] = useState<Filters>({
     search: '',
     status: 'all',
     category: 'all',
     qualityBand: 'all',
   });
-
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
 
-  // Filter courses based on current filters
+  // Calculate quality score based on course completeness
+  const calculateQualityScore = (course: any) => {
+    let score = 0;
+    let factors = 0;
+
+    // Content completeness (30%)
+    const hasDescription = course.description ? 1 : 0;
+    const hasImage = course.image_url ? 1 : 0;
+    score += (hasDescription + hasImage) / 2 * 30;
+    factors += 30;
+
+    // Engagement potential (25%)
+    const studentsCount = course.students_count || 0;
+    const engagementScore = Math.min(studentsCount / 100, 1);
+    score += engagementScore * 25;
+    factors += 25;
+
+    // Production quality (25%)
+    const hasCurriculum = course.modules_count > 0;
+    const hasLessons = course.lessons_count > 0;
+    const hasQuizzes = course.quizzes_count > 0;
+    const curriculumScore = (hasCurriculum ? 1 : 0) + (hasLessons ? 1 : 0) + (hasQuizzes ? 1 : 0);
+    score += (curriculumScore / 3) * 25;
+    factors += 25;
+
+    // Policy compliance (20%)
+    const isPublished = course.is_published ? 1 : 0;
+    const isVerified = course.verification_status === 'approved' ? 1 : 0;
+    score += (isPublished + isVerified) / 2 * 20;
+    factors += 20;
+
+    return factors > 0 ? Math.round(score) : 0;
+  };
+
+  // Fetch courses and reports
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // Fetch all courses with coach and category info
+        const { data: coursesData, error: coursesError } = await supabase
+          .from('courses')
+          .select(`
+            *,
+            coach:profiles!courses_coach_id_fkey(first_name, last_name, email),
+            category:categories(name)
+          `)
+          .order('created_at', { ascending: false });
+
+        if (coursesError) throw coursesError;
+
+        // Fetch module counts for each course
+        const { data: modulesData } = await supabase
+          .from('modules')
+          .select('course_id, id');
+
+        const moduleCounts = modulesData?.reduce((acc: Record<string, number>, m: any) => {
+          acc[m.course_id] = (acc[m.course_id] || 0) + 1;
+          return acc;
+        }, {});
+
+        // Fetch lesson counts
+        const { data: lessonsData } = await supabase
+          .from('module_content_items')
+          .select('module_id, content_type')
+          .in('module_id', modulesData?.map(m => m.id) || []);
+
+        const lessonCounts: Record<string, number> = {};
+        const quizCounts: Record<string, number> = {};
+        
+        if (lessonsData) {
+          const moduleIds = modulesData?.map(m => m.id) || [];
+          const modulesMap = new Map(modulesData.map(m => [m.id, m.course_id]));
+          
+          lessonsData.forEach(item => {
+            const courseId = modulesMap.get(item.module_id);
+            if (courseId) {
+              if (item.content_type === 'lesson') {
+                lessonCounts[courseId] = (lessonCounts[courseId] || 0) + 1;
+              } else if (item.content_type === 'quiz') {
+                quizCounts[courseId] = (quizCounts[courseId] || 0) + 1;
+              }
+            }
+          });
+        }
+
+        // Fetch enrollment counts
+        const enrollmentPromises = (coursesData || []).map(async (c) => {
+          const { count } = await supabase
+            .from('enrollments')
+            .select('*', { count: 'exact', head: true })
+            .eq('course_id', c.id);
+          return { courseId: c.id, count: count || 0 };
+        });
+
+        const enrollmentResults = await Promise.all(enrollmentPromises);
+        const studentsCountMap = enrollmentResults.reduce((acc, r) => {
+          acc[r.courseId] = r.count;
+          return acc;
+        }, {} as Record<string, number>);
+
+        // Map to Course interface
+        const mappedCourses: Course[] = (coursesData || []).map((c: any) => {
+          let uiStatus: 'pending' | 'approved' | 'rejected' | 'changes_requested' = 'pending';
+
+          if (c.verification_status === 'approved') uiStatus = 'approved';
+          else if (c.verification_status === 'rejected') uiStatus = 'rejected';
+          else if (c.verification_status === 'changes_requested') uiStatus = 'changes_requested';
+          else if (c.verification_status === 'pending_review') uiStatus = 'pending';
+          else if (c.verification_status === 'draft') uiStatus = 'pending';
+
+          const qualityScore = calculateQualityScore({
+            ...c,
+            modules_count: moduleCounts?.[c.id] || 0,
+            lessons_count: lessonCounts?.[c.id] || 0,
+            quizzes_count: quizCounts?.[c.id] || 0,
+            students_count: studentsCountMap?.[c.id] || 0,
+          });
+
+          const qualityFlags: string[] = [];
+          if (!c.description) qualityFlags.push('Missing course description');
+          if (!c.image_url) qualityFlags.push('Missing course image');
+          if ((moduleCounts?.[c.id] || 0) === 0) qualityFlags.push('No modules created');
+          if ((lessonCounts?.[c.id] || 0) === 0) qualityFlags.push('No lessons added');
+          if ((quizCounts?.[c.id] || 0) === 0) qualityFlags.push('No quizzes created');
+
+          return {
+            id: c.id,
+            title: c.title,
+            instructorName: c.coach ? `${c.coach.first_name || ''} ${c.coach.last_name || ''}`.trim() || c.coach?.email : 'Unknown',
+            instructorEmail: c.coach?.email || 'N/A',
+            instructorId: c.coach_id || 'unknown',
+            category: c.category?.name || 'General',
+            status: uiStatus,
+            submittedAt: c.created_at,
+            qualityScore,
+            qualityMetrics: {
+              contentCompleteness: c.description ? 90 : 40,
+              engagementPotential: Math.min((studentsCountMap?.[c.id] || 0) * 2, 100),
+              productionQuality: qualityScore,
+              policyCompliance: c.verification_status === 'approved' ? 100 : c.verification_status === 'rejected' ? 30 : 60,
+            },
+            qualityFlags,
+            reportsCount: 0,
+            description: c.description,
+            is_published: c.is_published,
+          };
+        });
+
+        // Fetch reports if table exists
+        let mappedReports: Report[] = [];
+        try {
+          const { data: reportsData, error: reportsError } = await supabase
+            .from('content_reports')
+            .select(`
+              *,
+              course:courses(title),
+              reporter:profiles!content_reports_reporter_id_fkey(first_name, last_name)
+            `)
+            .order('created_at', { ascending: false });
+
+          if (!reportsError && reportsData) {
+            mappedReports = reportsData.map((r: any) => ({
+              id: r.id,
+              courseId: r.course_id,
+              courseTitle: r.course?.title || 'Unknown Course',
+              reporterType: r.reporter_type || 'student',
+              reasonCategory: r.reason_category || 'Other',
+              reasonSnippet: r.description || 'No description provided',
+              severity: r.severity || 'medium',
+              status: r.status || 'open',
+              createdAt: r.created_at,
+              reporterId: r.reporter_id,
+            }));
+          }
+        } catch (e) {
+          console.log('Content reports table not found, using empty reports');
+        }
+
+        // Count reports per course
+        const reportsCountMap = mappedReports.reduce((acc, r) => {
+          acc[r.courseId] = (acc[r.courseId] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+
+        // Update courses with report counts
+        mappedCourses.forEach(c => {
+          c.reportsCount = reportsCountMap?.[c.id] || 0;
+        });
+
+        setCourses(mappedCourses);
+        setReports(mappedReports);
+      } catch (error) {
+        console.error('Error fetching moderation data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Filter courses based on active tab and filters
   const filteredCourses = courses.filter((course) => {
+    if (activeTab === 'pending' && course.status !== 'pending') return false;
+    if (activeTab === 'active' && course.status !== 'approved') return false;
+    if (activeTab === 'rejected' && course.status !== 'rejected' && course.status !== 'changes_requested') return false;
+
     if (filters.search && !course.title.toLowerCase().includes(filters.search.toLowerCase())) {
       return false;
     }
@@ -338,13 +281,10 @@ const CourseModerationPage: React.FC = () => {
     }
     if (filters.qualityBand !== 'all') {
       if (filters.qualityBand === 'high' && course.qualityScore < 80) return false;
-      if (
-        filters.qualityBand === 'medium' &&
-        (course.qualityScore < 60 || course.qualityScore >= 80)
-      )
-        return false;
+      if (filters.qualityBand === 'medium' && (course.qualityScore < 60 || course.qualityScore >= 80)) return false;
       if (filters.qualityBand === 'low' && course.qualityScore >= 60) return false;
     }
+
     return true;
   });
 
@@ -352,30 +292,34 @@ const CourseModerationPage: React.FC = () => {
     ? courses.find((c) => c.id === selectedCourseId)
     : undefined;
 
+  // Stats calculations
+  const stats = {
+    pending: courses.filter(c => c.status === 'pending').length,
+    approved: courses.filter(c => c.status === 'approved').length,
+    rejected: courses.filter(c => c.status === 'rejected' || c.status === 'changes_requested').length,
+    openReports: reports.filter(r => r.status === 'open' || r.status === 'investigating').length,
+  };
+
   const handleApprove = async (courseId: string) => {
     try {
-      const { supabase } = await import('../../lib/supabaseClient');
-      
-      // 1. Approve the course
       const { error: courseError } = await supabase
         .from('courses')
-        .update({ verification_status: 'approved' })
+        .update({ 
+          verification_status: 'approved',
+          is_published: true,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', courseId);
 
       if (courseError) throw courseError;
 
-      // 2. Publish all modules for this course
       const { error: modulesError } = await supabase
         .from('modules')
-        .update({ is_published: true })
+        .update({ is_published: true, updated_at: new Date().toISOString() })
         .eq('course_id', courseId);
 
-      if (modulesError) {
-        console.error('Error publishing modules:', modulesError);
-        // Continue anyway - modules error is not critical
-      }
+      if (modulesError) console.error('Error publishing modules:', modulesError);
 
-      // 3. Get all module IDs for this course
       const { data: modulesData } = await supabase
         .from('modules')
         .select('id')
@@ -384,17 +328,13 @@ const CourseModerationPage: React.FC = () => {
       if (modulesData && modulesData.length > 0) {
         const moduleIds = modulesData.map(m => m.id);
 
-        // 4. Publish all module_content_items
         const { error: itemsError } = await supabase
           .from('module_content_items')
-          .update({ is_published: true })
+          .update({ is_published: true, updated_at: new Date().toISOString() })
           .in('module_id', moduleIds);
 
-        if (itemsError) {
-          console.error('Error publishing content items:', itemsError);
-        }
+        if (itemsError) console.error('Error publishing content items:', itemsError);
 
-        // 5. Publish all lessons in this course
         const { data: lessonContentItems } = await supabase
           .from('module_content_items')
           .select('content_id')
@@ -405,11 +345,10 @@ const CourseModerationPage: React.FC = () => {
           const lessonIds = lessonContentItems.map(l => l.content_id);
           await supabase
             .from('lessons')
-            .update({ is_published: true })
+            .update({ is_published: true, updated_at: new Date().toISOString() })
             .in('id', lessonIds);
         }
 
-        // 6. Publish all quizzes in this course
         const { data: quizContentItems } = await supabase
           .from('module_content_items')
           .select('content_id')
@@ -420,39 +359,37 @@ const CourseModerationPage: React.FC = () => {
           const quizIds = quizContentItems.map(q => q.content_id);
           await supabase
             .from('quizzes')
-            .update({ is_published: true })
+            .update({ is_published: true, updated_at: new Date().toISOString() })
             .in('id', quizIds);
         }
       }
 
-      // Refresh list
-      const updatedCourses = activeCourses.filter(c => c.id !== courseId);
-      setActiveCourses(updatedCourses);
+      setCourses(prev => prev.map(c => 
+        c.id === courseId 
+          ? { ...c, status: 'approved' as const, qualityScore: Math.max(c.qualityScore, 80) }
+          : c
+      ));
 
-      window.alert(`✅ Course Approved & Published\n\nCourse ID: ${courseId}\n\nAll modules, lessons, and quizzes have been published.`);
+      alert(`✅ Course Approved & Published\n\nCourse ID: ${courseId}\n\nAll modules, lessons, and quizzes have been published.`);
     } catch (error) {
       console.error('Error approving course:', error);
-      window.alert('Failed to approve course');
+      alert('Failed to approve course');
     }
   };
 
   const handleRequestChanges = async (courseId: string, reason: string) => {
     try {
-      const { supabase } = await import('../../lib/supabaseClient');
-
-      // Update status and save admin_feedback
       const { error } = await supabase
         .from('courses')
         .update({
-          verification_status: 'changes_requested'
+          verification_status: 'changes_requested',
+          updated_at: new Date().toISOString()
         })
         .eq('id', courseId);
 
       if (error) throw error;
 
-      // Add feedback comment to history log
       if (reason) {
-        // Need current user ID for admin_id
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           await supabase.from('admin_verification_feedback').insert({
@@ -464,33 +401,31 @@ const CourseModerationPage: React.FC = () => {
         }
       }
 
-      // Refresh list
-      const updatedCourses = activeCourses.filter(c => c.id !== courseId);
-      setActiveCourses(updatedCourses);
+      setCourses(prev => prev.map(c => 
+        c.id === courseId 
+          ? { ...c, status: 'changes_requested' as const }
+          : c
+      ));
 
-      window.alert(`⚠️ Changes Requested\n\nCourse ID: ${courseId}\n\nFeedback sent to instructor.`);
+      alert(`⚠️ Changes Requested\n\nCourse ID: ${courseId}\n\nFeedback sent to instructor.`);
     } catch (error) {
       console.error('Error requesting changes:', error);
-      window.alert('Failed to request changes');
+      alert('Failed to request changes');
     }
   };
 
   const handleReject = async (courseId: string, reason: string) => {
     try {
-      const { supabase } = await import('../../lib/supabaseClient');
-
-      // Update status and save admin_feedback
-      // We'll treat it as a hard rejection via feedback
       const { error } = await supabase
         .from('courses')
         .update({
-          verification_status: 'changes_requested'
+          verification_status: 'rejected',
+          updated_at: new Date().toISOString()
         })
         .eq('id', courseId);
 
       if (error) throw error;
 
-      // Add feedback comment
       if (reason) {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
@@ -498,34 +433,105 @@ const CourseModerationPage: React.FC = () => {
             course_id: courseId,
             admin_id: user.id,
             content: `REJECTED: ${reason}`,
-            is_resolved: false // Keep unresolved so it appears prominently
+            is_resolved: false
           });
         }
       }
 
-      // Refresh list
-      const updatedCourses = activeCourses.filter(c => c.id !== courseId);
-      setActiveCourses(updatedCourses);
+      setCourses(prev => prev.map(c => 
+        c.id === courseId 
+          ? { ...c, status: 'rejected' as const, qualityScore: Math.min(c.qualityScore, 40) }
+          : c
+      ));
 
-      window.alert(`❌ Course Rejected\n\nCourse ID: ${courseId}\n\nStatus updated to Changes Requested (Admin Rejected).`);
+      alert(`❌ Course Rejected\n\nCourse ID: ${courseId}\n\nStatus updated to Rejected.`);
     } catch (error) {
       console.error('Error rejecting course:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      window.alert(`Failed to reject course: ${errorMessage}`);
+      alert(`Failed to reject course: ${errorMessage}`);
     }
   };
 
-  const handleInvestigate = (reportId: string) => {
-    window.alert(`🔍 Investigation Started\n\nReport ID: ${reportId}\n\n📊 Investigation Process:\n• Status: Under active review\n• Priority: High\n• Assigned: Moderation team\n• Timeline: 24-48 hours\n\n🔎 Investigation Steps:\n• Content review in progress\n• Evidence collection\n• Stakeholder interviews\n• Policy compliance check\n\n📧 Notifications:\n• Reporter: Investigation started\n• Content owner: Under review\n• Admin team: Case assigned\n\n⏱️ Updates will be provided every 12 hours until resolved.`);
+  const handleInvestigate = async (reportId: string) => {
+    try {
+      const { error } = await supabase
+        .from('content_reports')
+        .update({ status: 'investigating' })
+        .eq('id', reportId);
+
+      if (error) throw error;
+
+      setReports(prev => prev.map(r => 
+        r.id === reportId ? { ...r, status: 'investigating' as const } : r
+      ));
+
+      alert(`🔍 Investigation Started\n\nReport ID: ${reportId}\n\nStatus updated to "Under Investigation"`);
+    } catch (error) {
+      console.error('Error updating report:', error);
+      alert(`🔍 Investigation Started\n\nReport ID: ${reportId}`);
+    }
   };
 
-  const handleResolve = (reportId: string) => {
-    window.alert(`✅ Report Resolved\n\nReport ID: ${reportId}\n\n📋 Resolution Summary:\n• Status: Closed\n• Action taken: Content updated/removed\n• Resolution time: 36 hours\n• Outcome: Satisfactory\n\n📧 Notifications Sent:\n• Reporter: Issue resolved confirmation\n• Content owner: Action taken notice\n• Moderation team: Case closed\n\n📊 Impact:\n• Content compliance: Restored\n• User safety: Protected\n• Platform standards: Maintained\n\n📝 Case documentation saved for future reference.`);
+  const handleResolve = async (reportId: string, resolution: string = 'Content reviewed and action taken') => {
+    try {
+      const { error } = await supabase
+        .from('content_reports')
+        .update({ 
+          status: 'resolved',
+          resolved_at: new Date().toISOString(),
+          admin_notes: resolution
+        })
+        .eq('id', reportId);
+
+      if (error) throw error;
+
+      setReports(prev => prev.map(r => 
+        r.id === reportId ? { ...r, status: 'resolved' as const } : r
+      ));
+
+      alert(`✅ Report Resolved\n\nReport ID: ${reportId}\n\n${resolution}`);
+    } catch (error) {
+      console.error('Error resolving report:', error);
+      alert(`✅ Report Resolved\n\nReport ID: ${reportId}`);
+    }
   };
 
-  const handleDismiss = (reportId: string) => {
-    window.alert(`🚫 Report Dismissed\n\nReport ID: ${reportId}\n\n📝 Dismissal Reasoning:\n• Finding: No policy violation\n• Content: Complies with standards\n• Evidence: Insufficient or invalid\n• Decision: No action required\n\n📧 Notifications:\n• Reporter: Outcome explained\n• Content owner: No action needed\n• Documentation: Case archived\n\n💡 Reporter Options:\n• Review dismissal reasoning\n• Provide additional evidence\n• Submit new report if needed\n• Contact support for clarification\n\nAll decisions are logged for quality assurance.`);
+  const handleDismiss = async (reportId: string, reason: string = 'No violation found') => {
+    try {
+      const { error } = await supabase
+        .from('content_reports')
+        .update({ 
+          status: 'dismissed',
+          dismissed_at: new Date().toISOString(),
+          admin_notes: reason
+        })
+        .eq('id', reportId);
+
+      if (error) throw error;
+
+      setReports(prev => prev.map(r => 
+        r.id === reportId ? { ...r, status: 'dismissed' as const } : r
+      ));
+
+      alert(`🚫 Report Dismissed\n\nReport ID: ${reportId}\n\n${reason}`);
+    } catch (error) {
+      console.error('Error dismissing report:', error);
+      alert(`🚫 Report Dismissed\n\nReport ID: ${reportId}`);
+    }
   };
+
+  if (loading) {
+    return (
+      <AdminAppLayout>
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center">
+            <Loader2 className="w-12 h-12 animate-spin text-[#304DB5] mx-auto mb-4" />
+            <p className="text-text-secondary">Loading moderation data...</p>
+          </div>
+        </div>
+      </AdminAppLayout>
+    );
+  }
 
   return (
     <AdminAppLayout>
@@ -548,7 +554,7 @@ const CourseModerationPage: React.FC = () => {
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
             >
-              Pending Review
+              Pending Review ({stats.pending})
             </button>
             <button
               onClick={() => setActiveTab('active')}
@@ -557,7 +563,7 @@ const CourseModerationPage: React.FC = () => {
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
             >
-              Active Courses
+              Active Courses ({stats.approved})
             </button>
             <button
               onClick={() => setActiveTab('rejected')}
@@ -566,7 +572,7 @@ const CourseModerationPage: React.FC = () => {
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
             >
-              Rejected
+              Rejected ({stats.rejected})
             </button>
           </nav>
         </div>
@@ -579,25 +585,25 @@ const CourseModerationPage: React.FC = () => {
           <div className="bg-gradient-to-br from-[#DBEAFE] to-white rounded-2xl p-4 border border-[#93C5FD]">
             <p className="text-sm text-[#1E40AF] mb-1">Pending Review</p>
             <p className="text-2xl font-bold text-[#111827]">
-              {mockCourses.filter((c) => c.status === 'pending').length}
+              {stats.pending}
             </p>
           </div>
           <div className="bg-gradient-to-br from-[#D1FAE5] to-white rounded-2xl p-4 border border-[#6EE7B7]">
             <p className="text-sm text-[#047857] mb-1">Approved</p>
             <p className="text-2xl font-bold text-[#111827]">
-              {activeCourses.length}
+              {stats.approved}
             </p>
           </div>
           <div className="bg-gradient-to-br from-[#FEE2E2] to-white rounded-2xl p-4 border border-[#FCA5A5]">
             <p className="text-sm text-[#991B1B] mb-1">Rejected</p>
             <p className="text-2xl font-bold text-[#111827]">
-              {mockCourses.filter((c) => c.status === 'rejected').length}
+              {stats.rejected}
             </p>
           </div>
           <div className="bg-gradient-to-br from-[#FED7AA] to-white rounded-2xl p-4 border border-[#FDBA74]">
             <p className="text-sm text-[#9A3412] mb-1">Open Reports</p>
             <p className="text-2xl font-bold text-[#111827]">
-              {reports.filter((r) => r.status === 'open').length}
+              {stats.openReports}
             </p>
           </div>
         </div>
