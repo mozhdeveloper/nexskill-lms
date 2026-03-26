@@ -302,17 +302,18 @@ const CourseModerationPage: React.FC = () => {
 
   const handleApprove = async (courseId: string) => {
     try {
+      // Update course verification status
       const { error: courseError } = await supabase
         .from('courses')
-        .update({ 
+        .update({
           verification_status: 'approved',
-          is_published: true,
           updated_at: new Date().toISOString()
         })
         .eq('id', courseId);
 
       if (courseError) throw courseError;
 
+      // Publish all modules
       const { error: modulesError } = await supabase
         .from('modules')
         .update({ is_published: true, updated_at: new Date().toISOString() })
@@ -320,6 +321,7 @@ const CourseModerationPage: React.FC = () => {
 
       if (modulesError) console.error('Error publishing modules:', modulesError);
 
+      // Get all module IDs
       const { data: modulesData } = await supabase
         .from('modules')
         .select('id')
@@ -328,6 +330,7 @@ const CourseModerationPage: React.FC = () => {
       if (modulesData && modulesData.length > 0) {
         const moduleIds = modulesData.map(m => m.id);
 
+        // Publish all module content items
         const { error: itemsError } = await supabase
           .from('module_content_items')
           .update({ is_published: true, updated_at: new Date().toISOString() })
@@ -335,6 +338,7 @@ const CourseModerationPage: React.FC = () => {
 
         if (itemsError) console.error('Error publishing content items:', itemsError);
 
+        // Publish all lessons
         const { data: lessonContentItems } = await supabase
           .from('module_content_items')
           .select('content_id')
@@ -343,37 +347,30 @@ const CourseModerationPage: React.FC = () => {
 
         if (lessonContentItems && lessonContentItems.length > 0) {
           const lessonIds = lessonContentItems.map(l => l.content_id);
-          await supabase
+          const { error: lessonsError } = await supabase
             .from('lessons')
             .update({ is_published: true, updated_at: new Date().toISOString() })
             .in('id', lessonIds);
+          
+          if (lessonsError) console.error('Error publishing lessons:', lessonsError);
         }
 
-        const { data: quizContentItems } = await supabase
-          .from('module_content_items')
-          .select('content_id')
-          .in('module_id', moduleIds)
-          .eq('content_type', 'quiz');
-
-        if (quizContentItems && quizContentItems.length > 0) {
-          const quizIds = quizContentItems.map(q => q.content_id);
-          await supabase
-            .from('quizzes')
-            .update({ is_published: true, updated_at: new Date().toISOString() })
-            .in('id', quizIds);
-        }
+        // Note: Quizzes are NOT auto-published to avoid RLS issues
+        // Coaches can publish their own quizzes after approval
       }
 
-      setCourses(prev => prev.map(c => 
-        c.id === courseId 
+      setCourses(prev => prev.map(c =>
+        c.id === courseId
           ? { ...c, status: 'approved' as const, qualityScore: Math.max(c.qualityScore, 80) }
           : c
       ));
 
-      alert(`✅ Course Approved & Published\n\nCourse ID: ${courseId}\n\nAll modules, lessons, and quizzes have been published.`);
+      alert(`✅ Course Approved!\n\nCourse ID: ${courseId}\n\nModules and lessons have been published.\nNote: Coaches need to publish quizzes manually.`);
     } catch (error) {
       console.error('Error approving course:', error);
-      alert('Failed to approve course');
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      const errorMsg = error instanceof Error ? error.message : JSON.stringify(error);
+      alert(`Failed to approve course\n\nError: ${errorMsg}`);
     }
   };
 

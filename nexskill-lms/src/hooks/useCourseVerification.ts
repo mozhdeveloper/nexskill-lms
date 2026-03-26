@@ -233,16 +233,27 @@ export const useCourseVerification = (courseId: string | undefined): UseCourseVe
         if (!courseId) return;
 
         try {
-            const updates: any = { verification_status: status };
-            // admin_feedback column does not exist on courses table, so we don't update it.
-            // Feedback is stored in admin_verification_feedback table via addFeedback.
+            const updates: any = { 
+                verification_status: status,
+                updated_at: new Date().toISOString()
+            };
 
-            const { error: updateError } = await supabase
+            const { data, error: updateError } = await supabase
                 .from('courses')
                 .update(updates)
-                .eq('id', courseId);
+                .eq('id', courseId)
+                .select();
 
-            if (updateError) throw updateError;
+            if (updateError) {
+                console.error('Supabase update error:', updateError);
+                throw updateError;
+            }
+
+            if (!data || data.length === 0) {
+                console.error('No rows updated - check RLS policies');
+                throw new Error('Failed to update course - permission denied or course not found');
+            }
+
             await fetchCourseDetails();
         } catch (err) {
             console.error('Error updating verification status:', err);
