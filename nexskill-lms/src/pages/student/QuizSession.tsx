@@ -65,6 +65,18 @@ const QuizSession: React.FC = () => {
           .eq('quiz_id', quizId)
           .order('position', { ascending: true });
 
+        // DEBUG LOGS
+        console.log('=== QUIZ QUESTIONS DEBUG ===');
+        console.log('Quiz ID from URL:', quizId);
+        console.log('Course ID from URL:', courseId);
+        console.log('Raw rows from DB:', rows);
+        console.log('Rows length:', rows?.length);
+        console.log('First row question_content:', rows?.[0]?.question_content);
+        console.log('First row answer_config:', rows?.[0]?.answer_config);
+        console.log('First row question_type:', rows?.[0]?.question_type);
+        console.log('Error:', rErr);
+        console.log('Quiz data:', quiz);
+
         if (rErr) throw rErr;
 
         setQuizMeta({
@@ -83,6 +95,35 @@ const QuizSession: React.FC = () => {
             : ((rawContent as Record<string, unknown>) ?? {});
           const answer = r.answer_config as Record<string, unknown> | null;
           const type = mapQuestionType(r.question_type as string);
+
+          // DEBUG: Log each mapped question
+          console.log('Mapping question:', {
+            id: r.id,
+            rawContent,
+            contentBlock,
+            contentBlockText: contentBlock?.text,
+            answer,
+            type,
+          });
+
+          // Extract question text - try multiple possible locations
+          const rawQuestionText = 
+            (contentBlock?.text as string) ||
+            (contentBlock?.content as string) ||
+            (answer?.question_text as string) ||
+            (answer?.questionText as string) ||
+            (r.question_text as string) ||
+            '';
+
+          // Strip HTML tags and decode HTML entities to get plain text
+          const questionText = rawQuestionText
+            .replace(/<[^>]*>/g, '')  // Remove HTML tags
+            .replace(/&lt;/g, '<')     // Decode <
+            .replace(/&gt;/g, '>')     // Decode >
+            .replace(/&amp;/g, '&')    // Decode &
+            .replace(/&quot;/g, '"')   // Decode "
+            .replace(/&#39;/g, "'")    // Decode '
+            .trim();
 
           // Options: seed format stores them in content block; coach editor stores in answer_config.options
           let options = (contentBlock?.options as QuizQuestion['options']) || undefined;
@@ -108,7 +149,7 @@ const QuizSession: React.FC = () => {
           return {
             id: r.id as string,
             type,
-            questionText: (contentBlock?.text as string) || '',
+            questionText,
             options,
             correctOptionId,
             correctAnswer,
@@ -116,6 +157,9 @@ const QuizSession: React.FC = () => {
             points: (r.points as number) || 1,
           };
         });
+
+        console.log('Mapped questions:', mapped);
+        console.log('=== END DEBUG ===');
 
         setQuestions(mapped);
         if (quiz.time_limit_minutes) {
@@ -132,7 +176,8 @@ const QuizSession: React.FC = () => {
 
   // Countdown timer
   useEffect(() => {
-    if (timeRemaining === null || timeRemaining <= 0) return;
+    if (!quizMeta || quizMeta.time_limit_minutes === null || quizMeta.time_limit_minutes === undefined) return;
+    
     timerRef.current = setInterval(() => {
       setTimeRemaining((prev) => {
         if (prev === null || prev <= 1) {
@@ -145,7 +190,7 @@ const QuizSession: React.FC = () => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [timeRemaining !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [quizMeta?.time_limit_minutes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-submit when time runs out
   useEffect(() => {
@@ -252,6 +297,69 @@ const QuizSession: React.FC = () => {
       const { error: rErr } = await supabase.from('quiz_responses').insert(responses);
       if (rErr) console.error('Error saving responses:', rErr);
 
+      console.log('=== LESSON COMPLETION CHECK ===');
+      console.log('Quiz passed:', passed);
+      console.log('Quiz ID:', quizMeta.id);
+
+      // MARK LESSON AS COMPLETE if quiz is passed
+      if (passed) {
+        try {
+          // Get lesson_id from quiz
+          const { data: quizData, error: quizErr } = await supabase
+            .from('quizzes')
+            .select('lesson_id')
+            .eq('id', quizMeta.id)
+            .single();
+
+          console.log('Quiz data for lesson completion:', quizData);
+          console.log('Quiz error:', quizErr);
+
+          if (quizErr) {
+            console.error('Error fetching lesson_id:', quizErr);
+          } else if (quizData?.lesson_id) {
+            // Quiz has a lesson_id - mark that lesson complete
+            const { data: progressData, error: progressErr } = await supabase
+              .from('user_lesson_progress')
+              .upsert({
+                user_id: user.id,
+                lesson_id: quizData.lesson_id,
+                is_completed: true,
+                completed_at: new Date().toISOString(),
+              }, { onConflict: 'user_id,lesson_id' })
+              .select();
+            
+            if (progressErr) {
+              console.error('Error marking lesson complete:', progressErr);
+            } else {
+              console.log('✅ Lesson marked as complete:', quizData.lesson_id);
+              console.log('Progress data:', progressData);
+            }
+          } else {
+            // Quiz doesn't have lesson_id - it's a standalone module quiz
+            // Find the module_content_item for this quiz and mark the module as complete
+            console.log('⚠️ Quiz has no lesson_id - checking for module completion...');
+            
+            const { data: contentItem } = await supabase
+              .from('module_content_items')
+              .select('module_id')
+              .eq('content_id', quizMeta.id)
+              .eq('content_type', 'quiz')
+              .single();
+
+            if (contentItem) {
+              console.log('Quiz found in module:', contentItem.module_id);
+              // Note: Module-level completion tracking would go here
+              // For now, we just log that the quiz was passed
+              console.log('✅ Quiz passed - module completion tracking not yet implemented');
+            }
+          }
+        } catch (err) {
+          console.error('Unexpected error in lesson completion:', err);
+        }
+      } else {
+        console.log('⚠️ Quiz not passed, lesson not marked complete. Score:', passed);
+      }
+
       // Navigate to result page
       navigate(`/student/courses/${courseId}/quizzes/${quizId}/result`, {
         state: {
@@ -261,6 +369,7 @@ const QuizSession: React.FC = () => {
           passingScore: quizMeta.passing_score,
           questions,
           userAnswers: selectedAnswers,
+          passed,
         },
       });
     } catch (err) {
@@ -275,6 +384,13 @@ const QuizSession: React.FC = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // DEBUG: Log render state
+  console.log('=== RENDER DEBUG ===');
+  console.log('loading:', loading);
+  console.log('quizMeta:', quizMeta);
+  console.log('questions.length:', questions.length);
+  console.log('=== END RENDER DEBUG ===');
+
   if (loading) {
     return (
       <StudentAppLayout>
@@ -286,6 +402,9 @@ const QuizSession: React.FC = () => {
   }
 
   if (!quizMeta || questions.length === 0) {
+    console.log('SHOWING "NO QUESTIONS" SCREEN');
+    console.log('quizMeta is null?', !quizMeta);
+    console.log('questions.length is 0?', questions.length === 0);
     return (
       <StudentAppLayout>
         <div className="min-h-screen bg-[color:var(--bg-primary)] flex items-center justify-center">

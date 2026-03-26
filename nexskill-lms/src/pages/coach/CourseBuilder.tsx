@@ -664,7 +664,7 @@ const CourseBuilder: React.FC = () => {
     }
   };
 
-  const handleAddQuiz = async (_moduleId: string) => {
+  const handleAddQuiz = async (_moduleId: string, _lessonId?: string) => {
     let resolvedModuleId = _moduleId;
     try { resolvedModuleId = await resolveModuleId(_moduleId); } catch (e) { return; }
 
@@ -676,7 +676,11 @@ const CourseBuilder: React.FC = () => {
     };
 
     try {
-      const { error: quizError } = await supabase.from("quizzes").insert([newQuiz]);
+      // Insert quiz with lesson_id if provided (for quizzes tied to specific lessons)
+      const { error: quizError } = await supabase.from("quizzes").insert([{
+        ...newQuiz,
+        lesson_id: _lessonId || null, // Link to lesson if provided, otherwise null for standalone quizzes
+      }]);
       if (quizError) throw quizError;
 
       const { data: maxPositionData } = await supabase.from("module_content_items")
@@ -690,13 +694,13 @@ const CourseBuilder: React.FC = () => {
 
       const newQuizItem: ContentItem = { ...newQuiz, type: 'quiz', duration: "Quiz" };
       setCurriculum(curriculum.map((m) => m.id === _moduleId ? { ...m, lessons: [...m.lessons, newQuizItem] } : m));
-      setEditingQuiz({ moduleId: _moduleId, lessonId: "", quiz: newQuiz, questions: [] });
+      setEditingQuiz({ moduleId: _moduleId, lessonId: _lessonId || "", quiz: newQuiz, questions: [] });
     } catch (err) {
       alert("Error adding quiz");
     }
   };
 
-  const handleCreateQuizWithTitle = async (moduleId: string, _lessonId: string, quizTitle: string): Promise<string> => {
+  const handleCreateQuizWithTitle = async (moduleId: string, lessonId: string, quizTitle: string): Promise<string> => {
     let resolvedModuleId = moduleId;
     try { resolvedModuleId = await resolveModuleId(moduleId); } catch (e) { throw new Error("Failed to resolve module"); }
 
@@ -709,7 +713,11 @@ const CourseBuilder: React.FC = () => {
       late_submission_allowed: true, late_penalty_percent: 10,
     };
 
-    const { error: quizError } = await supabase.from("quizzes").insert([newQuiz]);
+    // Insert quiz WITH lesson_id since quizzes are created inside lessons
+    const { error: quizError } = await supabase.from("quizzes").insert([{
+      ...newQuiz,
+      lesson_id: lessonId, // Link quiz to the lesson it was created in
+    }]);
     if (quizError) throw new Error(quizError.message);
 
     return quizId;
