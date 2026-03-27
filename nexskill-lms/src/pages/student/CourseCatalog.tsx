@@ -20,8 +20,8 @@ const categories = [
   "Personal Development",
 ];
 
-// Helper to format duration from hours (number) to string
-const formatDuration = (hours: number) => {
+// Helper to format duration from hours (number) to string - fallback only
+const formatDurationFromHours = (hours: number) => {
   const h = Math.floor(hours);
   const m = Math.round((hours - h) * 60);
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
@@ -33,7 +33,7 @@ const CourseCatalog: React.FC = () => {
   
   // Fetch ALL courses
   const { courses: dbCourses, loading: loadingAll } = useCourses();
-  // Fetch ENROLLED courses
+  // Fetch ENROLLED courses with real durations
   const { courses: enrolledCourses, loading: loadingEnrolled } = useEnrolledCourses();
 
   const [activeTab, setActiveTab] = useState<'browse' | 'enrolled'>('enrolled');
@@ -125,6 +125,15 @@ const CourseCatalog: React.FC = () => {
     return sourceCourses.map(course => {
       const isEnrolled = enrolledCourseIds.has(course.id);
       const progress = courseProgress[course.id];
+      
+      // Use the real formatted duration if available (from enrolled courses hook)
+      // For browse courses, we need to compute it or use fallback
+      let duration = course.duration_hours ? formatDurationFromHours(course.duration_hours) : "0h";
+      
+      // If this is an enrolled course and we have the real formatted duration, use it
+      if (activeTab === 'enrolled' && (course as any).formattedDuration) {
+        duration = (course as any).formattedDuration;
+      }
 
       return {
         id: course.id,
@@ -134,7 +143,7 @@ const CourseCatalog: React.FC = () => {
         rating: (course as any).rating || 0,
         reviewCount: (course as any).reviewCount || 0,
         studentsCount: (course as any).studentsCount || 0,
-        duration: formatDuration(course.duration_hours || 0),
+        duration: duration,
         price: course.price || 0,
         originalPrice: undefined,
         isBestseller: false,
@@ -147,7 +156,7 @@ const CourseCatalog: React.FC = () => {
         totalLessons: progress?.total || 0,
       };
     });
-  }, [sourceCourses, enrolledCourseIds, courseProgress]);
+  }, [sourceCourses, enrolledCourseIds, courseProgress, activeTab]);
 
   // Filter and sort courses
   const filteredCourses = useMemo(() => {
