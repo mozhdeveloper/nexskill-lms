@@ -345,7 +345,7 @@ const CoursePlayer: React.FC = () => {
 
   return (
     <StudentAppLayout>
-      {/* Header — unchanged */}
+      {/* Header */}
       <div className="px-8 py-4 border-b border-[#EDF0FB] dark:border-gray-700">
         <div className="flex items-start justify-between mb-2">
           <div className="flex-1">
@@ -358,18 +358,6 @@ const CoursePlayer: React.FC = () => {
               <span>•</span>
               <span>{currentLesson.estimated_duration_minutes} min</span>
             </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="px-4 py-2 bg-[#F5F7FF] dark:bg-gray-800 rounded-full">
-              <span className="text-sm font-medium text-brand-primary">{progress}% complete</span>
-            </div>
-            <button
-              onClick={() => setShowCompleteModal(true)}
-              disabled={completedLessons.includes(lessonId || '')}
-              className="px-5 py-2 bg-gradient-to-r from-brand-primary to-brand-primary-light text-white text-sm font-medium rounded-full shadow-button-primary hover:shadow-lg hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {completedLessons.includes(lessonId || '') ? '✓ Completed' : 'Mark as complete'}
-            </button>
           </div>
         </div>
       </div>

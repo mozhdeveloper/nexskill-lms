@@ -82,24 +82,11 @@ export const VideoProgressTracker: React.FC<VideoProgressTrackerProps> = ({
       {children({
         onTimeUpdate: handleTimeUpdate,
         onDurationChange: handleDurationChange,
-        onVideoComplete: handleVideoComplete, // Pass to player
+        onVideoComplete: handleVideoComplete,
         isCompleted,
         progressPercent,
-        startTime: currentTime, // Pass current time for resume
+        startTime: currentTime,
       })}
-
-      {/* Progress indicator */}
-      {progressPercent > 0 && progressPercent < 80 && (
-        <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-          Progress: {Math.round(progressPercent)}%
-        </div>
-      )}
-
-      {isCompleted && (
-        <div className="mt-2 text-xs text-green-600 dark:text-green-400 font-medium flex items-center gap-1">
-          <span>✓</span> Video completed - Lesson marked as complete!
-        </div>
-      )}
     </>
   );
 };

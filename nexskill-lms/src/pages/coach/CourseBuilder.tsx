@@ -215,6 +215,19 @@ const CourseBuilder: React.FC = () => {
           );
           setCurriculum(modulesWithContent);
         }
+
+        // Fetch course goals
+        const { data: goalsData, error: goalsError } = await supabase
+          .from('course_goals')
+          .select('description')
+          .eq('course_id', courseId)
+          .order('position', { ascending: true });
+
+        if (goalsError) {
+          console.error('Error fetching course goals:', goalsError);
+        } else if (goalsData) {
+          setCourseGoals(goalsData.map(g => g.description));
+        }
       }
     };
     fetchCourse();
@@ -231,6 +244,7 @@ const CourseBuilder: React.FC = () => {
   const [editingQuiz, setEditingQuiz] = useState<{ moduleId: string; lessonId: string; quiz: Quiz; questions: QuizQuestion[] } | null>(null);
   const [drip, setDrip] = useState<ModuleDrip[]>([]);
   const [pricing, setPricing] = useState<PricingData>({ mode: "one-time", price: 99, currency: "USD" });
+  const [courseGoals, setCourseGoals] = useState<string[]>([]);
 
   const handleCurriculumChange = (updatedCurriculum: Module[]) => {
     setCurriculum(updatedCurriculum);
@@ -588,7 +602,7 @@ const CourseBuilder: React.FC = () => {
     try {
       const position = curriculum.length;
       const { data, error } = await supabase.from('modules').insert({
-        course_id: courseId, title: `Module ${position + 1}`,
+        course_id: courseId, title: "",
         position, is_published: false, is_sequential: false,
       }).select().single();
 
@@ -900,6 +914,7 @@ const CourseBuilder: React.FC = () => {
             courseSubtitle={settings.subtitle}
             courseDescription={settings.longDescription}
             instructorName={instructorName}
+            learningObjectives={courseGoals}
           />
         );
       default:

@@ -292,6 +292,20 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
     <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-card p-5 h-full flex flex-col">
       <h3 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary mb-4">Course content</h3>
 
+      {/* Progress Summary - moved to top under "Course content" title */}
+      <div className="mb-4 pb-4 border-b border-[#EDF0FB] dark:border-gray-700">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs text-text-muted">Course progress</span>
+          <span className="text-xs font-semibold text-text-primary dark:text-dark-text-primary">{progress}%</span>
+        </div>
+        <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-brand-primary to-brand-primary-light rounded-full transition-all"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+
       <div className="flex-1 overflow-y-auto space-y-2">
         {sidebarModules.map((module) => {
           const isExpanded  = expandedModules.includes(module.id);
@@ -354,20 +368,6 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
             </div>
           );
         })}
-      </div>
-
-      {/* Progress Summary */}
-      <div className="mt-4 pt-4 border-t border-[#EDF0FB] dark:border-gray-700">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-xs text-text-muted">Course progress</span>
-          <span className="text-xs font-semibold text-text-primary dark:text-dark-text-primary">{progress}%</span>
-        </div>
-        <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-brand-primary to-brand-primary-light rounded-full transition-all"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
       </div>
     </div>
   );
