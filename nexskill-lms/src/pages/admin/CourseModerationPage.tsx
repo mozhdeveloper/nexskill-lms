@@ -302,18 +302,7 @@ const CourseModerationPage: React.FC = () => {
 
   const handleApprove = async (courseId: string) => {
     try {
-      // Update course verification status
-      const { error: courseError } = await supabase
-        .from('courses')
-        .update({
-          verification_status: 'approved',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', courseId);
-
-      if (courseError) throw courseError;
-
-      // Publish all modules
+      // STEP 1: Publish all modules FIRST (trigger will fire but course is still pending_review)
       const { error: modulesError } = await supabase
         .from('modules')
         .update({ is_published: true, updated_at: new Date().toISOString() })
@@ -321,7 +310,7 @@ const CourseModerationPage: React.FC = () => {
 
       if (modulesError) console.error('Error publishing modules:', modulesError);
 
-      // Get all module IDs
+      // STEP 2: Get all module IDs
       const { data: modulesData } = await supabase
         .from('modules')
         .select('id')
@@ -330,7 +319,7 @@ const CourseModerationPage: React.FC = () => {
       if (modulesData && modulesData.length > 0) {
         const moduleIds = modulesData.map(m => m.id);
 
-        // Publish all module content items
+        // STEP 3: Publish all module content items
         const { error: itemsError } = await supabase
           .from('module_content_items')
           .update({ is_published: true, updated_at: new Date().toISOString() })
@@ -338,7 +327,7 @@ const CourseModerationPage: React.FC = () => {
 
         if (itemsError) console.error('Error publishing content items:', itemsError);
 
-        // Publish all lessons
+        // STEP 4: Publish all lessons
         const { data: lessonContentItems } = await supabase
           .from('module_content_items')
           .select('content_id')
@@ -351,7 +340,7 @@ const CourseModerationPage: React.FC = () => {
             .from('lessons')
             .update({ is_published: true, updated_at: new Date().toISOString() })
             .in('id', lessonIds);
-          
+
           if (lessonsError) console.error('Error publishing lessons:', lessonsError);
         }
 
@@ -359,6 +348,18 @@ const CourseModerationPage: React.FC = () => {
         // Coaches can publish their own quizzes after approval
       }
 
+      // STEP 5: FINALLY update course verification status (after all triggers have fired)
+      const { error: courseError } = await supabase
+        .from('courses')
+        .update({
+          verification_status: 'approved',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', courseId);
+
+      if (courseError) throw courseError;
+
+      // Update local state
       setCourses(prev => prev.map(c =>
         c.id === courseId
           ? { ...c, status: 'approved' as const, qualityScore: Math.max(c.qualityScore, 80) }

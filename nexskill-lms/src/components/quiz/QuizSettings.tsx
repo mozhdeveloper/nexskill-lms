@@ -224,23 +224,6 @@ const QuizSettings: React.FC<QuizSettingsProps> = ({ quiz, onChange }) => {
                         <label className="flex items-center gap-2 cursor-pointer">
                             <input
                                 type="checkbox"
-                                checked={quiz.requires_manual_grading}
-                                onChange={(e) =>
-                                    onChange({
-                                        requires_manual_grading:
-                                            e.target.checked,
-                                    })
-                                }
-                                className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                            />
-                            <span className="text-sm text-gray-700 dark:text-gray-300">
-                                Requires manual grading
-                            </span>
-                        </label>
-
-                        <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
                                 checked={quiz.is_published}
                                 onChange={(e) =>
                                     onChange({ is_published: e.target.checked })

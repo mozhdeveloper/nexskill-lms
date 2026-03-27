@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import { Video, FileQuestion } from 'lucide-react';
 
 interface ContentItem {
   id: string;
@@ -7,6 +8,7 @@ interface ContentItem {
   type: 'lesson' | 'quiz';
   duration: string;
   isCompleted: boolean;
+  itemNumber: number; // Sequential number across all modules
 }
 
 interface SidebarModule {
@@ -199,7 +201,9 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
         if (secs) youtubeLessonDurationMap.set(lessonId, secs);
       });
 
-      // ── 5. Build sidebar structure ────────────────────────────────────────
+      // ── 5. Build sidebar structure with sequential numbering ──────────────
+      // First, collect all items in order across all modules
+      let sequentialCounter = 1;
       const built: SidebarModule[] = modulesData.map((mod) => {
         const modItems = (itemsData ?? []).filter((i) => i.module_id === mod.id);
 
@@ -229,6 +233,7 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                 type:        'lesson' as const,
                 duration,
                 isCompleted: completedLessonIds.includes(l.id),
+                itemNumber: sequentialCounter++, // Assign sequential number
               };
             }
 
@@ -240,6 +245,7 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
               type:        'quiz' as const,
               duration:    `${q.time_limit_minutes ?? 30}m`,
               isCompleted: completedQuizIds.includes(q.id),
+              itemNumber: sequentialCounter++, // Assign sequential number
             };
           })
           .filter(Boolean) as ContentItem[];
@@ -333,6 +339,8 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                 <div className="bg-[#FAFBFF] dark:bg-gray-800/50 px-2 py-2 space-y-1">
                   {module.items.map((item) => {
                     const isActive = item.id === activeLessonId;
+                    const completed = item.isCompleted;
+                    
                     return (
                       <button
                         key={item.id}
@@ -341,25 +349,75 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                           isActive
                             ? 'bg-brand-primary-soft border-2 border-brand-primary'
                             : 'hover:bg-white dark:hover:bg-gray-700 hover:shadow-sm'
+                        } ${
+                          completed && !isActive
+                            ? 'bg-green-50 dark:bg-green-900/10'
+                            : ''
                         }`}
                       >
                         <div className="flex items-center gap-3 flex-1 text-left">
-                          <div className="flex-shrink-0">
-                            {item.isCompleted ? (
-                              <span className="text-green-500">✓</span>
-                            ) : isActive ? (
-                              <span className="text-brand-primary">▶</span>
+                          {/* Sequential number instead of icon */}
+                          <div className="flex-shrink-0 w-6">
+                            {completed ? (
+                              <span className="w-5 h-5 flex items-center justify-center bg-green-500 rounded-full text-white text-xs">
+                                ✓
+                              </span>
                             ) : (
-                              <span className="text-text-muted">{item.type === 'quiz' ? '📝' : '📄'}</span>
+                              <span className={`text-sm font-semibold ${
+                                isActive 
+                                  ? 'text-brand-primary' 
+                                  : 'text-text-muted dark:text-dark-text-muted'
+                              }`}>
+                                {item.itemNumber}
+                              </span>
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-medium truncate ${isActive ? 'text-brand-primary' : 'text-text-primary dark:text-dark-text-primary'}`}>
+                            <p className={`text-sm font-medium truncate ${
+                              completed 
+                                ? 'text-green-700 dark:text-green-400'
+                                : isActive 
+                                  ? 'text-brand-primary' 
+                                  : 'text-text-primary dark:text-dark-text-primary'
+                            }`}>
                               {item.title}
                             </p>
-                            <span className="text-xs text-text-muted">{item.type === 'quiz' ? '📝' : '📄'} {item.duration}</span>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <div className="flex items-center gap-1">
+                                {/* Video or Quiz icon next to duration */}
+                                {item.type === 'lesson' ? (
+                                  <Video className="w-3 h-3 text-blue-500 dark:text-blue-400" />
+                                ) : (
+                                  <FileQuestion className="w-3 h-3 text-purple-500 dark:text-purple-400" />
+                                )}
+                                <span className="text-xs text-text-muted dark:text-dark-text-muted">
+                                  {item.duration}
+                                </span>
+                              </div>
+                              {item.type === 'quiz' && (
+                                <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full">
+                                  Quiz
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
+                        {/* Optional: Add chevron for active item */}
+                        {isActive && (
+                          <svg
+                            className="w-4 h-4 text-brand-primary"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 5l7 7-7 7"
+                            />
+                          </svg>
+                        )}
                       </button>
                     );
                   })}

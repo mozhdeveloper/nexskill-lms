@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "../../../lib/supabaseClient";
 
 interface Lesson {
     id: string;
@@ -20,7 +21,63 @@ interface CourseCurriculumTabProps {
     isEnrolled?: boolean;
     completedLessonIds?: Set<string>;
     completedQuizIds?: Set<string>;
+    onTotalDurationLoaded?: (totalSeconds: number) => void;
 }
+
+// ─── YouTube / Duration Helpers ───────────────────────────────────────────────
+
+const parseISODuration = (isoDuration: string): number => {
+    const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+    if (!match) return 0;
+    return (
+        parseInt(match[1] || "0", 10) * 3600 +
+        parseInt(match[2] || "0", 10) * 60 +
+        parseInt(match[3] || "0", 10)
+    );
+};
+
+const extractYouTubeId = (url: string): string | null =>
+    url.match(
+        /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/
+    )?.[1] ?? null;
+
+const formatDuration = (seconds: number): string => {
+    const m = Math.floor(seconds / 60);
+    const s = Math.round(seconds % 60);
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+};
+
+const fetchYouTubeDurations = async (
+    videoIds: string[]
+): Promise<Map<string, number>> => {
+    const result = new Map<string, number>();
+    if (videoIds.length === 0) return result;
+
+    const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY;
+    if (!apiKey) return result;
+
+    try {
+        const chunks: string[][] = [];
+        for (let i = 0; i < videoIds.length; i += 50)
+            chunks.push(videoIds.slice(i, i + 50));
+
+        for (const chunk of chunks) {
+            const res = await fetch(
+                `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${chunk.join(",")}&key=${apiKey}`
+            );
+            if (!res.ok) continue;
+            const data = await res.json();
+            for (const item of data.items ?? []) {
+                result.set(item.id, parseISODuration(item.contentDetails.duration));
+            }
+        }
+    } catch (err) {
+        console.error("[CourseCurriculumTab] YouTube duration fetch error:", err);
+    }
+    return result;
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 const CourseCurriculumTab: React.FC<CourseCurriculumTabProps> = ({
     curriculum,
@@ -28,17 +85,125 @@ const CourseCurriculumTab: React.FC<CourseCurriculumTabProps> = ({
     isEnrolled = false,
     completedLessonIds = new Set(),
     completedQuizIds = new Set(),
+    onTotalDurationLoaded,
 }) => {
-
-    useEffect(()=>{
-        console.log(curriculum)
-    },[])
     const navigate = useNavigate();
-    // Default to expanding the first module
+
+    // Resolved durations keyed by lesson id (in seconds)
+    const [durationMap, setDurationMap] = useState<Map<string, number>>(new Map());
+
     const [expandedModules, setExpandedModules] = useState<string[]>(
         curriculum.length > 0 ? [curriculum[0].id] : []
     );
-    console.log(`debug = ${expandedModules}`)
+
+    // ── Fetch real durations ──────────────────────────────────────────────────
+    const fetchDurations = useCallback(async () => {
+        if (!courseId) return;
+
+        // Collect all lesson ids from curriculum prop
+        const allLessonIds = curriculum
+            .flatMap((m) => m.lessons)
+            .filter((l) => l.type === "lesson")
+            .map((l) => l.id);
+
+        if (allLessonIds.length === 0) return;
+
+        // 1. Fetch lesson rows (content_blocks for metadata)
+        const { data: lessonsData } = await supabase
+            .from("lessons")
+            .select("id, content_blocks, estimated_duration_minutes")
+            .in("id", allLessonIds);
+
+        // 2. Fetch watch-progress durations as fallback
+        const { data: watchData } = await supabase
+            .from("lesson_video_progress")
+            .select("lesson_id, duration_seconds")
+            .in("lesson_id", allLessonIds);
+
+        const watchedMap = new Map<string, number>();
+        (watchData ?? []).forEach((v: any) => {
+            if (v.duration_seconds > 0 && !watchedMap.has(v.lesson_id))
+                watchedMap.set(v.lesson_id, v.duration_seconds);
+        });
+
+        // 3. Parse stored durations & collect YouTube IDs to fetch
+        const storedMap = new Map<string, number>();
+        const ytIdsToFetch: string[] = [];
+        const lessonForYtId = new Map<string, string>();
+        const estimatedMap = new Map<string, number>();
+
+        (lessonsData ?? []).forEach((l: any) => {
+            // Store estimated as final fallback
+            if (l.estimated_duration_minutes)
+                estimatedMap.set(l.id, l.estimated_duration_minutes * 60);
+
+            if (!Array.isArray(l.content_blocks)) return;
+            const videoBlock = l.content_blocks.find(
+                (b: any) => b.type === "video" || b.block_type === "video"
+            );
+            if (!videoBlock) return;
+
+            const metaDuration =
+                videoBlock.attributes?.media_metadata?.duration ??
+                videoBlock.attributes?.duration ??
+                null;
+
+            if (typeof metaDuration === "number" && metaDuration > 0) {
+                storedMap.set(l.id, metaDuration);
+                return;
+            }
+
+            const url: string = videoBlock.content ?? videoBlock.url ?? "";
+            const ytId = extractYouTubeId(url);
+            if (ytId) {
+                ytIdsToFetch.push(ytId);
+                lessonForYtId.set(ytId, l.id);
+            }
+        });
+
+        // 4. Batch-fetch YouTube durations
+        const ytDurations = await fetchYouTubeDurations([...new Set(ytIdsToFetch)]);
+        const ytLessonMap = new Map<string, number>();
+        lessonForYtId.forEach((lessonId, ytId) => {
+            const secs = ytDurations.get(ytId);
+            if (secs) ytLessonMap.set(lessonId, secs);
+        });
+
+        // 5. Build final map: YouTube > stored metadata > watch progress > estimated
+        const resolved = new Map<string, number>();
+        allLessonIds.forEach((id) => {
+            const secs =
+                ytLessonMap.get(id) ??
+                storedMap.get(id) ??
+                watchedMap.get(id) ??
+                estimatedMap.get(id) ??
+                0;
+            resolved.set(id, secs);
+        });
+
+        setDurationMap(resolved);
+
+        // Notify parent of total course duration
+        if (onTotalDurationLoaded) {
+            const total = [...resolved.values()].reduce((a, b) => a + b, 0);
+            onTotalDurationLoaded(total);
+        }
+    }, [courseId, curriculum, onTotalDurationLoaded]);
+
+    useEffect(() => {
+        fetchDurations();
+    }, [fetchDurations]);
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    const getLessonDuration = (lesson: Lesson): string => {
+        if (lesson.type === "quiz") return lesson.duration || "Quiz";
+        const secs = durationMap.get(lesson.id);
+        if (secs && secs > 0) return formatDuration(secs);
+        // If still loading or not found, fall back to prop duration or a dash
+        return lesson.duration || "—";
+    };
+
     const toggleModule = (moduleId: string) => {
         setExpandedModules((prev) =>
             prev.includes(moduleId)
@@ -61,7 +226,6 @@ const CourseCurriculumTab: React.FC<CourseCurriculumTabProps> = ({
         return completedLessonIds.has(lesson.id);
     };
 
-    // Calculate module progress
     const getModuleProgress = (mod: Module) => {
         if (!mod.lessons || mod.lessons.length === 0) return 0;
         const completed = mod.lessons.filter((l) => isCompleted(l)).length;
@@ -76,13 +240,17 @@ const CourseCurriculumTab: React.FC<CourseCurriculumTabProps> = ({
         );
     }
 
-    // Overall progress
-    const totalItems = curriculum.reduce((sum, m) => sum + (m.lessons?.length || 0), 0);
-    const totalCompleted = curriculum.reduce(
-        (sum, m) => sum + (m.lessons?.filter((l) => isCompleted(l)).length || 0),
+    const totalItems = curriculum.reduce(
+        (sum, m) => sum + (m.lessons?.length || 0),
         0
     );
-    const overallPercent = totalItems > 0 ? Math.round((totalCompleted / totalItems) * 100) : 0;
+    const totalCompleted = curriculum.reduce(
+        (sum, m) =>
+            sum + (m.lessons?.filter((l) => isCompleted(l)).length || 0),
+        0
+    );
+    const overallPercent =
+        totalItems > 0 ? Math.round((totalCompleted / totalItems) * 100) : 0;
 
     return (
         <div className="space-y-4">
@@ -120,8 +288,11 @@ const CourseCurriculumTab: React.FC<CourseCurriculumTabProps> = ({
                         >
                             <div className="flex items-center gap-3">
                                 <svg
-                                    className={`w-5 h-5 text-text-muted transition-transform ${expandedModules.includes(module.id) ? "rotate-90" : ""
-                                        }`}
+                                    className={`w-5 h-5 text-text-muted transition-transform ${
+                                        expandedModules.includes(module.id)
+                                            ? "rotate-90"
+                                            : ""
+                                    }`}
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"
@@ -138,19 +309,21 @@ const CourseCurriculumTab: React.FC<CourseCurriculumTabProps> = ({
                                 </span>
                             </div>
                             <div className="flex items-center gap-3">
-                                {isEnrolled && module.lessons && module.lessons.length > 0 && (
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-16 bg-gray-200 dark:bg-gray-600 rounded-full h-1.5">
-                                            <div
-                                                className="bg-green-500 h-1.5 rounded-full transition-all"
-                                                style={{ width: `${modProgress}%` }}
-                                            />
+                                {isEnrolled &&
+                                    module.lessons &&
+                                    module.lessons.length > 0 && (
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-16 bg-gray-200 dark:bg-gray-600 rounded-full h-1.5">
+                                                <div
+                                                    className="bg-green-500 h-1.5 rounded-full transition-all"
+                                                    style={{ width: `${modProgress}%` }}
+                                                />
+                                            </div>
+                                            <span className="text-xs text-text-muted dark:text-dark-text-muted">
+                                                {modProgress}%
+                                            </span>
                                         </div>
-                                        <span className="text-xs text-text-muted dark:text-dark-text-muted">
-                                            {modProgress}%
-                                        </span>
-                                    </div>
-                                )}
+                                    )}
                                 <span className="text-sm text-text-muted dark:text-dark-text-muted">
                                     {module.lessons?.length || 0} items
                                 </span>
@@ -166,17 +339,25 @@ const CourseCurriculumTab: React.FC<CourseCurriculumTabProps> = ({
                                         return (
                                             <div
                                                 key={lesson.id}
-                                                onClick={() => clickable && handleItemClick(lesson)}
-                                                className={`flex items-center justify-between py-2 px-3 rounded-lg transition-colors ${clickable
+                                                onClick={() =>
+                                                    clickable && handleItemClick(lesson)
+                                                }
+                                                className={`flex items-center justify-between py-2 px-3 rounded-lg transition-colors ${
+                                                    clickable
                                                         ? "cursor-pointer hover:bg-white dark:hover:bg-dark-background-card"
                                                         : "cursor-default"
-                                                    } ${completed ? "bg-green-50 dark:bg-green-900/10" : ""}`}
+                                                } ${
+                                                    completed
+                                                        ? "bg-green-50 dark:bg-green-900/10"
+                                                        : ""
+                                                }`}
                                             >
                                                 <div className="flex items-center gap-3">
-                                                    {/* Completion indicator */}
                                                     {isEnrolled ? (
                                                         completed ? (
-                                                            <span className="w-5 h-5 flex items-center justify-center bg-green-500 rounded-full text-white text-xs">✓</span>
+                                                            <span className="w-5 h-5 flex items-center justify-center bg-green-500 rounded-full text-white text-xs">
+                                                                ✓
+                                                            </span>
                                                         ) : (
                                                             <span className="w-5 h-5 flex items-center justify-center border-2 border-gray-300 dark:border-gray-600 rounded-full text-xs" />
                                                         )
@@ -185,10 +366,13 @@ const CourseCurriculumTab: React.FC<CourseCurriculumTabProps> = ({
                                                             {lesson.type === "quiz" ? "❓" : "▶️"}
                                                         </span>
                                                     )}
-                                                    <span className={`text-sm ${completed
-                                                            ? "text-green-700 dark:text-green-400"
-                                                            : "text-text-secondary dark:text-dark-text-secondary"
-                                                        }`}>
+                                                    <span
+                                                        className={`text-sm ${
+                                                            completed
+                                                                ? "text-green-700 dark:text-green-400"
+                                                                : "text-text-secondary dark:text-dark-text-secondary"
+                                                        }`}
+                                                    >
                                                         {lesson.title}
                                                     </span>
                                                     {lesson.type === "quiz" && (
@@ -199,15 +383,27 @@ const CourseCurriculumTab: React.FC<CourseCurriculumTabProps> = ({
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-xs text-text-muted dark:text-dark-text-muted">
-                                                        {lesson.duration || (lesson.type === 'quiz' ? 'Quiz' : 'Lesson')}
+                                                        {getLessonDuration(lesson)}
                                                     </span>
                                                     {clickable && (
-                                                        <svg className="w-4 h-4 text-text-muted dark:text-dark-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                                        <svg
+                                                            className="w-4 h-4 text-text-muted dark:text-dark-text-muted"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            viewBox="0 0 24 24"
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                strokeWidth={2}
+                                                                d="M9 5l7 7-7 7"
+                                                            />
                                                         </svg>
                                                     )}
                                                     {!isEnrolled && (
-                                                        <span className="text-xs text-text-muted">🔒</span>
+                                                        <span className="text-xs text-text-muted">
+                                                            🔒
+                                                        </span>
                                                     )}
                                                 </div>
                                             </div>
