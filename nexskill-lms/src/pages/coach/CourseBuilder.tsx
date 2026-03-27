@@ -247,6 +247,9 @@ const CourseBuilder: React.FC = () => {
   const [courseGoals, setCourseGoals] = useState<string[]>([]);
 
   const handleCurriculumChange = (updatedCurriculum: Module[]) => {
+    // Check if course was previously approved and content is being modified
+    const wasApproved = verificationStatus === 'approved';
+    
     setCurriculum(updatedCurriculum);
 
     if (saveCurriculumTimeoutRef.current) clearTimeout(saveCurriculumTimeoutRef.current);
@@ -265,7 +268,30 @@ const CourseBuilder: React.FC = () => {
         }));
 
         const { error } = await supabase.from('modules').upsert(updates);
-        if (error) console.error("Error saving modules:", error);
+        if (error) {
+          console.error("Error saving modules:", error);
+          return;
+        }
+
+        // If course was approved and curriculum changed, mark as pending_review
+        if (wasApproved) {
+          console.log('Course was approved, marking as pending_review due to curriculum changes');
+          const { error: updateError } = await supabase
+            .from('courses')
+            .update({
+              verification_status: 'pending_review',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', courseId);
+
+          if (updateError) {
+            console.error('Error updating verification status:', updateError);
+          } else {
+            setVerificationStatus('pending_review');
+            // Show notification to coach
+            console.log('Course marked as pending_review. Changes will be visible after admin approval.');
+          }
+        }
       } catch (err) {
         console.error("Error in module auto-save:", err);
       }
