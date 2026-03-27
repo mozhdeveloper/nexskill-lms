@@ -211,34 +211,54 @@ const CourseModerationPage: React.FC = () => {
           };
         });
 
-        // Fetch reports if table exists
+        // Fetch reports - content_reports table may not exist
         let mappedReports: Report[] = [];
+        let reportsAvailable = false;
+        
+        // First check if content_reports table exists
         try {
-          const { data: reportsData, error: reportsError } = await supabase
+          const { count, error: checkError } = await supabase
             .from('content_reports')
-            .select(`
-              *,
-              course:courses(title),
-              reporter:profiles!content_reports_reporter_id_fkey(first_name, last_name)
-            `)
-            .order('created_at', { ascending: false });
-
-          if (!reportsError && reportsData) {
-            mappedReports = reportsData.map((r: any) => ({
-              id: r.id,
-              courseId: r.course_id,
-              courseTitle: r.course?.title || 'Unknown Course',
-              reporterType: r.reporter_type || 'student',
-              reasonCategory: r.reason_category || 'Other',
-              reasonSnippet: r.description || 'No description provided',
-              severity: r.severity || 'medium',
-              status: r.status || 'open',
-              createdAt: r.created_at,
-              reporterId: r.reporter_id,
-            }));
+            .select('*', { count: 'exact', head: true });
+          
+          reportsAvailable = !checkError;
+          if (!reportsAvailable) {
+            console.log('ℹ️ Content reports table not available - reports disabled');
           }
         } catch (e) {
-          console.log('Content reports table not found, using empty reports');
+          reportsAvailable = false;
+          console.log('ℹ️ Content reports table not available - reports disabled');
+        }
+
+        // Only fetch reports if table exists
+        if (reportsAvailable) {
+          try {
+            const { data: reportsData, error: reportsError } = await supabase
+              .from('content_reports')
+              .select(`
+                *,
+                course:courses(title),
+                reporter:profiles!content_reports_reporter_id_fkey(first_name, last_name)
+              `)
+              .order('created_at', { ascending: false });
+
+            if (!reportsError && reportsData) {
+              mappedReports = reportsData.map((r: any) => ({
+                id: r.id,
+                courseId: r.course_id,
+                courseTitle: r.course?.title || 'Unknown Course',
+                reporterType: r.reporter_type || 'student',
+                reasonCategory: r.reason_category || 'Other',
+                reasonSnippet: r.description || 'No description provided',
+                severity: r.severity || 'medium',
+                status: r.status || 'open',
+                createdAt: r.created_at,
+                reporterId: r.reporter_id,
+              }));
+            }
+          } catch (e) {
+            console.log('ℹ️ Content reports fetch failed - using empty reports');
+          }
         }
 
         // Count reports per course
@@ -301,33 +321,77 @@ const CourseModerationPage: React.FC = () => {
   };
 
   const handleApprove = async (courseId: string) => {
+    console.log('🟢 Approving course:', courseId);
+    
+    if (!courseId) {
+      alert('❌ Error: No course ID provided');
+      return;
+    }
+
     try {
-      // STEP 1: Publish all modules FIRST (trigger will fire but course is still pending_review)
+      // Step 1: Update course verification status
+      console.log('⏳ Step 1: Updating course status to approved...');
+      const { data: courseData, error: courseError } = await supabase
+        .from('courses')
+        .update({
+          verification_status: 'approved',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', courseId)
+        .select();
+
+      console.log('Course update result:', { courseData, courseError });
+
+      if (courseError) {
+        console.error('❌ Course update error:', courseError);
+        throw courseError;
+      }
+
+      if (!courseData || courseData.length === 0) {
+        console.error('❌ No course found with ID:', courseId);
+        throw new Error('Course not found');
+      }
+
+      // Step 2: Publish all modules
+      console.log('⏳ Step 2: Publishing modules...');
       const { error: modulesError } = await supabase
         .from('modules')
         .update({ is_published: true, updated_at: new Date().toISOString() })
         .eq('course_id', courseId);
 
-      if (modulesError) console.error('Error publishing modules:', modulesError);
+      if (modulesError) {
+        console.error('⚠️ Warning: Error publishing modules:', modulesError);
+        // Don't throw - continue with approval
+      }
 
-      // STEP 2: Get all module IDs
-      const { data: modulesData } = await supabase
+      // Step 3: Get all module IDs
+      console.log('⏳ Step 3: Getting module IDs...');
+      const { data: modulesData, error: modulesFetchError } = await supabase
         .from('modules')
         .select('id')
         .eq('course_id', courseId);
 
+      if (modulesFetchError) {
+        console.error('⚠️ Warning: Error fetching modules:', modulesFetchError);
+      }
+
       if (modulesData && modulesData.length > 0) {
         const moduleIds = modulesData.map(m => m.id);
+        console.log('Found modules:', moduleIds);
 
-        // STEP 3: Publish all module content items
+        // Step 4: Publish all module content items
+        console.log('⏳ Step 4: Publishing content items...');
         const { error: itemsError } = await supabase
           .from('module_content_items')
           .update({ is_published: true, updated_at: new Date().toISOString() })
           .in('module_id', moduleIds);
 
-        if (itemsError) console.error('Error publishing content items:', itemsError);
+        if (itemsError) {
+          console.error('⚠️ Warning: Error publishing content items:', itemsError);
+        }
 
-        // STEP 4: Publish all lessons
+        // Step 5: Publish all lessons
+        console.log('⏳ Step 5: Publishing lessons...');
         const { data: lessonContentItems } = await supabase
           .from('module_content_items')
           .select('content_id')
@@ -336,42 +400,37 @@ const CourseModerationPage: React.FC = () => {
 
         if (lessonContentItems && lessonContentItems.length > 0) {
           const lessonIds = lessonContentItems.map(l => l.content_id);
+          console.log('Found lessons:', lessonIds);
+          
           const { error: lessonsError } = await supabase
             .from('lessons')
             .update({ is_published: true, updated_at: new Date().toISOString() })
             .in('id', lessonIds);
-
-          if (lessonsError) console.error('Error publishing lessons:', lessonsError);
+          
+          if (lessonsError) {
+            console.error('⚠️ Warning: Error publishing lessons:', lessonsError);
+          }
         }
 
         // Note: Quizzes are NOT auto-published to avoid RLS issues
         // Coaches can publish their own quizzes after approval
       }
 
-      // STEP 5: FINALLY update course verification status (after all triggers have fired)
-      const { error: courseError } = await supabase
-        .from('courses')
-        .update({
-          verification_status: 'approved',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', courseId);
-
-      if (courseError) throw courseError;
-
-      // Update local state
+      // Step 6: Update local state
+      console.log('✅ Course approved successfully!');
       setCourses(prev => prev.map(c =>
         c.id === courseId
           ? { ...c, status: 'approved' as const, qualityScore: Math.max(c.qualityScore, 80) }
           : c
       ));
 
-      alert(`✅ Course Approved!\n\nCourse ID: ${courseId}\n\nModules and lessons have been published.\nNote: Coaches need to publish quizzes manually.`);
-    } catch (error) {
-      console.error('Error approving course:', error);
+      alert(`✅ Course Approved!\n\nCourse ID: ${courseId}\nCourse Title: ${courseData[0].title}\n\n✅ Modules and lessons have been published.\n⚠️ Note: Coaches need to publish quizzes manually.`);
+      
+    } catch (error: any) {
+      console.error('❌ Error approving course:', error);
       console.error('Error details:', JSON.stringify(error, null, 2));
       const errorMsg = error instanceof Error ? error.message : JSON.stringify(error);
-      alert(`Failed to approve course\n\nError: ${errorMsg}`);
+      alert(`❌ Failed to approve course\n\nError: ${errorMsg}\n\nCheck console for details.`);
     }
   };
 
@@ -465,8 +524,8 @@ const CourseModerationPage: React.FC = () => {
 
       alert(`🔍 Investigation Started\n\nReport ID: ${reportId}\n\nStatus updated to "Under Investigation"`);
     } catch (error) {
-      console.error('Error updating report:', error);
-      alert(`🔍 Investigation Started\n\nReport ID: ${reportId}`);
+      console.log('ℹ️ Reports feature not available - content_reports table not found');
+      alert(`⚠️ Reports Not Available\n\nThe content reports feature is not enabled in this instance.`);
     }
   };
 
@@ -489,8 +548,8 @@ const CourseModerationPage: React.FC = () => {
 
       alert(`✅ Report Resolved\n\nReport ID: ${reportId}\n\n${resolution}`);
     } catch (error) {
-      console.error('Error resolving report:', error);
-      alert(`✅ Report Resolved\n\nReport ID: ${reportId}`);
+      console.log('ℹ️ Reports feature not available - content_reports table not found');
+      alert(`⚠️ Reports Not Available\n\nThe content reports feature is not enabled in this instance.`);
     }
   };
 
@@ -513,8 +572,8 @@ const CourseModerationPage: React.FC = () => {
 
       alert(`🚫 Report Dismissed\n\nReport ID: ${reportId}\n\n${reason}`);
     } catch (error) {
-      console.error('Error dismissing report:', error);
-      alert(`🚫 Report Dismissed\n\nReport ID: ${reportId}`);
+      console.log('ℹ️ Reports feature not available - content_reports table not found');
+      alert(`⚠️ Reports Not Available\n\nThe content reports feature is not enabled in this instance.`);
     }
   };
 

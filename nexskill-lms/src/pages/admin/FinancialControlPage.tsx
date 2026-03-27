@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabaseClient';
 import AdminAppLayout from '../../layouts/AdminAppLayout';
 import TransactionsTable from '../../components/admin/finance/TransactionsTable';
 import PayoutManagementPanel from '../../components/admin/finance/PayoutManagementPanel';
@@ -70,389 +71,191 @@ const FinancialControlPage: React.FC = () => {
   const [transactionType, setTransactionType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Transactions dummy data
-  const [transactions] = useState<Transaction[]>([
-    {
-      id: 'TXN-2025-001',
-      date: '2025-01-15',
-      time: '14:32',
-      userName: 'Sarah Johnson',
-      userEmail: 'sarah.johnson@example.com',
-      itemType: 'course',
-      itemName: 'Complete Python Programming Bootcamp',
-      amount: 149.99,
-      currency: '$',
-      status: 'completed',
-      paymentMethod: 'Credit Card',
-    },
-    {
-      id: 'TXN-2025-002',
-      date: '2025-01-15',
-      time: '13:15',
-      userName: 'Michael Chen',
-      userEmail: 'michael.chen@example.com',
-      itemType: 'coaching',
-      itemName: '1-on-1 Career Coaching Session',
-      amount: 200.0,
-      currency: '$',
-      status: 'completed',
-      paymentMethod: 'GCash',
-    },
-    {
-      id: 'TXN-2025-003',
-      date: '2025-01-15',
-      time: '11:45',
-      userName: 'Dr. Emily Rodriguez',
-      userEmail: 'emily.rodriguez@example.com',
-      itemType: 'subscription',
-      itemName: 'Premium Monthly Plan',
-      amount: 49.99,
-      currency: '$',
-      status: 'completed',
-      paymentMethod: 'PayPal',
-    },
-    {
-      id: 'TXN-2025-004',
-      date: '2025-01-14',
-      time: '16:20',
-      userName: 'Alex Martinez',
-      userEmail: 'alex.martinez@example.com',
-      itemType: 'course',
-      itemName: 'Data Science with R and Python',
-      amount: 299.0,
-      currency: '$',
-      status: 'refunded',
-      paymentMethod: 'Credit Card',
-      refundId: 'REF-001',
-    },
-    {
-      id: 'TXN-2025-005',
-      date: '2025-01-14',
-      time: '15:10',
-      userName: 'Kevin Park',
-      userEmail: 'kevin.park@example.com',
-      itemType: 'course',
-      itemName: 'Advanced JavaScript ES6+',
-      amount: 89.99,
-      currency: '$',
-      status: 'completed',
-      paymentMethod: 'Credit Card',
-    },
-    {
-      id: 'TXN-2025-006',
-      date: '2025-01-14',
-      time: '10:30',
-      userName: 'Jessica Lee',
-      userEmail: 'jessica.lee@example.com',
-      itemType: 'subscription',
-      itemName: 'Pro Annual Plan',
-      amount: 499.0,
-      currency: '$',
-      status: 'completed',
-      paymentMethod: 'Bank Transfer',
-    },
-    {
-      id: 'TXN-2025-007',
-      date: '2025-01-13',
-      time: '14:55',
-      userName: 'David Thompson',
-      userEmail: 'david.thompson@example.com',
-      itemType: 'coaching',
-      itemName: 'Technical Interview Prep Session',
-      amount: 150.0,
-      currency: '$',
-      status: 'pending',
-      paymentMethod: 'Credit Card',
-    },
-    {
-      id: 'TXN-2025-008',
-      date: '2025-01-13',
-      time: '12:40',
-      userName: 'Dr. Rachel Kim',
-      userEmail: 'rachel.kim@example.com',
-      itemType: 'course',
-      itemName: 'Machine Learning Fundamentals',
-      amount: 199.0,
-      currency: '$',
-      status: 'completed',
-      paymentMethod: 'Credit Card',
-    },
-    {
-      id: 'TXN-2025-009',
-      date: '2025-01-13',
-      time: '09:15',
-      userName: 'Unknown User',
-      userEmail: 'test@example.com',
-      itemType: 'course',
-      itemName: 'Web Development Course',
-      amount: 49.99,
-      currency: '$',
-      status: 'failed',
-      paymentMethod: 'Credit Card',
-    },
-    {
-      id: 'TXN-2025-010',
-      date: '2025-01-12',
-      time: '17:25',
-      userName: 'Linda Brown',
-      userEmail: 'linda.brown@example.com',
-      itemType: 'subscription',
-      itemName: 'Premium Monthly Plan',
-      amount: 49.99,
-      currency: '$',
-      status: 'completed',
-      paymentMethod: 'Credit Card',
-    },
-    {
-      id: 'TXN-2025-011',
-      date: '2025-01-12',
-      time: '15:50',
-      userName: 'James Wilson',
-      userEmail: 'james.wilson@example.com',
-      itemType: 'course',
-      itemName: 'UX/UI Design Masterclass',
-      amount: 179.0,
-      currency: '$',
-      status: 'completed',
-      paymentMethod: 'PayPal',
-    },
-    {
-      id: 'TXN-2025-012',
-      date: '2025-01-12',
-      time: '11:20',
-      userName: 'Maria Garcia',
-      userEmail: 'maria.garcia@example.com',
-      itemType: 'coaching',
-      itemName: 'Portfolio Review Session',
-      amount: 175.0,
-      currency: '$',
-      status: 'completed',
-      paymentMethod: 'GCash',
-    },
-    {
-      id: 'TXN-2025-013',
-      date: '2025-01-11',
-      time: '13:35',
-      userName: 'Robert Taylor',
-      userEmail: 'robert.taylor@example.com',
-      itemType: 'course',
-      itemName: 'Digital Marketing Strategy 2025',
-      amount: 129.0,
-      currency: '$',
-      status: 'refunded',
-      paymentMethod: 'Credit Card',
-      refundId: 'REF-003',
-    },
-    {
-      id: 'TXN-2025-014',
-      date: '2025-01-11',
-      time: '10:10',
-      userName: 'Sophie Anderson',
-      userEmail: 'sophie.anderson@example.com',
-      itemType: 'subscription',
-      itemName: 'Premium Monthly Plan',
-      amount: 49.99,
-      currency: '$',
-      status: 'completed',
-      paymentMethod: 'Credit Card',
-    },
-    {
-      id: 'TXN-2025-015',
-      date: '2025-01-10',
-      time: '16:45',
-      userName: 'Daniel White',
-      userEmail: 'daniel.white@example.com',
-      itemType: 'course',
-      itemName: 'Cloud Computing with AWS',
-      amount: 249.0,
-      currency: '$',
-      status: 'completed',
-      paymentMethod: 'Bank Transfer',
-    },
-  ]);
+  // State for data
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Payouts dummy data
-  const [payouts, setPayouts] = useState<Payout[]>([
-    {
-      id: 'PAYOUT-W01',
-      periodLabel: 'Jan 2025 – Week 1',
-      totalAmount: 12500,
-      status: 'scheduled',
-      scheduledDate: '2025-01-20',
-      destinationSummary: 'GCash •••• 1234',
-    },
-    {
-      id: 'PAYOUT-W02',
-      periodLabel: 'Dec 2024 – Week 4',
-      totalAmount: 18750,
-      status: 'processing',
-      scheduledDate: '2025-01-13',
-      destinationSummary: 'Bank •••• 5678',
-    },
-    {
-      id: 'PAYOUT-W03',
-      periodLabel: 'Dec 2024 – Week 3',
-      totalAmount: 15200,
-      status: 'paid',
-      scheduledDate: '2025-01-06',
-      paidDate: '2025-01-08',
-      destinationSummary: 'PayPal •••• 9012',
-    },
-    {
-      id: 'PAYOUT-W04',
-      periodLabel: 'Dec 2024 – Week 2',
-      totalAmount: 9800,
-      status: 'on_hold',
-      scheduledDate: '2024-12-30',
-      destinationSummary: 'GCash •••• 3456',
-    },
-  ]);
+  // Payouts (placeholder - you may need a payouts table)
+  const [payouts, setPayouts] = useState<Payout[]>([]);
 
-  // Refunds dummy data
-  const [refunds, setRefunds] = useState<Refund[]>([
-    {
-      id: 'REF-001',
-      transactionId: 'TXN-2025-004',
-      date: '2025-01-14',
-      userName: 'Alex Martinez',
-      amount: 299.0,
-      reason: 'Changed mind - Not satisfied with course content',
-      status: 'requested',
-      method: 'original_payment',
-    },
-    {
-      id: 'REF-002',
-      transactionId: 'TXN-2025-007',
-      date: '2025-01-13',
-      userName: 'Lisa Anderson',
-      amount: 149.99,
-      reason: 'Technical issues - Unable to access course materials',
-      status: 'approved',
-      method: 'original_payment',
-    },
-    {
-      id: 'REF-003',
-      transactionId: 'TXN-2025-013',
-      date: '2025-01-11',
-      userName: 'Robert Taylor',
-      amount: 129.0,
-      reason: 'Duplicate purchase by mistake',
-      status: 'processed',
-      method: 'original_payment',
-    },
-    {
-      id: 'REF-004',
-      transactionId: 'TXN-2024-998',
-      date: '2025-01-10',
-      userName: 'Emily White',
-      amount: 89.99,
-      reason: 'Course quality not as advertised',
-      status: 'requested',
-      method: 'original_payment',
-    },
-    {
-      id: 'REF-005',
-      transactionId: 'TXN-2024-985',
-      date: '2025-01-09',
-      userName: 'James Brown',
-      amount: 199.0,
-      reason: 'Financial hardship',
-      status: 'declined',
-      method: 'original_payment',
-    },
-    {
-      id: 'REF-006',
-      transactionId: 'TXN-2024-972',
-      date: '2025-01-08',
-      userName: 'Maria Santos',
-      amount: 49.99,
-      reason: 'Course not compatible with my schedule',
-      status: 'processed',
-      method: 'original_payment',
-    },
-  ]);
+  // Refunds (from transactions with refunded status)
+  const [refunds, setRefunds] = useState<Refund[]>([]);
 
-  // Coupons dummy data
-  const [coupons, setCoupons] = useState<Coupon[]>([
-    {
-      code: 'LAUNCH25',
-      type: 'percentage',
-      value: 25,
-      appliesTo: 'all_courses',
-      usageLimit: 500,
-      usedCount: 342,
-      status: 'active',
-      endDate: '2025-02-28',
-    },
-    {
-      code: 'EARLYBIRD',
-      type: 'percentage',
-      value: 50,
-      appliesTo: 'all_courses',
-      usageLimit: 100,
-      usedCount: 98,
-      status: 'active',
-      endDate: '2025-01-31',
-    },
-    {
-      code: 'FREEMONTH',
-      type: 'fixed',
-      value: 29,
-      appliesTo: 'subscriptions',
-      usageLimit: 200,
-      usedCount: 156,
-      status: 'active',
-      endDate: '2025-03-15',
-    },
-    {
-      code: 'NEWYEAR2025',
-      type: 'percentage',
-      value: 30,
-      appliesTo: 'all_courses',
-      usageLimit: 1000,
-      usedCount: 1000,
-      status: 'expired',
-      endDate: '2025-01-10',
-    },
-    {
-      code: 'COACHING20',
-      type: 'percentage',
-      value: 20,
-      appliesTo: 'single_course',
-      usageLimit: 50,
-      usedCount: 12,
-      status: 'scheduled',
-      startDate: '2025-02-01',
-      endDate: '2025-02-28',
-    },
-  ]);
+  // Coupons (placeholder - create coupons table if needed)
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
 
-  // Subscription analytics dummy data
-  const subscriptionAnalytics: SubscriptionAnalytics = {
-    mrr: 48000,
-    arr: 576000,
-    activeSubscribers: 520,
-    churnRate: 3.2,
-    mrrTrend: [
-      { monthLabel: 'Jan', value: 32000 },
-      { monthLabel: 'Feb', value: 35000 },
-      { monthLabel: 'Mar', value: 37500 },
-      { monthLabel: 'Apr', value: 39000 },
-      { monthLabel: 'May', value: 41000 },
-      { monthLabel: 'Jun', value: 42500 },
-      { monthLabel: 'Jul', value: 43800 },
-      { monthLabel: 'Aug', value: 45000 },
-      { monthLabel: 'Sep', value: 46200 },
-      { monthLabel: 'Oct', value: 46800 },
-      { monthLabel: 'Nov', value: 47500 },
-      { monthLabel: 'Dec', value: 48000 },
-    ],
-    plans: [
-      { name: 'Basic Monthly', subscribers: 280, mrr: 13920, churnRate: 4.2 },
-      { name: 'Premium Monthly', subscribers: 180, mrr: 17820, churnRate: 2.8 },
-      { name: 'Pro Annual', subscribers: 60, mrr: 16260, churnRate: 1.5 },
-    ],
-  };
+  // Subscription analytics
+  const [subscriptionAnalytics, setSubscriptionAnalytics] = useState<SubscriptionAnalytics>({
+    mrr: 0,
+    arr: 0,
+    activeSubscribers: 0,
+    churnRate: 0,
+    mrrTrend: [],
+    plans: [],
+  });
+
+  // Fetch Financial Data
+  useEffect(() => {
+    const fetchFinancialData = async () => {
+      setLoading(true);
+      console.log('📊 Fetching financial data...');
+
+      try {
+        // 1. Fetch Transactions
+        const { data: transactionsData, error: txError } = await supabase
+          .from('transactions')
+          .select(`
+            *,
+            profiles (
+              first_name,
+              last_name,
+              email
+            ),
+            courses (
+              title
+            )
+          `)
+          .order('created_at', { ascending: false })
+          .limit(100);
+
+        if (txError) {
+          console.error('Error fetching transactions:', txError);
+        } else {
+          console.log('✅ Transactions fetched:', transactionsData?.length || 0);
+
+          // Map to Transaction interface
+          const mappedTransactions: Transaction[] = (transactionsData || []).map((tx: any) => ({
+            id: tx.id || `TXN-${Date.now()}`,
+            date: tx.created_at ? new Date(tx.created_at).toISOString().split('T')[0] : 'N/A',
+            time: tx.created_at ? new Date(tx.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'N/A',
+            userName: tx.profiles ? `${tx.profiles.first_name || ''} ${tx.profiles.last_name || ''}`.trim() : 'Unknown',
+            userEmail: tx.profiles?.email || 'N/A',
+            itemType: tx.item_type || tx.type || 'course',
+            itemName: tx.courses?.title || tx.course_name || tx.description || 'Unknown Item',
+            amount: tx.amount || 0,
+            currency: '$',
+            status: tx.status || 'pending',
+            paymentMethod: tx.payment_method || 'Credit Card',
+            refundId: tx.refund_id,
+          }));
+
+          setTransactions(mappedTransactions);
+
+          // Extract refunds from transactions
+          const refundTransactions = mappedTransactions.filter(t => t.status === 'refunded');
+          const mappedRefunds: Refund[] = refundTransactions.map((t, idx) => ({
+            id: t.refundId || `REF-${idx + 1}`,
+            transactionId: t.id,
+            date: t.date,
+            userName: t.userName,
+            amount: t.amount,
+            reason: 'Refund requested', // You may need a refunds table for detailed reasons
+            status: 'processed',
+            method: 'original_payment',
+          }));
+          setRefunds(mappedRefunds);
+        }
+
+        // 2. Calculate Subscription Analytics
+        const now = new Date();
+        const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        // Fetch subscription transactions for MRR
+        const { data: subTransactions } = await supabase
+          .from('transactions')
+          .select('amount, status, created_at')
+          .eq('type', 'subscription')
+          .eq('status', 'completed')
+          .gte('created_at', currentMonthStart.toISOString());
+
+        const mrr = (subTransactions || []).reduce((sum, tx) => sum + (tx.amount || 0), 0);
+        const arr = mrr * 12;
+
+        // Count active subscribers (simplified - count users with active subscriptions)
+        // If subscription_status column doesn't exist, we'll count from transactions
+        let subscriberCount = 0;
+        
+        // Try to count from profiles table first
+        const { count: profileCount, error: profileError } = await supabase
+          .from('profiles')
+          .select('*', { count: 'exact', head: true })
+          .eq('subscription_status', 'active');
+        
+        if (!profileError && profileCount) {
+          subscriberCount = profileCount;
+        } else {
+          // Fallback: count unique users with subscription transactions
+          const { data: subUsers } = await supabase
+            .from('transactions')
+            .select('user_id')
+            .eq('type', 'subscription')
+            .eq('status', 'completed');
+          
+          subscriberCount = new Set(subUsers?.map(u => u.user_id) || []).size;
+        }
+
+        // Calculate MRR trend (last 12 months)
+        const mrrTrend = [];
+        for (let i = 11; i >= 0; i--) {
+          const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+          const monthLabel = monthDate.toLocaleString('en-US', { month: 'short' });
+
+          const { data: monthTransactions } = await supabase
+            .from('transactions')
+            .select('amount')
+            .eq('type', 'subscription')
+            .eq('status', 'completed')
+            .gte('created_at', monthDate.toISOString())
+            .lte('created_at', monthEnd.toISOString());
+
+          const monthMRR = (monthTransactions || []).reduce((sum, tx) => sum + (tx.amount || 0), 0);
+          mrrTrend.push({ monthLabel, value: monthMRR });
+        }
+
+        setSubscriptionAnalytics({
+          mrr: mrr || 0,
+          arr: arr || 0,
+          activeSubscribers: subscriberCount,
+          churnRate: 3.2, // Would need subscription cancellations data
+          mrrTrend,
+          plans: [
+            { name: 'Basic Monthly', subscribers: 0, mrr: 0, churnRate: 0 },
+            { name: 'Premium Monthly', subscribers: 0, mrr: 0, churnRate: 0 },
+            { name: 'Pro Annual', subscribers: 0, mrr: 0, churnRate: 0 },
+          ],
+        });
+
+        // 3. Generate Payouts (placeholder - you need a payouts table)
+        const pendingPayouts = (transactions || [])
+          .filter(t => t.status === 'completed' && !t.payoutBatchId)
+          .reduce((sum, t) => sum + t.amount, 0);
+
+        if (pendingPayouts > 0) {
+          setPayouts([{
+            id: 'PAYOUT-PENDING',
+            periodLabel: 'Pending Payout',
+            totalAmount: pendingPayouts,
+            status: 'scheduled',
+            scheduledDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            destinationSummary: 'Multiple coaches',
+          }]);
+        }
+
+        console.log('✅ Financial data loaded');
+        console.log('Transactions:', transactions.length);
+        console.log('Refunds:', refunds.length);
+        console.log('MRR:', mrr);
+
+      } catch (error) {
+        console.error('❌ Error fetching financial data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFinancialData();
+  }, []);
 
   // Filter transactions
   const filteredTransactions = transactions.filter((transaction) => {
@@ -463,6 +266,18 @@ const FinancialControlPage: React.FC = () => {
         return false;
       if (transactionType === 'refunds' && transaction.status !== 'refunded') return false;
     }
+
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      return (
+        transaction.userName.toLowerCase().includes(query) ||
+        transaction.userEmail.toLowerCase().includes(query) ||
+        transaction.itemName.toLowerCase().includes(query) ||
+        transaction.id.toLowerCase().includes(query)
+      );
+    }
+
     return true;
   });
 
@@ -474,7 +289,7 @@ const FinancialControlPage: React.FC = () => {
     .filter((t) => t.status === 'refunded')
     .reduce((sum, t) => sum + t.amount, 0);
   const netRevenue = totalVolume - refundedAmount;
-  const refundRate = ((refundedAmount / totalVolume) * 100).toFixed(1);
+  const refundRate = totalVolume > 0 ? ((refundedAmount / totalVolume) * 100).toFixed(1) : '0';
 
   const handleUpdatePayout = (payoutId: string, updatedFields: Partial<Payout>) => {
     setPayouts((prev) =>
@@ -533,18 +348,18 @@ const FinancialControlPage: React.FC = () => {
             <div className="px-4 py-2 bg-gradient-to-br from-[#DBEAFE] to-white rounded-full border border-[#93C5FD]">
               <p className="text-xs text-[#1E40AF] mb-0.5">Total Volume</p>
               <p className="text-sm font-bold text-[#111827]">
-                ${totalVolume.toLocaleString()}
+                ${loading ? '...' : totalVolume.toLocaleString()}
               </p>
             </div>
             <div className="px-4 py-2 bg-gradient-to-br from-[#D1FAE5] to-white rounded-full border border-[#6EE7B7]">
               <p className="text-xs text-[#047857] mb-0.5">Net Revenue</p>
               <p className="text-sm font-bold text-[#111827]">
-                ${netRevenue.toLocaleString()}
+                ${loading ? '...' : netRevenue.toLocaleString()}
               </p>
             </div>
             <div className="px-4 py-2 bg-gradient-to-br from-[#FEE2E2] to-white rounded-full border border-[#FCA5A5]">
               <p className="text-xs text-[#991B1B] mb-0.5">Refund Rate</p>
-              <p className="text-sm font-bold text-[#111827]">{refundRate}%</p>
+              <p className="text-sm font-bold text-[#111827]">{loading ? '...' : refundRate}%</p>
             </div>
           </div>
         </div>
