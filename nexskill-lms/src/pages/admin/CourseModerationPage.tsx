@@ -62,24 +62,20 @@ const CourseModerationPage: React.FC = () => {
   });
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
 
-  // Calculate quality score based on course completeness
   const calculateQualityScore = (course: any) => {
     let score = 0;
     let factors = 0;
 
-    // Content completeness (30%)
     const hasDescription = course.description ? 1 : 0;
     const hasImage = course.image_url ? 1 : 0;
     score += (hasDescription + hasImage) / 2 * 30;
     factors += 30;
 
-    // Engagement potential (25%)
     const studentsCount = course.students_count || 0;
     const engagementScore = Math.min(studentsCount / 100, 1);
     score += engagementScore * 25;
     factors += 25;
 
-    // Production quality (25%)
     const hasCurriculum = course.modules_count > 0;
     const hasLessons = course.lessons_count > 0;
     const hasQuizzes = course.quizzes_count > 0;
@@ -87,7 +83,6 @@ const CourseModerationPage: React.FC = () => {
     score += (curriculumScore / 3) * 25;
     factors += 25;
 
-    // Policy compliance (20%)
     const isPublished = course.is_published ? 1 : 0;
     const isVerified = course.verification_status === 'approved' ? 1 : 0;
     score += (isPublished + isVerified) / 2 * 20;
@@ -96,12 +91,10 @@ const CourseModerationPage: React.FC = () => {
     return factors > 0 ? Math.round(score) : 0;
   };
 
-  // Fetch courses and reports
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Fetch all courses with coach and category info
         const { data: coursesData, error: coursesError } = await supabase
           .from('courses')
           .select(`
@@ -113,7 +106,6 @@ const CourseModerationPage: React.FC = () => {
 
         if (coursesError) throw coursesError;
 
-        // Fetch module counts for each course
         const { data: modulesData } = await supabase
           .from('modules')
           .select('course_id, id');
@@ -123,7 +115,6 @@ const CourseModerationPage: React.FC = () => {
           return acc;
         }, {});
 
-        // Fetch lesson counts
         const { data: lessonsData } = await supabase
           .from('module_content_items')
           .select('module_id, content_type')
@@ -148,7 +139,6 @@ const CourseModerationPage: React.FC = () => {
           });
         }
 
-        // Fetch enrollment counts
         const enrollmentPromises = (coursesData || []).map(async (c) => {
           const { count } = await supabase
             .from('enrollments')
@@ -163,7 +153,6 @@ const CourseModerationPage: React.FC = () => {
           return acc;
         }, {} as Record<string, number>);
 
-        // Map to Course interface
         const mappedCourses: Course[] = (coursesData || []).map((c: any) => {
           let uiStatus: 'pending' | 'approved' | 'rejected' | 'changes_requested' = 'pending';
 
@@ -211,69 +200,8 @@ const CourseModerationPage: React.FC = () => {
           };
         });
 
-        // Fetch reports - content_reports table may not exist
-        let mappedReports: Report[] = [];
-        let reportsAvailable = false;
-        
-        // First check if content_reports table exists
-        try {
-          const { count, error: checkError } = await supabase
-            .from('content_reports')
-            .select('*', { count: 'exact', head: true });
-          
-          reportsAvailable = !checkError;
-          if (!reportsAvailable) {
-            console.log('ℹ️ Content reports table not available - reports disabled');
-          }
-        } catch (e) {
-          reportsAvailable = false;
-          console.log('ℹ️ Content reports table not available - reports disabled');
-        }
-
-        // Only fetch reports if table exists
-        if (reportsAvailable) {
-          try {
-            const { data: reportsData, error: reportsError } = await supabase
-              .from('content_reports')
-              .select(`
-                *,
-                course:courses(title),
-                reporter:profiles!content_reports_reporter_id_fkey(first_name, last_name)
-              `)
-              .order('created_at', { ascending: false });
-
-            if (!reportsError && reportsData) {
-              mappedReports = reportsData.map((r: any) => ({
-                id: r.id,
-                courseId: r.course_id,
-                courseTitle: r.course?.title || 'Unknown Course',
-                reporterType: r.reporter_type || 'student',
-                reasonCategory: r.reason_category || 'Other',
-                reasonSnippet: r.description || 'No description provided',
-                severity: r.severity || 'medium',
-                status: r.status || 'open',
-                createdAt: r.created_at,
-                reporterId: r.reporter_id,
-              }));
-            }
-          } catch (e) {
-            console.log('ℹ️ Content reports fetch failed - using empty reports');
-          }
-        }
-
-        // Count reports per course
-        const reportsCountMap = mappedReports.reduce((acc, r) => {
-          acc[r.courseId] = (acc[r.courseId] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
-
-        // Update courses with report counts
-        mappedCourses.forEach(c => {
-          c.reportsCount = reportsCountMap?.[c.id] || 0;
-        });
-
         setCourses(mappedCourses);
-        setReports(mappedReports);
+        setReports([]);
       } catch (error) {
         console.error('Error fetching moderation data:', error);
       } finally {
@@ -284,7 +212,6 @@ const CourseModerationPage: React.FC = () => {
     fetchData();
   }, []);
 
-  // Filter courses based on active tab and filters
   const filteredCourses = courses.filter((course) => {
     if (activeTab === 'pending' && course.status !== 'pending') return false;
     if (activeTab === 'active' && course.status !== 'approved') return false;
@@ -312,25 +239,20 @@ const CourseModerationPage: React.FC = () => {
     ? courses.find((c) => c.id === selectedCourseId)
     : undefined;
 
-  // Stats calculations
   const stats = {
     pending: courses.filter(c => c.status === 'pending').length,
     approved: courses.filter(c => c.status === 'approved').length,
     rejected: courses.filter(c => c.status === 'rejected' || c.status === 'changes_requested').length,
-    openReports: reports.filter(r => r.status === 'open' || r.status === 'investigating').length,
+    openReports: 0,
   };
 
   const handleApprove = async (courseId: string) => {
-    console.log('🟢 Approving course:', courseId);
-    
     if (!courseId) {
-      alert('❌ Error: No course ID provided');
+      alert('Error: No course ID provided');
       return;
     }
 
     try {
-      // Step 1: Update course verification status
-      console.log('⏳ Step 1: Updating course status to approved...');
       const { data: courseData, error: courseError } = await supabase
         .from('courses')
         .update({
@@ -340,97 +262,20 @@ const CourseModerationPage: React.FC = () => {
         .eq('id', courseId)
         .select();
 
-      console.log('Course update result:', { courseData, courseError });
+      if (courseError) throw courseError;
+      if (!courseData || courseData.length === 0) throw new Error('Course not found');
 
-      if (courseError) {
-        console.error('❌ Course update error:', courseError);
-        throw courseError;
-      }
-
-      if (!courseData || courseData.length === 0) {
-        console.error('❌ No course found with ID:', courseId);
-        throw new Error('Course not found');
-      }
-
-      // Step 2: Publish all modules
-      console.log('⏳ Step 2: Publishing modules...');
-      const { error: modulesError } = await supabase
-        .from('modules')
-        .update({ is_published: true, updated_at: new Date().toISOString() })
-        .eq('course_id', courseId);
-
-      if (modulesError) {
-        console.error('⚠️ Warning: Error publishing modules:', modulesError);
-        // Don't throw - continue with approval
-      }
-
-      // Step 3: Get all module IDs
-      console.log('⏳ Step 3: Getting module IDs...');
-      const { data: modulesData, error: modulesFetchError } = await supabase
-        .from('modules')
-        .select('id')
-        .eq('course_id', courseId);
-
-      if (modulesFetchError) {
-        console.error('⚠️ Warning: Error fetching modules:', modulesFetchError);
-      }
-
-      if (modulesData && modulesData.length > 0) {
-        const moduleIds = modulesData.map(m => m.id);
-        console.log('Found modules:', moduleIds);
-
-        // Step 4: Publish all module content items
-        console.log('⏳ Step 4: Publishing content items...');
-        const { error: itemsError } = await supabase
-          .from('module_content_items')
-          .update({ is_published: true, updated_at: new Date().toISOString() })
-          .in('module_id', moduleIds);
-
-        if (itemsError) {
-          console.error('⚠️ Warning: Error publishing content items:', itemsError);
-        }
-
-        // Step 5: Publish all lessons
-        console.log('⏳ Step 5: Publishing lessons...');
-        const { data: lessonContentItems } = await supabase
-          .from('module_content_items')
-          .select('content_id')
-          .in('module_id', moduleIds)
-          .eq('content_type', 'lesson');
-
-        if (lessonContentItems && lessonContentItems.length > 0) {
-          const lessonIds = lessonContentItems.map(l => l.content_id);
-          console.log('Found lessons:', lessonIds);
-          
-          const { error: lessonsError } = await supabase
-            .from('lessons')
-            .update({ is_published: true, updated_at: new Date().toISOString() })
-            .in('id', lessonIds);
-          
-          if (lessonsError) {
-            console.error('⚠️ Warning: Error publishing lessons:', lessonsError);
-          }
-        }
-
-        // Note: Quizzes are NOT auto-published to avoid RLS issues
-        // Coaches can publish their own quizzes after approval
-      }
-
-      // Step 6: Update local state
-      console.log('✅ Course approved successfully!');
       setCourses(prev => prev.map(c =>
         c.id === courseId
           ? { ...c, status: 'approved' as const, qualityScore: Math.max(c.qualityScore, 80) }
           : c
       ));
 
-      alert(`✅ Course Approved!\n\nCourse ID: ${courseId}\nCourse Title: ${courseData[0].title}\n\n✅ Modules and lessons have been published.\n⚠️ Note: Coaches need to publish quizzes manually.`);
+      alert(`Course Approved!\n\nCourse: ${courseData[0].title}`);
       
     } catch (error: any) {
-      console.error('❌ Error approving course:', error);
-      console.error('Error details:', JSON.stringify(error, null, 2));
-      const errorMsg = error instanceof Error ? error.message : JSON.stringify(error);
-      alert(`❌ Failed to approve course\n\nError: ${errorMsg}\n\nCheck console for details.`);
+      console.error('Approval error:', error);
+      alert(`Failed to approve\n\nError: ${error.message || error}\n\nCheck console (F12) for details.`);
     }
   };
 
@@ -446,25 +291,13 @@ const CourseModerationPage: React.FC = () => {
 
       if (error) throw error;
 
-      if (reason) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          await supabase.from('admin_verification_feedback').insert({
-            course_id: courseId,
-            admin_id: user.id,
-            content: reason,
-            is_resolved: false
-          });
-        }
-      }
-
       setCourses(prev => prev.map(c => 
         c.id === courseId 
           ? { ...c, status: 'changes_requested' as const }
           : c
       ));
 
-      alert(`⚠️ Changes Requested\n\nCourse ID: ${courseId}\n\nFeedback sent to instructor.`);
+      alert(`Changes Requested\n\nCourse ID: ${courseId}`);
     } catch (error) {
       console.error('Error requesting changes:', error);
       alert('Failed to request changes');
@@ -483,97 +316,16 @@ const CourseModerationPage: React.FC = () => {
 
       if (error) throw error;
 
-      if (reason) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          await supabase.from('admin_verification_feedback').insert({
-            course_id: courseId,
-            admin_id: user.id,
-            content: `REJECTED: ${reason}`,
-            is_resolved: false
-          });
-        }
-      }
-
       setCourses(prev => prev.map(c => 
         c.id === courseId 
           ? { ...c, status: 'rejected' as const, qualityScore: Math.min(c.qualityScore, 40) }
           : c
       ));
 
-      alert(`❌ Course Rejected\n\nCourse ID: ${courseId}\n\nStatus updated to Rejected.`);
+      alert(`Course Rejected\n\nCourse ID: ${courseId}`);
     } catch (error) {
       console.error('Error rejecting course:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      alert(`Failed to reject course: ${errorMessage}`);
-    }
-  };
-
-  const handleInvestigate = async (reportId: string) => {
-    try {
-      const { error } = await supabase
-        .from('content_reports')
-        .update({ status: 'investigating' })
-        .eq('id', reportId);
-
-      if (error) throw error;
-
-      setReports(prev => prev.map(r => 
-        r.id === reportId ? { ...r, status: 'investigating' as const } : r
-      ));
-
-      alert(`🔍 Investigation Started\n\nReport ID: ${reportId}\n\nStatus updated to "Under Investigation"`);
-    } catch (error) {
-      console.log('ℹ️ Reports feature not available - content_reports table not found');
-      alert(`⚠️ Reports Not Available\n\nThe content reports feature is not enabled in this instance.`);
-    }
-  };
-
-  const handleResolve = async (reportId: string, resolution: string = 'Content reviewed and action taken') => {
-    try {
-      const { error } = await supabase
-        .from('content_reports')
-        .update({ 
-          status: 'resolved',
-          resolved_at: new Date().toISOString(),
-          admin_notes: resolution
-        })
-        .eq('id', reportId);
-
-      if (error) throw error;
-
-      setReports(prev => prev.map(r => 
-        r.id === reportId ? { ...r, status: 'resolved' as const } : r
-      ));
-
-      alert(`✅ Report Resolved\n\nReport ID: ${reportId}\n\n${resolution}`);
-    } catch (error) {
-      console.log('ℹ️ Reports feature not available - content_reports table not found');
-      alert(`⚠️ Reports Not Available\n\nThe content reports feature is not enabled in this instance.`);
-    }
-  };
-
-  const handleDismiss = async (reportId: string, reason: string = 'No violation found') => {
-    try {
-      const { error } = await supabase
-        .from('content_reports')
-        .update({ 
-          status: 'dismissed',
-          dismissed_at: new Date().toISOString(),
-          admin_notes: reason
-        })
-        .eq('id', reportId);
-
-      if (error) throw error;
-
-      setReports(prev => prev.map(r => 
-        r.id === reportId ? { ...r, status: 'dismissed' as const } : r
-      ));
-
-      alert(`🚫 Report Dismissed\n\nReport ID: ${reportId}\n\n${reason}`);
-    } catch (error) {
-      console.log('ℹ️ Reports feature not available - content_reports table not found');
-      alert(`⚠️ Reports Not Available\n\nThe content reports feature is not enabled in this instance.`);
+      alert(`Failed to reject course: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -593,7 +345,6 @@ const CourseModerationPage: React.FC = () => {
   return (
     <AdminAppLayout>
       <div className="m-5 space-y-6">
-        {/* Page Header */}
         <div>
           <h1 className="text-2xl font-bold text-[#111827] mb-2">Course Moderation</h1>
           <p className="text-sm text-[#5F6473]">
@@ -601,7 +352,6 @@ const CourseModerationPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Tabs */}
         <div className="border-b border-gray-200 mb-6">
           <nav className="-mb-px flex space-x-8" aria-label="Tabs">
             <button
@@ -634,40 +384,24 @@ const CourseModerationPage: React.FC = () => {
           </nav>
         </div>
 
-        {/* Filters */}
         <CourseModerationFiltersBar value={filters} onChange={setFilters} />
 
-        {/* Stats Summary */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-gradient-to-br from-[#DBEAFE] to-white rounded-2xl p-4 border border-[#93C5FD]">
             <p className="text-sm text-[#1E40AF] mb-1">Pending Review</p>
-            <p className="text-2xl font-bold text-[#111827]">
-              {stats.pending}
-            </p>
+            <p className="text-2xl font-bold text-[#111827]">{stats.pending}</p>
           </div>
           <div className="bg-gradient-to-br from-[#D1FAE5] to-white rounded-2xl p-4 border border-[#6EE7B7]">
             <p className="text-sm text-[#047857] mb-1">Approved</p>
-            <p className="text-2xl font-bold text-[#111827]">
-              {stats.approved}
-            </p>
+            <p className="text-2xl font-bold text-[#111827]">{stats.approved}</p>
           </div>
           <div className="bg-gradient-to-br from-[#FEE2E2] to-white rounded-2xl p-4 border border-[#FCA5A5]">
             <p className="text-sm text-[#991B1B] mb-1">Rejected</p>
-            <p className="text-2xl font-bold text-[#111827]">
-              {stats.rejected}
-            </p>
-          </div>
-          <div className="bg-gradient-to-br from-[#FED7AA] to-white rounded-2xl p-4 border border-[#FDBA74]">
-            <p className="text-sm text-[#9A3412] mb-1">Open Reports</p>
-            <p className="text-2xl font-bold text-[#111827]">
-              {stats.openReports}
-            </p>
+            <p className="text-2xl font-bold text-[#111827]">{stats.rejected}</p>
           </div>
         </div>
 
-        {/* Main Content Area */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left: Course Approval Table (2/3) */}
           <div className="lg:col-span-2">
             <CourseApprovalTable
               courses={filteredCourses}
@@ -678,14 +412,13 @@ const CourseModerationPage: React.FC = () => {
             />
           </div>
 
-          {/* Right: Side Panels (1/3) */}
           <div className="lg:col-span-1 space-y-6">
             <CourseQualityScorePanel selectedCourse={selectedCourse} />
             <ReportedContentQueuePanel
               reports={reports}
-              onInvestigate={handleInvestigate}
-              onResolve={handleResolve}
-              onDismiss={handleDismiss}
+              onInvestigate={() => {}}
+              onResolve={() => {}}
+              onDismiss={() => {}}
             />
           </div>
         </div>

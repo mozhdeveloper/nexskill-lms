@@ -124,6 +124,7 @@ const UsersManagementPage: React.FC = () => {
   const [editingUser, setEditingUser] = useState<User | undefined>(undefined);
   const [selectedUserId, setSelectedUserId] = useState<string | undefined>(undefined);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [pendingCoachesCount, setPendingCoachesCount] = useState(0);
 
   // Filter users
   const filteredUsers = users.filter((user) => {
@@ -472,7 +473,7 @@ const UsersManagementPage: React.FC = () => {
             >
               Pending Coaches
               <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-yellow-100 text-yellow-700">
-                4
+                {pendingCoachesCount}
               </span>
               {activeTab === 'pending-coaches' && (
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#304DB5]" />

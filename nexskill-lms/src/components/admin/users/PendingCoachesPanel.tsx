@@ -24,9 +24,10 @@ interface PendingCoach {
 interface PendingCoachesPanelProps {
   onApprove?: (coachId: string) => void;
   onReject?: (coachId: string, reason: string) => void;
+  onCountChange?: (count: number) => void;
 }
 
-const PendingCoachesPanel: React.FC<PendingCoachesPanelProps> = ({ onApprove, onReject }) => {
+const PendingCoachesPanel: React.FC<PendingCoachesPanelProps> = ({ onApprove, onReject, onCountChange }) => {
   const [pendingCoaches, setPendingCoaches] = useState<PendingCoach[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCoach, setSelectedCoach] = useState<PendingCoach | null>(null);
@@ -216,10 +217,10 @@ const PendingCoachesPanel: React.FC<PendingCoachesPanelProps> = ({ onApprove, on
             <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
               <Check className="w-5 h-5 text-green-600" />
             </div>
-            <p className="text-sm text-slate-600">Approved This Week</p>
+            <p className="text-sm text-slate-600">Total Applications</p>
           </div>
           <p className="text-3xl font-bold text-green-600">
-            {pendingCoaches.filter((c) => c.status === 'approved').length}
+            {pendingCoaches.length}
           </p>
         </div>
       </div>
@@ -321,7 +322,7 @@ const PendingCoachesPanel: React.FC<PendingCoachesPanelProps> = ({ onApprove, on
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <FileText className="w-4 h-4 text-slate-400" />
-                        <span className="text-slate-900">{coach.certifications.length}</span>
+                        <span className="text-slate-900">{coach.certifications?.length || 0}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600">
@@ -476,46 +477,22 @@ const PendingCoachesPanel: React.FC<PendingCoachesPanelProps> = ({ onApprove, on
                 </div>
               </div>
 
-              {/* Certifications */}
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900 mb-3">
-                  Certifications & Documents ({selectedCoach.certifications.length})
-                </h3>
-                <div className="space-y-3">
-                  {selectedCoach.certifications.map((cert) => (
-                    <div
-                      key={cert.id}
-                      className="p-4 bg-slate-50 rounded-xl border border-slate-200"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
-                            <FileText className="w-5 h-5 text-slate-400" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="font-medium text-slate-900">{cert.name}</p>
-                              {getCertTypeBadge(cert.type)}
-                            </div>
-                            <p className="text-sm text-slate-500">Issued by {cert.issuer}</p>
-                            <p className="text-xs text-slate-400 mt-1">
-                              Issued: {formatDate(cert.issueDate)}
-                              {cert.expiryDate && ` • Expires: ${formatDate(cert.expiryDate)}`}
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => alert(`Downloading: ${cert.name}`)}
-                          className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-                        >
-                          <Download className="w-4 h-4" />
-                          View
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+              {/* Job Info */}
+              {selectedCoach.jobTitle && (
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900 mb-3">Professional Info</h3>
+                  <div className="p-4 bg-slate-50 rounded-xl">
+                    <p className="text-sm text-slate-600 mb-1">Job Title</p>
+                    <p className="font-medium text-slate-900">{selectedCoach.jobTitle}</p>
+                    {selectedCoach.experienceLevel && (
+                      <>
+                        <p className="text-sm text-slate-600 mt-3 mb-1">Experience Level</p>
+                        <p className="font-medium text-slate-900">{selectedCoach.experienceLevel}</p>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Modal Footer */}
