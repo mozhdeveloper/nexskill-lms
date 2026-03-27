@@ -447,9 +447,7 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
         setExpandedLessons((prev) => { const next = new Set(prev); next.delete(lessonId); return next; });
         
         // Trigger refresh to update sidebar durations
-        if (onRefreshLesson) {
-            onRefreshLesson(moduleId, lessonId);
-        }
+        
     };
 
     const handleSaveQuizTitle = async (moduleId: string, lessonId: string) => {
