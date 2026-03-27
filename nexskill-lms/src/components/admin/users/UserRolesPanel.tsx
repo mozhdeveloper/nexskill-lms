@@ -13,7 +13,7 @@ interface User {
 
 interface UserRolesPanelProps {
   selectedUser?: User;
-  onUpdate: (userId: string, updatedFields: Partial<User>) => void;
+  onUpdate: (userId: string, updatedFields: Partial<User>) => Promise<void>;
   onToggleBan: (userId: string) => void;
 }
 
@@ -25,6 +25,7 @@ const UserRolesPanel: React.FC<UserRolesPanelProps> = ({
   const [editedRoles, setEditedRoles] = useState<string[]>([]);
   const [editedStatus, setEditedStatus] = useState<User['status']>('active');
   const [hasChanges, setHasChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (selectedUser) {
@@ -35,21 +36,27 @@ const UserRolesPanel: React.FC<UserRolesPanelProps> = ({
   }, [selectedUser]);
 
   const handleRoleToggle = (role: string) => {
-    const newRoles = editedRoles.includes(role)
-      ? editedRoles.filter((r) => r !== role)
-      : [...editedRoles, role];
+    // Only allow one role at a time (since profiles.role is a single value)
+    const newRoles = [role];
     setEditedRoles(newRoles);
     setHasChanges(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (selectedUser) {
-      onUpdate(selectedUser.id, {
-        roles: editedRoles,
-        status: editedStatus,
-      });
+      setIsSaving(true);
+      try {
+        await onUpdate(selectedUser.id, {
+          roles: editedRoles,
+          status: editedStatus,
+        });
+        console.log('Roles & status updated for user:', selectedUser.id);
+      } catch (error) {
+        console.error('Error updating roles:', error);
+      } finally {
+        setIsSaving(false);
+      }
       setHasChanges(false);
-      console.log('Roles & status updated for user:', selectedUser.id);
     }
   };
 
@@ -237,14 +244,16 @@ const UserRolesPanel: React.FC<UserRolesPanelProps> = ({
           <button
             onClick={handleRevert}
             className="flex-1 px-4 py-2 bg-[#F5F7FF] text-[#5F6473] font-semibold rounded-full hover:bg-[#EDF0FB] transition-colors"
+            disabled={isSaving}
           >
             Revert
           </button>
           <button
             onClick={handleSave}
-            className="flex-1 px-4 py-2 bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white font-semibold rounded-full hover:shadow-lg transition-all"
+            className="flex-1 px-4 py-2 bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white font-semibold rounded-full hover:shadow-lg transition-all disabled:opacity-50"
+            disabled={isSaving}
           >
-            Save Roles
+            {isSaving ? 'Saving...' : 'Save Roles'}
           </button>
         </div>
       )}

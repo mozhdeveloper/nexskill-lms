@@ -221,9 +221,193 @@ const UsersManagementPage: React.FC = () => {
     }
   };
 
-  const handleUpdateUser = (userId: string, updatedFields: Partial<User>) => {
+  const handleUpdateUser = async (userId: string, updatedFields: Partial<User>) => {
+    console.log('=== HANDLE UPDATE USER ===');
+    console.log('User ID:', userId);
+    console.log('Updated fields:', updatedFields);
+    
+    // Update local state optimistically
     setUsers(users.map((u) => (u.id === userId ? { ...u, ...updatedFields } : u)));
-    showStatusMessage('User roles and status updated successfully');
+
+    // Persist to Supabase
+    const { supabase } = await import('../../lib/supabaseClient');
+
+    // Build update object - map roles array to single role field
+    const updateData: Record<string, any> = {};
+    if (updatedFields.roles && updatedFields.roles.length > 0) {
+      // Use the first/main role from the roles array
+      updateData.role = updatedFields.roles[0];
+      console.log('Setting role to:', updateData.role);
+    }
+    if (updatedFields.status) {
+      // Map status to a field if your schema has it, otherwise skip
+      // Note: profiles table may not have a status field
+      console.log('Status update requested:', updatedFields.status);
+    }
+
+    console.log('Update data to send:', updateData);
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updateData)
+      .eq('id', userId)
+      .select();
+
+    if (error) {
+      console.error('=== PROFILE UPDATE ERROR ===');
+      console.error('Error details:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      console.error('Error details:', error.details);
+      showStatusMessage(`Failed to update: ${error.message}`);
+      // Revert local state on error
+      setUsers(users);
+      throw error;
+    } else {
+      console.log('=== PROFILE UPDATE SUCCESS ===');
+      console.log('Updated data:', data);
+      showStatusMessage(`User role updated to ${updateData.role}`);
+    }
+  };
+
+  const handleApproveCoach = async (coachId: string) => {
+    console.log('=== APPROVE COACH STARTED ===');
+    console.log('Coach ID to approve:', coachId);
+    
+    if (!coachId) {
+      console.error('No coach ID provided!');
+      showStatusMessage('Error: No coach ID provided');
+      return;
+    }
+
+    const { supabase } = await import('../../lib/supabaseClient');
+
+    // First, let's check what data exists for this coach
+    console.log('Checking existing data for coach...');
+    const { data: existingProfile, error: checkProfileError } = await supabase
+      .from('profiles')
+      .select('id, role, first_name, last_name, email')
+      .eq('id', coachId)
+      .single();
+
+    if (checkProfileError) {
+      console.error('Error checking profile:', checkProfileError);
+      showStatusMessage('Coach profile not found in database');
+      return;
+    }
+
+    console.log('Existing profile data:', existingProfile);
+
+    const { data: existingCoach, error: checkCoachError } = await supabase
+      .from('coach_profiles')
+      .select('id, verification_status, job_title')
+      .eq('id', coachId)
+      .single();
+
+    if (checkCoachError) {
+      console.error('Error checking coach profile:', checkCoachError);
+    } else {
+      console.log('Existing coach profile data:', existingCoach);
+    }
+
+    // Update the user's role to 'coach' in profiles table
+    console.log('Updating profiles.role to coach...');
+    const { error: profileError, data: profileData } = await supabase
+      .from('profiles')
+      .update({ role: 'coach' })
+      .eq('id', coachId)
+      .select();
+
+    if (profileError) {
+      console.error('=== PROFILE UPDATE ERROR ===');
+      console.error('Error details:', profileError);
+      console.error('Error code:', profileError.code);
+      console.error('Error message:', profileError.message);
+      showStatusMessage(`Failed to update role: ${profileError.message}`);
+      return;
+    }
+
+    console.log('=== PROFILE UPDATE SUCCESS ===');
+    console.log('Updated profile data:', profileData);
+
+    // Update the coach_profiles verification status
+    console.log('Updating coach_profiles verification_status to verified...');
+    const { error: coachError, data: coachData } = await supabase
+      .from('coach_profiles')
+      .update({ verification_status: 'verified' })
+      .eq('id', coachId)
+      .select();
+
+    if (coachError) {
+      console.error('=== COACH PROFILE UPDATE ERROR ===');
+      console.error('Error details:', coachError);
+      console.error('Error code:', coachError.code);
+      console.error('Error message:', coachError.message);
+      // Don't fail - the role was already updated
+    } else {
+      console.log('=== COACH PROFILE UPDATE SUCCESS ===');
+      console.log('Updated coach profile data:', coachData);
+    }
+
+    // Verify the update by fetching again
+    console.log('Verifying update...');
+    const { data: verifiedProfile } = await supabase
+      .from('profiles')
+      .select('id, role, first_name, last_name')
+      .eq('id', coachId)
+      .single();
+
+    console.log('Verified profile after update:', verifiedProfile);
+
+    // Refresh the users list to show updated role
+    const { data: updatedUsers, error: usersError } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('updated_at', { ascending: false });
+
+    if (usersError) {
+      console.error('Error refreshing users:', usersError);
+    }
+
+    if (updatedUsers) {
+      const mappedUsers: User[] = updatedUsers.map((profile: any) => ({
+        id: profile.id,
+        firstName: profile.first_name || '',
+        lastName: profile.last_name || '',
+        email: profile.email || 'N/A',
+        status: 'active',
+        roles: [profile.role || 'student'],
+        createdAt: profile.updated_at,
+        lastActiveAt: profile.updated_at || new Date().toISOString(),
+        organizationId: undefined
+      }));
+      setUsers(mappedUsers);
+      console.log('Users list refreshed. Total users:', mappedUsers.length);
+    }
+
+    console.log('=== APPROVE COACH COMPLETED ===');
+    showStatusMessage(`Coach ${verifiedProfile?.first_name || ''} ${verifiedProfile?.last_name || ''} is now a coach!`);
+  };
+
+  const handleRejectCoach = async (coachId: string, reason: string) => {
+    console.log('Rejecting coach with ID:', coachId, 'Reason:', reason);
+    const { supabase } = await import('../../lib/supabaseClient');
+
+    // Update the coach_profiles verification status
+    const { error: coachError, data: coachData } = await supabase
+      .from('coach_profiles')
+      .update({ verification_status: 'rejected' })
+      .eq('id', coachId)
+      .select();
+
+    if (coachError) {
+      console.error('Error rejecting coach:', coachError);
+      showStatusMessage('Failed to reject coach. Please try again.');
+      return;
+    }
+
+    console.log('Coach rejected successfully:', coachData);
+    showStatusMessage('Coach application rejected');
   };
 
   const handleFilterByOrg = (orgId: string) => {
@@ -346,14 +530,8 @@ const UsersManagementPage: React.FC = () => {
           </>
         ) : (
           <PendingCoachesPanel
-            onApprove={(coachId) => {
-              showStatusMessage(`Coach application approved successfully`);
-              console.log('Approved coach:', coachId);
-            }}
-            onReject={(coachId, reason) => {
-              showStatusMessage(`Coach application rejected`);
-              console.log('Rejected coach:', coachId, 'Reason:', reason);
-            }}
+            onApprove={handleApproveCoach}
+            onReject={handleRejectCoach}
           />
         )}
       </div>

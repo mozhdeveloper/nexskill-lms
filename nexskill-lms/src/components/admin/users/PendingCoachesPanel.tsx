@@ -1,16 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Eye, Check, XCircle, FileText, Award, User, Mail, Phone, Calendar, Download, ExternalLink } from 'lucide-react';
-
-interface CoachCertification {
-  id: string;
-  name: string;
-  type: 'certificate' | 'diploma' | 'license' | 'other';
-  issuer: string;
-  issueDate: string;
-  expiryDate?: string;
-  fileUrl: string;
-  verified: boolean;
-}
+import { supabase } from '../../../lib/supabaseClient';
 
 interface PendingCoach {
   id: string;
@@ -25,7 +15,8 @@ interface PendingCoach {
   yearsExperience: number;
   linkedinUrl?: string;
   websiteUrl?: string;
-  certifications: CoachCertification[];
+  jobTitle?: string;
+  experienceLevel?: string;
   status: 'pending' | 'under_review' | 'approved' | 'rejected';
   reviewNotes?: string;
 }
@@ -35,147 +26,75 @@ interface PendingCoachesPanelProps {
   onReject?: (coachId: string, reason: string) => void;
 }
 
-// Dummy pending coaches data
-const dummyPendingCoaches: PendingCoach[] = [
-  {
-    id: 'coach-pending-1',
-    firstName: 'Alexandra',
-    lastName: 'Thompson',
-    email: 'alexandra.t@email.com',
-    phone: '+1 (555) 123-4567',
-    appliedAt: '2025-12-04T10:30:00Z',
-    expertise: ['Web Development', 'JavaScript', 'React'],
-    bio: 'Senior software engineer with 8+ years of experience in full-stack web development. Passionate about teaching and mentoring aspiring developers.',
-    yearsExperience: 8,
-    linkedinUrl: 'https://linkedin.com/in/alexandrathompson',
-    websiteUrl: 'https://alexthompson.dev',
-    certifications: [
-      {
-        id: 'cert-1',
-        name: 'AWS Certified Solutions Architect',
-        type: 'certificate',
-        issuer: 'Amazon Web Services',
-        issueDate: '2024-03-15',
-        expiryDate: '2027-03-15',
-        fileUrl: '/uploads/certs/aws-cert.pdf',
-        verified: false,
-      },
-      {
-        id: 'cert-2',
-        name: 'Google Cloud Professional Developer',
-        type: 'certificate',
-        issuer: 'Google Cloud',
-        issueDate: '2023-08-20',
-        expiryDate: '2025-08-20',
-        fileUrl: '/uploads/certs/gcp-cert.pdf',
-        verified: false,
-      },
-    ],
-    status: 'pending',
-  },
-  {
-    id: 'coach-pending-2',
-    firstName: 'Marcus',
-    lastName: 'Rivera',
-    email: 'marcus.r@email.com',
-    phone: '+1 (555) 234-5678',
-    appliedAt: '2025-12-03T14:15:00Z',
-    expertise: ['Data Science', 'Machine Learning', 'Python'],
-    bio: 'Data scientist with PhD in Computer Science. Specialized in machine learning and AI applications in business.',
-    yearsExperience: 6,
-    linkedinUrl: 'https://linkedin.com/in/marcusrivera',
-    certifications: [
-      {
-        id: 'cert-3',
-        name: 'TensorFlow Developer Certificate',
-        type: 'certificate',
-        issuer: 'Google',
-        issueDate: '2024-01-10',
-        fileUrl: '/uploads/certs/tf-cert.pdf',
-        verified: false,
-      },
-      {
-        id: 'cert-4',
-        name: 'PhD in Computer Science',
-        type: 'diploma',
-        issuer: 'Stanford University',
-        issueDate: '2019-06-15',
-        fileUrl: '/uploads/certs/phd-diploma.pdf',
-        verified: false,
-      },
-    ],
-    status: 'under_review',
-  },
-  {
-    id: 'coach-pending-3',
-    firstName: 'Sarah',
-    lastName: 'Kim',
-    email: 'sarah.kim@email.com',
-    phone: '+1 (555) 345-6789',
-    appliedAt: '2025-12-02T09:45:00Z',
-    expertise: ['UI/UX Design', 'Figma', 'Adobe Creative Suite'],
-    bio: 'Lead UX designer with 10 years of experience working with Fortune 500 companies. Specializes in user research and design systems.',
-    yearsExperience: 10,
-    linkedinUrl: 'https://linkedin.com/in/sarahkimux',
-    websiteUrl: 'https://sarahkim.design',
-    certifications: [
-      {
-        id: 'cert-5',
-        name: 'Google UX Design Professional Certificate',
-        type: 'certificate',
-        issuer: 'Google',
-        issueDate: '2023-05-22',
-        fileUrl: '/uploads/certs/google-ux.pdf',
-        verified: false,
-      },
-    ],
-    status: 'pending',
-  },
-  {
-    id: 'coach-pending-4',
-    firstName: 'James',
-    lastName: 'Okonkwo',
-    email: 'james.o@email.com',
-    phone: '+1 (555) 456-7890',
-    appliedAt: '2025-12-01T16:20:00Z',
-    expertise: ['Project Management', 'Agile', 'Scrum'],
-    bio: 'Certified Scrum Master and PMP with experience leading cross-functional teams at tech startups and enterprise companies.',
-    yearsExperience: 12,
-    linkedinUrl: 'https://linkedin.com/in/jamesokonkwo',
-    certifications: [
-      {
-        id: 'cert-6',
-        name: 'Project Management Professional (PMP)',
-        type: 'license',
-        issuer: 'Project Management Institute',
-        issueDate: '2020-02-28',
-        expiryDate: '2026-02-28',
-        fileUrl: '/uploads/certs/pmp.pdf',
-        verified: false,
-      },
-      {
-        id: 'cert-7',
-        name: 'Certified Scrum Master (CSM)',
-        type: 'certificate',
-        issuer: 'Scrum Alliance',
-        issueDate: '2019-11-15',
-        expiryDate: '2025-11-15',
-        fileUrl: '/uploads/certs/csm.pdf',
-        verified: false,
-      },
-    ],
-    status: 'pending',
-  },
-];
-
 const PendingCoachesPanel: React.FC<PendingCoachesPanelProps> = ({ onApprove, onReject }) => {
-  const [pendingCoaches, setPendingCoaches] = useState<PendingCoach[]>(dummyPendingCoaches);
+  const [pendingCoaches, setPendingCoaches] = useState<PendingCoach[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedCoach, setSelectedCoach] = useState<PendingCoach | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'under_review'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Fetch pending coaches from Supabase
+  useEffect(() => {
+    const fetchPendingCoaches = async () => {
+      setIsLoading(true);
+      
+      // Fetch coach_profiles with verification_status = 'pending' or 'under_review'
+      const { data: coachData, error: coachError } = await supabase
+        .from('coach_profiles')
+        .select(`
+          id,
+          job_title,
+          bio,
+          experience_level,
+          content_areas,
+          tools,
+          linkedin_url,
+          portfolio_url,
+          verification_status,
+          created_at,
+          profiles (
+            id,
+            first_name,
+            last_name,
+            email,
+            username
+          )
+        `)
+        .in('verification_status', ['pending', 'under_review']);
+
+      if (coachError) {
+        console.error('Error fetching pending coaches:', coachError);
+        setIsLoading(false);
+        return;
+      }
+
+      // Map the data to PendingCoach format
+      const mappedCoaches: PendingCoach[] = (coachData || []).map((coach: any) => ({
+        id: coach.profiles?.id || coach.id,
+        firstName: coach.profiles?.first_name || 'Unknown',
+        lastName: coach.profiles?.last_name || '',
+        email: coach.profiles?.email || '',
+        phone: '', // Phone not stored in profile
+        appliedAt: coach.created_at,
+        expertise: coach.content_areas || [],
+        bio: coach.bio || '',
+        yearsExperience: coach.experience_level === 'Expert' ? 5 : coach.experience_level === 'Intermediate' ? 3 : 1,
+        linkedinUrl: coach.linkedin_url,
+        websiteUrl: coach.portfolio_url,
+        jobTitle: coach.job_title,
+        experienceLevel: coach.experience_level,
+        status: coach.verification_status === 'under_review' ? 'under_review' : 'pending',
+      }));
+
+      setPendingCoaches(mappedCoaches);
+      setIsLoading(false);
+    };
+
+    fetchPendingCoaches();
+  }, []);
 
   const filteredCoaches = pendingCoaches.filter((coach) => {
     const matchesSearch =
@@ -253,7 +172,7 @@ const PendingCoachesPanel: React.FC<PendingCoachesPanelProps> = ({ onApprove, on
     }
   };
 
-  const getCertTypeBadge = (type: CoachCertification['type']) => {
+  const getCertTypeBadge = (type: string) => {
     switch (type) {
       case 'certificate':
         return <span className="px-2 py-0.5 text-xs rounded bg-blue-100 text-blue-700">Certificate</span>;
