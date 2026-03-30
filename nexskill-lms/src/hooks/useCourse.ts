@@ -268,6 +268,8 @@ export const useCourse = (courseId: string | undefined) => {
         if (modulesData && modulesData.length > 0) {
           const moduleIds = modulesData.map((m) => m.id);
 
+          console.log("[useCourse] Fetching module_content_items for modules:", moduleIds);
+
           const { data: itemsData, error: itemsError } = await supabase
             .from("module_content_items")
             .select("module_id, content_id, content_type, position")
@@ -275,7 +277,11 @@ export const useCourse = (courseId: string | undefined) => {
             .eq("is_published", true)
             .order("position", { ascending: true });
 
-          console.log("[useCourse] Content items:", itemsData, "Error:", itemsError);
+          console.log("[useCourse] module_content_items result:", { itemsData, itemsError });
+
+          if (itemsError) {
+            console.error("[useCourse] Error fetching content items:", itemsError);
+          }
 
           if (itemsData && itemsData.length > 0) {
             const lessonIds = itemsData
@@ -284,6 +290,9 @@ export const useCourse = (courseId: string | undefined) => {
             const quizIds = itemsData
               .filter((i) => i.content_type === "quiz")
               .map((i) => i.content_id);
+
+            console.log("[useCourse] Lesson IDs to fetch:", lessonIds);
+            console.log("[useCourse] Quiz IDs to fetch:", quizIds);
 
             // Fetch lesson/quiz details AND resolve video durations in parallel
             const [lessonsRes, quizzesRes, { durationMap, totalSeconds }] =
@@ -301,6 +310,9 @@ export const useCourse = (courseId: string | undefined) => {
 
             totalDurationSeconds = totalSeconds;
 
+            console.log("[useCourse] Lessons fetched:", lessonsRes.data?.length || 0);
+            console.log("[useCourse] Quizzes fetched:", quizzesRes.data?.length || 0);
+
             const lessonsMap = new Map(
               (lessonsRes.data ?? []).map((l: any) => [l.id, l])
             );
@@ -316,7 +328,10 @@ export const useCourse = (courseId: string | undefined) => {
                 .map((item) => {
                   if (item.content_type === "lesson") {
                     const l = lessonsMap.get(item.content_id);
-                    if (!l) return null;
+                    if (!l) {
+                      console.warn("[useCourse] Lesson not found for ID:", item.content_id);
+                      return null;
+                    }
                     // Use resolved video duration; fall back to estimated
                     const secs = durationMap.get(l.id) ?? 0;
                     const duration =
@@ -332,7 +347,10 @@ export const useCourse = (courseId: string | undefined) => {
                   }
                   if (item.content_type === "quiz") {
                     const q = quizzesMap.get(item.content_id);
-                    if (!q) return null;
+                    if (!q) {
+                      console.warn("[useCourse] Quiz not found for ID:", item.content_id);
+                      return null;
+                    }
                     return {
                       id: q.id,
                       title: q.title,
@@ -344,15 +362,22 @@ export const useCourse = (courseId: string | undefined) => {
                 })
                 .filter(Boolean) as Lesson[];
 
+              console.log(`[useCourse] Module "${module.title}" has ${lessons.length} lessons`);
               return { id: module.id, title: module.title, lessons };
             });
+
+            const totalLessons = curriculum.reduce((sum, m) => sum + m.lessons.length, 0);
+            console.log("[useCourse] Total curriculum built:", { modules: curriculum.length, totalLessons });
           } else {
+            console.warn("[useCourse] No module_content_items found - creating empty modules");
             curriculum = modulesData.map((m) => ({
               id: m.id,
               title: m.title,
               lessons: [],
             }));
           }
+        } else {
+          console.warn("[useCourse] No published modules found for course:", courseId);
         }
 
         // 3. Coach details

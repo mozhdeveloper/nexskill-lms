@@ -4,12 +4,15 @@ import { supabase } from '../../lib/supabaseClient';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
 import LessonSidebar from '../../components/learning/LessonSidebar';
 import ContentBlockRenderer from '../../components/learning/ContentBlockRenderer';
+import StudentContentRenderer from '../../components/learning/StudentContentRenderer';
 import DownloadCenter from '../../components/learning/DownloadCenter';
 import LessonNotesPanel from '../../components/learning/LessonNotesPanel';
 import AISummaryDrawer from '../../components/learning/AISummaryDrawer';
 import AskAIWidget from '../../components/learning/AskAIWidget';
 import MarkLessonCompleteModal from '../../components/learning/MarkLessonCompleteModal';
 import type { Lesson } from '../../types/lesson';
+import type { LessonContentItem } from '../../types/lesson-content-item';
+import { fetchLessonContentItems } from '../../lib/supabase/lesson-content.queries';
 
 type LessonWithModule = Lesson & { moduleTitle?: string };
 
@@ -34,6 +37,7 @@ const CoursePlayer: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [flatItemList, setFlatItemList] = useState<FlatItem[]>([]);
+  const [lessonContentItems, setLessonContentItems] = useState<LessonContentItem[]>([]);
 
   // New state: active bottom tab
   const [activeTab, setActiveTab] = useState<BottomTab | null>(null);
@@ -84,6 +88,15 @@ const CoursePlayer: React.FC = () => {
         };
 
         setCurrentLesson(lessonWithModule);
+
+        // Fetch content items for this lesson
+        try {
+          const contentItems = await fetchLessonContentItems(lessonId);
+          setLessonContentItems(contentItems);
+        } catch (contentError) {
+          console.error('Error fetching lesson content items:', contentError);
+          setLessonContentItems([]);
+        }
 
         // Fetch completed lessons using user_lesson_progress
         const { data: { user } } = await supabase.auth.getUser();
@@ -371,12 +384,21 @@ const CoursePlayer: React.FC = () => {
 
             {/* Content renderer — larger, more padded */}
             <div className="bg-white dark:bg-dark-background-card rounded-2xl p-8 shadow-lg border border-gray-100 dark:border-gray-700">
-              <ContentBlockRenderer
-                contentBlocks={currentLesson.content_blocks || []}
-                lessonId={lessonId || ''}
-                onQuizClick={(quizId) => navigate(`/student/courses/${courseId}/quizzes/${quizId}/take`)}
-                onVideoComplete={handleVideoComplete}
-              />
+              {lessonContentItems && lessonContentItems.length > 0 ? (
+                <StudentContentRenderer
+                  contentItems={lessonContentItems}
+                  lessonId={lessonId || ''}
+                  onQuizClick={(quizId) => navigate(`/student/courses/${courseId}/quizzes/${quizId}/take`)}
+                  onVideoComplete={handleVideoComplete}
+                />
+              ) : (
+                <ContentBlockRenderer
+                  contentBlocks={currentLesson.content_blocks || []}
+                  lessonId={lessonId || ''}
+                  onQuizClick={(quizId) => navigate(`/student/courses/${courseId}/quizzes/${quizId}/take`)}
+                  onVideoComplete={handleVideoComplete}
+                />
+              )}
             </div>
 
             {/* Next / Previous Navigation */}

@@ -1,71 +1,96 @@
 import React from 'react';
+import { Play, Image as ImageIcon } from 'lucide-react';
 
 interface CoursePreviewPaneProps {
     courseTitle: string;
-    courseSubtitle?: string;
-    courseDescription?: string;
-    instructorName?: string;
-    learningObjectives?: string[];
+    courseSubtitle: string;
+    courseDescription: string;
+    instructorName: string;
+    learningObjectives: string[];
+    thumbnailUrl?: string | null;
+    previewVideoUrl?: string | null;
 }
 
 const CoursePreviewPane: React.FC<CoursePreviewPaneProps> = ({
     courseTitle,
     courseSubtitle,
     courseDescription,
-    instructorName = "Instructor",
-    learningObjectives
+    instructorName,
+    learningObjectives,
+    thumbnailUrl,
+    previewVideoUrl,
 }) => {
     return (
-        <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-lg border border-slate-100 dark:border-gray-700 overflow-hidden">
-            {/* Mock Course Landing Page Header */}
-            <div className="bg-slate-900 text-white p-12">
-                <div className="max-w-4xl mx-auto">
-                    <span className="inline-block px-3 py-1 bg-white/20 rounded-full text-xs font-medium mb-4 backdrop-blur-sm">
-                        Course Preview
-                    </span>
-                    <h1 className="text-4xl font-bold mb-4 leading-tight">{courseTitle || "Untitled Course"}</h1>
-                    <p className="text-xl text-slate-300 mb-6 font-light">{courseSubtitle || "No subtitle provided."}</p>
-
-                    <div className="flex items-center gap-4 text-sm text-slate-400">
-                        <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
-                                {instructorName.charAt(0)}
-                            </div>
-                            <span>Created by {instructorName}</span>
-                        </div>
-                        <span>•</span>
-                        <span>Last updated {new Date().toLocaleDateString()}</span>
+        <div className="space-y-6">
+            {/* Hero Section with Thumbnail */}
+            <div className="relative rounded-xl overflow-hidden bg-slate-100 dark:bg-gray-800">
+                {thumbnailUrl ? (
+                    <img
+                        src={thumbnailUrl}
+                        alt={courseTitle}
+                        className="w-full h-64 object-cover"
+                    />
+                ) : (
+                    <div className="w-full h-64 bg-gradient-to-br from-slate-200 to-slate-300 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center">
+                        <ImageIcon className="w-16 h-16 text-slate-400 dark:text-gray-600" />
                     </div>
-                </div>
-            </div>
-
-            {/* Content Area */}
-            <div className="p-12 max-w-4xl mx-auto">
-                <div className="prose prose-lg dark:prose-invert max-w-none">
-                    <h3>About this course</h3>
-                    <div className="whitespace-pre-wrap text-slate-600 dark:text-dark-text-secondary">
-                        {courseDescription || "No description added yet."}
-                    </div>
-                </div>
-
-                <div className="mt-12 p-6 bg-slate-50 dark:bg-gray-800 rounded-2xl border border-slate-200 dark:border-gray-700">
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-dark-text-primary mb-4">What you'll learn</h3>
-                    {learningObjectives && learningObjectives.length > 0 ? (
-                        <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {learningObjectives.map((objective, i) => (
-                                <li key={i} className="flex items-start gap-2 text-slate-600 dark:text-dark-text-secondary">
-                                    <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    <span>{objective}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    ) : (
-                        <div className="text-slate-500 italic text-sm">No learning objectives added yet.</div>
+                )}
+                
+                {/* Overlay for text */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+                    <h1 className="text-3xl font-bold mb-2">{courseTitle}</h1>
+                    {courseSubtitle && (
+                        <p className="text-lg text-white/90">{courseSubtitle}</p>
                     )}
+                    <p className="text-sm text-white/80 mt-2">by {instructorName}</p>
                 </div>
             </div>
+
+            {/* Preview Video Section */}
+            {previewVideoUrl && (
+                <div className="rounded-xl overflow-hidden bg-slate-50 dark:bg-gray-800/50 p-4">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-dark-text-primary mb-3 flex items-center gap-2">
+                        <Play className="w-5 h-5" />
+                        Course Preview
+                    </h3>
+                    <video
+                        src={previewVideoUrl}
+                        controls
+                        className="w-full rounded-lg"
+                        poster={thumbnailUrl || undefined}
+                    >
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+            )}
+
+            {/* Course Description */}
+            <div>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-dark-text-primary mb-3">
+                    About This Course
+                </h3>
+                <p className="text-slate-600 dark:text-dark-text-secondary leading-relaxed">
+                    {courseDescription || "No description provided."}
+                </p>
+            </div>
+
+            {/* Learning Objectives */}
+            {learningObjectives && learningObjectives.length > 0 && (
+                <div>
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-dark-text-primary mb-3">
+                        What You'll Learn
+                    </h3>
+                    <ul className="space-y-2">
+                        {learningObjectives.map((objective, index) => (
+                            <li key={index} className="flex items-start gap-2 text-slate-600 dark:text-dark-text-secondary">
+                                <span className="text-[#304DB5] mt-1">✓</span>
+                                <span>{objective}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
         </div>
     );
 };

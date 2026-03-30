@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Settings,
   BookOpen,
+  Image,
   Video,
   Calendar,
   DollarSign,
@@ -26,6 +27,7 @@ interface CourseBuilderSidebarProps {
 
 const sections: Section[] = [
   { key: 'settings', label: 'Overview & Settings', icon: Settings },
+  { key: 'media', label: 'Course Media', icon: Image },
   { key: 'curriculum', label: 'Curriculum', icon: BookOpen },
   { key: 'goals', label: 'Course Goals', icon: Target },
   { key: 'live-sessions', label: 'Live Sessions', icon: Video },

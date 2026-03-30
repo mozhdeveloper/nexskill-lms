@@ -1,3 +1,5 @@
+import type { LessonContentItem } from './lesson-content-item';
+
 export interface LessonContentBlock {
     id: string;
     type:
@@ -10,7 +12,8 @@ export interface LessonContentBlock {
     | "quote"
     | "divider"
     | "embed"
-    | "document";
+    | "document"
+    | "quiz";
     content: string; // HTML content for text blocks, URL for media
     attributes?: {
         // Common attributes
@@ -46,6 +49,18 @@ export interface LessonContentBlock {
         // Document-specific
         original_filename?: string;
         bytes?: number;
+        // Quiz-specific attributes
+        quizId?: string;
+        title?: string;
+        description?: string;
+        timeLimitMinutes?: number;
+        passingScore?: number;
+        maxAttempts?: number;
+        isPublished?: boolean;
+        time_limit_minutes?: number; // Legacy snake_case
+        passing_score?: number; // Legacy snake_case
+        max_attempts?: number; // Legacy snake_case
+        is_published?: boolean; // Legacy snake_case
         [key: string]: any; // Allow additional custom attributes
     };
     position: number;
@@ -60,7 +75,10 @@ export interface Lesson {
     id: string;
     title: string;
     description?: string;
+    // Legacy field - kept for backward compatibility during migration
     content_blocks: LessonContentBlock[];
+    // New field - multiple content items per lesson
+    content_items?: LessonContentItem[];
     estimated_duration_minutes?: number;
     is_published: boolean;
     created_at?: string;

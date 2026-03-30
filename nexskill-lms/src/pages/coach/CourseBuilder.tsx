@@ -13,13 +13,23 @@ import DeleteCourseModal from "../../components/courses/DeleteCourseModal";
 import LiveSessionManager from "../../components/coach/live-sessions/LiveSessionManager";
 import QuizEditorPanel from "../../components/quiz/QuizEditorPanel";
 import CourseGoalsPanel from "../../components/coach/course-builder/CourseGoalsPanel";
+import CourseMediaManager from "../../components/coach/course-builder/CourseMediaManager";
 import type { Module } from "../../types/lesson";
 import type { Quiz, QuizQuestion } from "../../types/quiz";
 import type { ContentItem } from "../../types/content-item";
+import type { LessonContentItem } from "../../types/lesson-content-item";
 import { supabase } from "../../lib/supabaseClient";
+import {
+    fetchLessonContentItems,
+    createContentItem,
+    deleteContentItem,
+    reorderContentItems,
+    updateContentItemMetadata,
+} from "../../lib/supabase/lesson-content.queries";
 
 type SectionKey =
   | "settings"
+  | "media"
   | "curriculum"
   | "live-sessions"
   | "drip"
@@ -141,6 +151,12 @@ const CourseBuilder: React.FC = () => {
           : null;
         setAdminFeedback(latestFeedback?.content || "");
 
+        // Set media URLs
+        setThumbnailUrl(courseData.thumbnail_url || null);
+        setThumbnailPublicId(courseData.thumbnail_public_id || null);
+        setPreviewVideoUrl(courseData.preview_video_url || null);
+        setPreviewVideoPublicId(courseData.preview_video_public_id || null);
+
         const { data: modulesData, error: modulesError } = await supabase
           .from("modules")
           .select("*")
@@ -228,6 +244,43 @@ const CourseBuilder: React.FC = () => {
         } else if (goalsData) {
           setCourseGoals(goalsData.map(g => g.description));
         }
+
+        // Fetch content items for all lessons
+        const allLessonIds: string[] = [];
+        for (const mod of modulesData || []) {
+          const { data: contentItems } = await supabase
+            .from('module_content_items')
+            .select('content_id, content_type')
+            .eq('module_id', mod.id);
+          
+          contentItems?.forEach((ci: any) => {
+            if (ci.content_type === 'lesson') {
+              allLessonIds.push(ci.content_id);
+            }
+          });
+        }
+
+        // Fetch lesson_content_items for all lessons
+        if (allLessonIds.length > 0) {
+          const { data: allContentItems, error: contentItemsError } = await supabase
+            .from('lesson_content_items')
+            .select('*')
+            .in('lesson_id', allLessonIds)
+            .order('position', { ascending: true });
+
+          if (contentItemsError) {
+            console.error('Error fetching content items:', contentItemsError);
+          } else if (allContentItems) {
+            const itemsByLesson: Record<string, LessonContentItem[]> = {};
+            allContentItems.forEach((item: any) => {
+              if (!itemsByLesson[item.lesson_id]) {
+                itemsByLesson[item.lesson_id] = [];
+              }
+              itemsByLesson[item.lesson_id].push(item);
+            });
+            setLessonContentItems(itemsByLesson);
+          }
+        }
       }
     };
     fetchCourse();
@@ -245,6 +298,16 @@ const CourseBuilder: React.FC = () => {
   const [drip, setDrip] = useState<ModuleDrip[]>([]);
   const [pricing, setPricing] = useState<PricingData>({ mode: "one-time", price: 99, currency: "USD" });
   const [courseGoals, setCourseGoals] = useState<string[]>([]);
+
+  // Media state
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+  const [thumbnailPublicId, setThumbnailPublicId] = useState<string | null>(null);
+  const [previewVideoUrl, setPreviewVideoUrl] = useState<string | null>(null);
+  const [previewVideoPublicId, setPreviewVideoPublicId] = useState<string | null>(null);
+
+  // Content items state (keyed by lessonId)
+  const [lessonContentItems, setLessonContentItems] = useState<Record<string, LessonContentItem[]>>({});
+  const [loadingContentItems, setLoadingContentItems] = useState<Set<string>>(new Set());
 
   const handleCurriculumChange = (updatedCurriculum: Module[]) => {
     // Check if course was previously approved and content is being modified
@@ -393,7 +456,7 @@ const CourseBuilder: React.FC = () => {
     try {
       const { error: lessonError } = await supabase.from("lessons").insert([{
         id: lessonId,
-        title: newLesson.title || "Untitled Lesson",
+        title: newLesson.title || "",
         description: newLesson.description || "",
         content_blocks: newLesson.content_blocks || [],
         estimated_duration_minutes: newLesson.estimated_duration_minutes || 15,
@@ -433,7 +496,7 @@ const CourseBuilder: React.FC = () => {
         ...newLesson,
         id: lessonId,
         type: 'lesson',
-        title: newLesson.title || "Untitled Lesson",
+        title: newLesson.title || "",
         content_blocks: newLesson.content_blocks || [],
         duration: `${newLesson.estimated_duration_minutes || 15} min`,
         summary: newLesson.summary || "",
@@ -600,6 +663,192 @@ const CourseBuilder: React.FC = () => {
       }
     } catch (err) {
       console.error("[CourseBuilder] Error saving video block:", err);
+    }
+  };
+
+  // Media handlers
+  const handleThumbnailUpload = async (url: string, publicId: string) => {
+    if (!courseId) return;
+
+    const { error } = await supabase
+      .from('courses')
+      .update({
+        thumbnail_url: url,
+        thumbnail_public_id: publicId,
+        thumbnail_updated_at: new Date().toISOString(),
+      })
+      .eq('id', courseId);
+
+    if (error) throw error;
+
+    setThumbnailUrl(url);
+    setThumbnailPublicId(publicId);
+  };
+
+  const handleVideoUpload = async (url: string, publicId: string) => {
+    if (!courseId) return;
+
+    const { error } = await supabase
+      .from('courses')
+      .update({
+        preview_video_url: url,
+        preview_video_public_id: publicId,
+        preview_video_updated_at: new Date().toISOString(),
+      })
+      .eq('id', courseId);
+
+    if (error) throw error;
+
+    setPreviewVideoUrl(url);
+    setPreviewVideoPublicId(publicId);
+  };
+
+  const handleDeleteThumbnail = async () => {
+    if (!courseId) return;
+
+    const { error } = await supabase
+      .from('courses')
+      .update({
+        thumbnail_url: null,
+        thumbnail_public_id: null,
+        thumbnail_updated_at: null,
+      })
+      .eq('id', courseId);
+
+    if (error) throw error;
+
+    setThumbnailUrl(null);
+    setThumbnailPublicId(null);
+  };
+
+  const handleDeleteVideo = async () => {
+    if (!courseId) return;
+
+    const { error } = await supabase
+      .from('courses')
+      .update({
+        preview_video_url: null,
+        preview_video_public_id: null,
+        preview_video_updated_at: null,
+      })
+      .eq('id', courseId);
+
+    if (error) throw error;
+
+    setPreviewVideoUrl(null);
+    setPreviewVideoPublicId(null);
+  };
+
+  // ─── Content Item Handlers ─────────────────────────────────────────────────
+
+  const handleFetchContentItems = async (lessonId: string) => {
+    if (loadingContentItems.has(lessonId)) return;
+
+    setLoadingContentItems(prev => new Set(prev).add(lessonId));
+    try {
+      const items = await fetchLessonContentItems(lessonId);
+      setLessonContentItems(prev => ({
+        ...prev,
+        [lessonId]: items,
+      }));
+    } catch (error) {
+      console.error('Error fetching content items:', error);
+    } finally {
+      setLoadingContentItems(prev => {
+        const next = new Set(prev);
+        next.delete(lessonId);
+        return next;
+      });
+    }
+  };
+
+  const handleAddContentItem = async (
+    lessonId: string,
+    moduleId: string,
+    contentType: 'video' | 'quiz' | 'text' | 'document',
+    metadata?: any,
+    contentId?: string
+  ) => {
+    if (!courseId || !moduleId) return;
+
+    try {
+      const newItem = await createContentItem({
+        lesson_id: lessonId,
+        course_id: courseId,
+        module_id: moduleId,
+        content_type: contentType,
+        content_id: contentId || null,
+        metadata: metadata || {},
+      });
+
+      setLessonContentItems(prev => ({
+        ...prev,
+        [lessonId]: [...(prev[lessonId] || []), newItem],
+      }));
+
+      return newItem;
+    } catch (error: any) {
+      console.error('Error adding content item:', error);
+      throw error;
+    }
+  };
+
+  const handleDeleteContentItem = async (lessonId: string, contentItemId: string) => {
+    if (!window.confirm('Are you sure you want to delete this content item?')) return;
+
+    try {
+      await deleteContentItem(contentItemId);
+
+      setLessonContentItems(prev => ({
+        ...prev,
+        [lessonId]: prev[lessonId]?.filter(item => item.id !== contentItemId) || [],
+      }));
+    } catch (error: any) {
+      console.error('Error deleting content item:', error);
+      throw error;
+    }
+  };
+
+  const handleMoveContentItemUp = async (lessonId: string, contentItemId: string) => {
+    try {
+      await reorderContentItems(lessonId, contentItemId, 'up');
+      // Refresh after reorder
+      await handleFetchContentItems(lessonId);
+    } catch (error) {
+      console.error('Error moving content item up:', error);
+    }
+  };
+
+  const handleMoveContentItemDown = async (lessonId: string, contentItemId: string) => {
+    try {
+      await reorderContentItems(lessonId, contentItemId, 'down');
+      // Refresh after reorder
+      await handleFetchContentItems(lessonId);
+    } catch (error) {
+      console.error('Error moving content item down:', error);
+    }
+  };
+
+  const handleUpdateContentItemMetadata = async (
+    contentItemId: string,
+    metadata: any
+  ) => {
+    try {
+      const updated = await updateContentItemMetadata(contentItemId, metadata);
+      // Update local state
+      setLessonContentItems(prev => {
+        const updatedItems: Record<string, LessonContentItem[]> = {};
+        Object.entries(prev).forEach(([lessonId, items]) => {
+          updatedItems[lessonId] = items.map(item =>
+            item.id === contentItemId ? updated : item
+          );
+        });
+        return updatedItems;
+      });
+      return updated;
+    } catch (error) {
+      console.error('Error updating content item metadata:', error);
+      throw error;
     }
   };
 
@@ -892,6 +1141,20 @@ const CourseBuilder: React.FC = () => {
             onDelete={async () => setIsDeleteModalOpen(true)}
           />
         );
+      case "media":
+        return (
+          <CourseMediaManager
+            courseId={courseId!}
+            thumbnailUrl={thumbnailUrl}
+            thumbnailPublicId={thumbnailPublicId}
+            previewVideoUrl={previewVideoUrl}
+            previewVideoPublicId={previewVideoPublicId}
+            onThumbnailUpload={handleThumbnailUpload}
+            onVideoUpload={handleVideoUpload}
+            onDeleteThumbnail={handleDeleteThumbnail}
+            onDeleteVideo={handleDeleteVideo}
+          />
+        );
       case "curriculum":
         return (
           <CurriculumEditor
@@ -908,6 +1171,16 @@ const CourseBuilder: React.FC = () => {
             onUpdateLessonContent={handleUpdateLessonContent}
             onSaveVideoBlock={handleSaveVideoBlock}
             onRefreshLesson={handleRefreshLesson}
+            // Content items props
+            lessonContentItems={lessonContentItems}
+            loadingContentItems={loadingContentItems}
+            onFetchContentItems={handleFetchContentItems}
+            onAddContentItem={handleAddContentItem}
+            onDeleteContentItem={handleDeleteContentItem}
+            onMoveContentItemUp={handleMoveContentItemUp}
+            onMoveContentItemDown={handleMoveContentItemDown}
+            onUpdateContentItemMetadata={handleUpdateContentItemMetadata}
+            courseId={courseId!}
           />
         );
       case "live-sessions":

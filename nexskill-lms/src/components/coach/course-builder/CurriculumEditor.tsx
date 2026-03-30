@@ -10,6 +10,8 @@ import {
     Unlock,
     Video,
     FileQuestion,
+    FileText,
+    File,
     AlignLeft,
     FolderOpen,
     X,
@@ -23,6 +25,7 @@ import {
 } from "lucide-react";
 import type { Lesson, Module } from "../../../types/lesson";
 import type { ContentItem } from "../../../types/content-item";
+import type { LessonContentItem, ContentMetadata } from "../../../types/lesson-content-item";
 import { CloudinaryVideoUploadService } from "../../../services/cloudinaryVideoUpload.service";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -42,6 +45,16 @@ interface CurriculumEditorProps {
     onUpdateLessonContent?: (moduleId: string, lessonId: string, contentBlocks: any[]) => Promise<void>;
     onSaveVideoBlock?: (moduleId: string, lessonId: string, videoUrl: string) => Promise<void>;
     onRefreshLesson?: (moduleId: string, lessonId: string) => void;
+    // Content items props (for multiple content per lesson)
+    lessonContentItems?: Record<string, LessonContentItem[]>;
+    loadingContentItems?: Set<string>;
+    onFetchContentItems?: (lessonId: string) => Promise<void>;
+    onAddContentItem?: (lessonId: string, moduleId: string, contentType: 'video' | 'quiz' | 'text' | 'document', metadata?: any, contentId?: string) => Promise<any>;
+    onDeleteContentItem?: (lessonId: string, contentItemId: string) => Promise<void>;
+    onMoveContentItemUp?: (lessonId: string, contentItemId: string) => Promise<void>;
+    onMoveContentItemDown?: (lessonId: string, contentItemId: string) => Promise<void>;
+    onUpdateContentItemMetadata?: (contentItemId: string, metadata: any) => Promise<any>;
+    courseId?: string;
 }
 
 interface ActivePlusMenu {
@@ -63,7 +76,11 @@ interface ContentOptions {
     videoMetadata?: {
         duration: number;
         thumbnail_url?: string;
+        cloudinary_public_id?: string;
     };
+    // For multiple content items
+    contentItemId?: string; // ID of existing content item being edited
+    position?: number; // Position for new content item
 }
 
 interface VideoPreviewModalProps {
@@ -202,6 +219,16 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
     onUpdateLessonTitle,
     onUpdateLessonContent,
     onSaveVideoBlock,
+    // Content items props
+    lessonContentItems = {},
+    loadingContentItems = new Set(),
+    onFetchContentItems,
+    onAddContentItem,
+    onDeleteContentItem,
+    onMoveContentItemUp,
+    onMoveContentItemDown,
+    onUpdateContentItemMetadata,
+    courseId,
 }) => {
     const [expandedModules, setExpandedModules] = useState<Set<string>>(
         new Set(curriculum.map((m) => m.id))
@@ -428,7 +455,7 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
 
         onChange(updatedCurriculum);
 
-        // Save to database
+        // Save to database (legacy - content_blocks)
         if (!lessonId.startsWith('lesson-')) {
             if (onUpdateLessonContent) {
                 const updatedLesson = updatedCurriculum
@@ -443,11 +470,61 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
             }
         }
 
+        // ALSO save to new lesson_content_items table
+        if (onAddContentItem && courseId) {
+            try {
+                // Fetch video title from YouTube API if it's a YouTube URL
+                let videoTitle = 'Video';
+                let thumbnailUrl = undefined;
+                const videoId = contentOptions.videoUrl.match(/(?:v=|\/)([a-zA-Z0-9_-]{11})/)?.[1];
+                
+                if (videoId && contentOptions.videoUrl.includes('youtube')) {
+                    const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY;
+                    if (apiKey) {
+                        try {
+                            const response = await fetch(
+                                `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${apiKey}`
+                            );
+                            const data = await response.json();
+                            if (data.items && data.items.length > 0) {
+                                videoTitle = data.items[0].snippet.title;
+                                thumbnailUrl = data.items[0].snippet.thumbnails?.medium?.url;
+                            }
+                        } catch (err) {
+                            console.error('Error fetching YouTube video title:', err);
+                        }
+                    }
+                }
+
+                await onAddContentItem(
+                    lessonId,
+                    moduleId,
+                    'video',
+                    {
+                        video_type: contentOptions.videoUrl.includes('youtube') || contentOptions.videoUrl.includes('vimeo') ? 'external' : 'cloudinary',
+                        url: contentOptions.videoUrl,
+                        duration: contentOptions.videoDuration,
+                        thumbnail_url: thumbnailUrl || contentOptions.videoMetadata?.thumbnail_url,
+                        cloudinary_public_id: contentOptions.videoMetadata?.cloudinary_public_id,
+                        title: videoTitle,
+                    },
+                    undefined
+                );
+                // Refresh content items
+                if (onFetchContentItems) {
+                    await onFetchContentItems(lessonId);
+                }
+            } catch (error) {
+                console.error('Error creating content item:', error);
+            }
+        }
+
         setContentOptions(null);
-        setExpandedLessons((prev) => { const next = new Set(prev); next.delete(lessonId); return next; });
-        
+        // Keep lesson expanded after adding content
+        // setExpandedLessons((prev) => { const next = new Set(prev); next.delete(lessonId); return next; });
+
         // Trigger refresh to update sidebar durations
-        
+
     };
 
     const handleSaveQuizTitle = async (moduleId: string, lessonId: string) => {
@@ -483,7 +560,8 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
         );
 
         onChange(updatedCurriculum);
-        
+
+        // Save to database (legacy - content_blocks)
         if (!lessonId.startsWith('lesson-') && onUpdateLessonContent) {
             const updatedLesson = updatedCurriculum
                 .find(m => m.id === moduleId)
@@ -493,12 +571,37 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
             }
         }
 
+        // ALSO save to new lesson_content_items table
+        if (onAddContentItem && courseId) {
+            try {
+                // Fetch quiz title from database
+                let quizTitle = contentOptions.quizTitle || 'Quiz';
+                
+                await onAddContentItem(
+                    lessonId,
+                    moduleId,
+                    'quiz',
+                    {
+                        title: quizTitle,
+                    },
+                    quizId
+                );
+                // Refresh content items
+                if (onFetchContentItems) {
+                    await onFetchContentItems(lessonId);
+                }
+            } catch (error) {
+                console.error('Error creating content item:', error);
+            }
+        }
+
         setContentOptions(null);
-        setExpandedLessons((prev) => {
-            const next = new Set(prev);
-            next.delete(lessonId);
-            return next;
-        });
+        // Keep lesson expanded after adding content
+        // setExpandedLessons((prev) => {
+        //     const next = new Set(prev);
+        //     next.delete(lessonId);
+        //     return next;
+        // });
 
         if (onEditQuiz) onEditQuiz(moduleId, lessonId, quizId);
     };
@@ -676,12 +779,12 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                                                 <div className="flex-shrink-0">
                                                                     {videoBlock && (
                                                                         <span className="flex items-center gap-1 text-xs text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-full font-medium">
-                                                                            <Video className="w-3 h-3" />Video
+                                                                            <Video className="w-3 h-3" />
                                                                         </span>
                                                                     )}
                                                                     {quizBlock && (
                                                                         <span className="flex items-center gap-1 text-xs text-purple-500 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 px-2 py-0.5 rounded-full font-medium">
-                                                                            <FileQuestion className="w-3 h-3" />Quiz
+                                                                            <FileQuestion className="w-3 h-3" />
                                                                         </span>
                                                                     )}
                                                                 </div>
@@ -699,13 +802,110 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                                     {/* ── Expanded area ── */}
                                                     {lessonExpanded && (
                                                         <div className="px-12 pb-4 pt-0">
+                                                            {/* Content Items List */}
+                                                            {onFetchContentItems && onAddContentItem && courseId && (
+                                                                <div className="mt-3 space-y-2">
+                                                                    {/* Added content items */}
+                                                                    {(lessonContentItems?.[item.id] || []).length > 0 && (
+                                                                        <div className="space-y-1 mb-3">
+                                                                            {(lessonContentItems?.[item.id] || []).map((contentItem, idx) => (
+                                                                                <div
+                                                                                    key={contentItem.id}
+                                                                                    className="group flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-slate-700/50 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 transition-colors"
+                                                                                >
+                                                                                    {/* Drag handle */}
+                                                                                    <div className="flex-shrink-0 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                                        <GripVertical className="w-4 h-4 text-gray-400" />
+                                                                                    </div>
+                                                                                    {/* Icon */}
+                                                                                    <div className="flex-shrink-0">
+                                                                                        {contentItem.content_type === 'video' && (
+                                                                                            <Video className="w-4 h-4 text-blue-500" />
+                                                                                        )}
+                                                                                        {contentItem.content_type === 'quiz' && (
+                                                                                            <FileQuestion className="w-4 h-4 text-purple-500" />
+                                                                                        )}
+                                                                                        {contentItem.content_type === 'text' && (
+                                                                                            <FileText className="w-4 h-4 text-green-500" />
+                                                                                        )}
+                                                                                        {contentItem.content_type === 'document' && (
+                                                                                            <File className="w-4 h-4 text-orange-500" />
+                                                                                        )}
+                                                                                    </div>
+                                                                                    {/* Title */}
+                                                                                    <span className="text-sm text-gray-700 dark:text-gray-200 flex-1 truncate" title={contentItem.content_type === 'video' ? contentItem.metadata?.url : undefined}>
+                                                                                        {contentItem.content_type === 'video' ? (contentItem.metadata?.title || 'Video') :
+                                                                                         contentItem.content_type === 'quiz' ? (contentItem.metadata?.title || 'Quiz') :
+                                                                                         contentItem.content_type === 'text' ? 'Text' : 'Document'}
+                                                                                    </span>
+                                                                                    {/* Play button for videos */}
+                                                                                    {contentItem.content_type === 'video' && contentItem.metadata?.url && (
+                                                                                        <button
+                                                                                            onClick={() => setPreviewVideoUrl(contentItem.metadata.url || null)}
+                                                                                            className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors flex-shrink-0"
+                                                                                            title="Preview video"
+                                                                                        >
+                                                                                            <Play className="w-4 h-4" />
+                                                                                        </button>
+                                                                                    )}
+                                                                                    {/* Edit button for quizzes */}
+                                                                                    {contentItem.content_type === 'quiz' && contentItem.content_id && onEditQuiz && (
+                                                                                        <button
+                                                                                            onClick={() => onEditQuiz(module.id, item.id, contentItem.content_id!)}
+                                                                                            className="px-3 py-1.5 text-sm font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors flex-shrink-0"
+                                                                                        >
+                                                                                            Edit
+                                                                                        </button>
+                                                                                    )}
+                                                                                    {/* Delete button */}
+                                                                                    {onDeleteContentItem && (
+                                                                                        <button
+                                                                                            onClick={() => onDeleteContentItem(item.id, contentItem.id)}
+                                                                                            className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+                                                                                        >
+                                                                                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                                                                                        </button>
+                                                                                    )}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                    
+                                                                    {/* Add content button */}
+                                                                    {showingOpts ? (
+                                                                        <button
+                                                                            onClick={() => setContentOptions(null)}
+                                                                            className="flex items-center text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                                                                            title="Close"
+                                                                        >
+                                                                            <X className="w-4 h-4" />
+                                                                        </button>
+                                                                    ) : (
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                setActivePlusMenu({ moduleId: module.id, lessonId: item.id });
+                                                                                setContentOptions({
+                                                                                    moduleId: module.id,
+                                                                                    lessonId: item.id,
+                                                                                    mode: "picker",
+                                                                                    videoUrl: "",
+                                                                                    quizTitle: "",
+                                                                                    isUploading: false,
+                                                                                    uploadProgress: 0,
+                                                                                });
+                                                                            }}
+                                                                            className="flex items-center text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                                                                            title="Add content"
+                                                                        >
+                                                                            <Plus className="w-4 h-4" />
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            )}
 
                                                             {/* Picker */}
                                                             {showingOpts && contentOptions?.mode === "picker" && (
                                                                 <div className="pt-2">
-                                                                    <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">
-                                                                        Add content
-                                                                    </p>
                                                                     <div className="flex items-center gap-2 flex-wrap">
                                                                         <button
                                                                             onClick={handleVideoLinkClick}
@@ -728,16 +928,7 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                                                             <FileQuestion className="w-3.5 h-3.5" />
                                                                             Quiz
                                                                         </button>
-                                                                        <button
-                                                                            onClick={() => setContentOptions(null)}
-                                                                            className="ml-auto p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-                                                                        >
-                                                                            <X className="w-3.5 h-3.5" />
-                                                                        </button>
                                                                     </div>
-                                                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                                                                        Add video content via YouTube/Vimeo link or upload video file directly
-                                                                    </p>
                                                                 </div>
                                                             )}
 
@@ -822,7 +1013,7 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
 
                                                                                 onChange(updatedCurriculum);
 
-                                                                                // Save to database
+                                                                                // Save to database (legacy - content_blocks)
                                                                                 if (!contentOptions.lessonId.startsWith('lesson-')) {
                                                                                     if (onUpdateLessonContent) {
                                                                                         const updatedLesson = updatedCurriculum
@@ -831,6 +1022,32 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                                                                         if (updatedLesson) {
                                                                                             await onUpdateLessonContent(contentOptions.moduleId, contentOptions.lessonId, (updatedLesson as any).content_blocks || []);
                                                                                         }
+                                                                                    }
+                                                                                }
+
+                                                                                // ALSO save to new lesson_content_items table
+                                                                                if (onAddContentItem && courseId) {
+                                                                                    try {
+                                                                                        await onAddContentItem(
+                                                                                            contentOptions.lessonId,
+                                                                                            contentOptions.moduleId,
+                                                                                            'video',
+                                                                                            {
+                                                                                                video_type: 'cloudinary',
+                                                                                                url: response.secure_url,
+                                                                                                duration: response.duration,
+                                                                                                thumbnail_url: CloudinaryVideoUploadService.generateThumbnailUrl(response.public_id),
+                                                                                                cloudinary_public_id: response.public_id,
+                                                                                                title: response.original_filename || file.name,
+                                                                                            },
+                                                                                            undefined
+                                                                                        );
+                                                                                        // Refresh content items
+                                                                                        if (onFetchContentItems) {
+                                                                                            await onFetchContentItems(contentOptions.lessonId);
+                                                                                        }
+                                                                                    } catch (error) {
+                                                                                        console.error('Error creating content item:', error);
                                                                                     }
                                                                                 }
 
@@ -908,18 +1125,19 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                                                             <div className="flex items-center gap-2 mt-3">
                                                                                 <button
                                                                                     onClick={() => {
-                                                                                        // Save and close
+                                                                                        // Save and keep lesson expanded
                                                                                         setContentOptions(null);
-                                                                                        setExpandedLessons((prev) => {
-                                                                                            const next = new Set(prev);
-                                                                                            next.delete(contentOptions.lessonId);
-                                                                                            return next;
-                                                                                        });
+                                                                                        // Keep lesson expanded - don't collapse
+                                                                                        // setExpandedLessons((prev) => {
+                                                                                        //     const next = new Set(prev);
+                                                                                        //     next.delete(contentOptions.lessonId);
+                                                                                        //     return next;
+                                                                                        // });
                                                                                     }}
                                                                                     className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors"
                                                                                 >
                                                                                     <Check className="w-3.5 h-3.5" />
-                                                                                    Save & Close
+                                                                                    Save & Add
                                                                                 </button>
                                                                                 <button
                                                                                     onClick={() => {
@@ -1132,94 +1350,9 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                                                 </div>
                                                             )}
 
-                                                            {/* Video block display with preview button */}
-                                                            {!showingOpts && videoBlock && (
+                                                            {/* Empty state - just + button */}
+                                                            {!showingOpts && (!lessonContentItems?.[item.id] || lessonContentItems?.[item.id].length === 0) && (
                                                                 <div className="pt-2">
-                                                                    {/* Check if this is an uploaded Cloudinary video or external link */}
-                                                                    {videoBlock.content?.includes('cloudinary.com') && videoBlock.content?.includes('/video/upload/') ? (
-                                                                        // UPLOADED VIDEO (Cloudinary) - Show inline video player
-                                                                        <div className="rounded-xl overflow-hidden shadow-lg border border-gray-200 dark:border-gray-700 bg-black">
-                                                                            <video
-                                                                                src={videoBlock.content}
-                                                                                controls
-                                                                                className="w-full aspect-video"
-                                                                                poster={videoBlock.attributes?.media_metadata?.thumbnail_url}
-                                                                                preload="metadata"
-                                                                            >
-                                                                                <track kind="captions" />
-                                                                                Your browser does not support the video tag.
-                                                                            </video>
-                                                                            {videoBlock.attributes?.caption && (
-                                                                                <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-2 italic px-4 pb-3">
-                                                                                    {videoBlock.attributes.caption}
-                                                                                </p>
-                                                                            )}
-                                                                        </div>
-                                                                    ) : (
-                                                                        // EXTERNAL VIDEO (YouTube/Vimeo) - Show URL with play button
-                                                                        <div className="flex items-center gap-2">
-                                                                            <div className="flex items-center gap-2 flex-1 min-w-0 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2">
-                                                                                <Video className="w-4 h-4 text-blue-500 flex-shrink-0" />
-                                                                                <span className="text-sm text-gray-600 dark:text-gray-300 truncate">
-                                                                                    {videoBlock.content || "No URL"}
-                                                                                </span>
-                                                                            </div>
-                                                                            <button
-                                                                                onClick={() => setPreviewVideoUrl(videoBlock.content)}
-                                                                                className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors flex-shrink-0"
-                                                                                title="Preview video"
-                                                                            >
-                                                                                <Play className="w-4 h-4" />
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={() => handleDeleteBlock(module.id, item.id, videoBlock.id)}
-                                                                                className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors flex-shrink-0"
-                                                                                title="Remove video"
-                                                                            >
-                                                                                <Trash2 className="w-4 h-4" />
-                                                                            </button>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            )}
-
-                                                            {/* Quiz block display */}
-                                                            {!showingOpts && quizBlock && (
-                                                                <div className="pt-2 flex items-center gap-2">
-                                                                    <div className="flex items-center gap-2 flex-1 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2">
-                                                                        <FileQuestion className="w-4 h-4 text-purple-500 flex-shrink-0" />
-                                                                        <span className="text-sm text-gray-600 dark:text-gray-300">
-                                                                            {quizBlock.title ? `Quiz: ${quizBlock.title}` : "Quiz"}
-                                                                        </span>
-                                                                    </div>
-                                                                    <button
-                                                                        onClick={() => onEditQuiz && onEditQuiz(module.id, item.id, quizBlock.quizId)}
-                                                                        className="px-3 py-2 text-sm font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors flex-shrink-0"
-                                                                    >
-                                                                        Edit
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleDeleteBlock(module.id, item.id, quizBlock.id)}
-                                                                        className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors flex-shrink-0"
-                                                                        title="Remove quiz"
-                                                                    >
-                                                                        <Trash2 className="w-4 h-4" />
-                                                                    </button>
-                                                                </div>
-                                                            )}
-
-                                                            {/* Empty nudge */}
-                                                            {!showingOpts && !hasContent && (
-                                                                <div className="pt-2">
-                                                                    <p className="text-xs text-gray-400 dark:text-gray-500 italic">
-                                                                        No content yet —{" "}
-                                                                        <button
-                                                                            onClick={() => handleContentClick(module.id, item.id)}
-                                                                            className="not-italic font-medium text-blue-500 hover:underline"
-                                                                        >
-                                                                            + add content
-                                                                        </button>
-                                                                    </p>
                                                                 </div>
                                                             )}
                                                         </div>

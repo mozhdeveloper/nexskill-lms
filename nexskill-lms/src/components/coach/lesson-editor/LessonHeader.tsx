@@ -87,7 +87,7 @@ const LessonHeader: React.FC<LessonHeaderProps> = ({
                         <h1 className="text-4xl font-black text-gray-900 dark:text-white leading-tight">
                             {lesson.title || (
                                 <span className="text-gray-300 italic">
-                                    Untitled Lesson
+                                    Untitled
                                 </span>
                             )}
                         </h1>

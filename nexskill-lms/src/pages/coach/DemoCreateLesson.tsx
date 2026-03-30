@@ -241,7 +241,7 @@ const DemoCreateLesson: React.FC = () => {
                             Student View Preview
                         </div>
                         <h1 className="text-2xl font-bold text-slate-900 dark:text-dark-text-primary">
-                            {formData.title || "Untitled Lesson"}
+                            {formData.title || "Untitled"}
                         </h1>
                     </div>
 

@@ -3,7 +3,7 @@ import DOMPurify from 'dompurify';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { FileQuestion, Clock, CheckCircle, AlertCircle, Play } from 'lucide-react';
-import type { LessonContentBlock } from '../../../types/lesson';
+import type { LessonContentBlock } from '../../types/lesson.ts';
 import { VideoProgressTracker } from './VideoProgressTracker';
 import { YouTubePlayer } from './YouTubePlayer';
 import { HTML5VideoPlayer } from './HTML5VideoPlayer';
@@ -49,8 +49,7 @@ const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({ contentBloc
         );
 
       case 'heading': {
-        const level = b.attributes?.level || 2;
-        const HeadingTag = `h${Math.min(Math.max(level, 1), 6)}` as keyof JSX.IntrinsicElements;
+        const level = Math.min(Math.max(b.attributes?.level || 2, 1), 6);
         const sizeClasses: Record<number, string> = {
           1: 'text-3xl',
           2: 'text-2xl',
@@ -59,6 +58,7 @@ const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({ contentBloc
           5: 'text-base',
           6: 'text-sm',
         };
+        const HeadingTag = level === 1 ? 'h1' : level === 2 ? 'h2' : level === 3 ? 'h3' : level === 4 ? 'h4' : level === 5 ? 'h5' : 'h6';
         return (
           <HeadingTag
             key={b.id}
@@ -108,7 +108,14 @@ const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({ contentBloc
               videoUrl={b.content}
               onComplete={onVideoComplete}
             >
-              {({ onTimeUpdate, onDurationChange, onVideoComplete: playerOnComplete, isCompleted, progressPercent, startTime }) => (
+              {({ onTimeUpdate, onDurationChange, onVideoComplete: playerOnComplete, isCompleted, progressPercent, startTime }: {
+                onTimeUpdate: (currentTime: number, duration: number) => void;
+                onDurationChange: (duration: number) => void;
+                onVideoComplete: () => void;
+                isCompleted: boolean;
+                progressPercent: number;
+                startTime: number;
+              }) => (
                 <div className="my-4">
                   {isYouTube ? (
                     <YouTubePlayer
@@ -196,11 +203,11 @@ const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({ contentBloc
       case 'list': {
         const isOrdered = b.attributes?.ordered || false;
         const ListTag = isOrdered ? 'ol' : 'ul';
-        const items = b.content.split('\n').filter(item => item.trim());
-        
+        const items = b.content.split('\n').filter((item: string) => item.trim());
+
         return (
           <ListTag key={b.id} className={`${isOrdered ? 'list-decimal' : 'list-disc'} list-inside my-4 pl-4`}>
-            {items.map((item, idx) => (
+            {items.map((item: string, idx: number) => (
               <li key={idx} className="mb-1 text-slate-700 dark:text-dark-text-secondary">
                 {item.trim().replace(/^[-*]\s*/, '')}
               </li>
@@ -241,16 +248,16 @@ const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({ contentBloc
         );
 
       // ═════════════════════════════════════════════════════════════════
-      // THE FIX: Added 'quiz' case here
+      // Quiz case - handles quiz content blocks
       // ═════════════════════════════════════════════════════════════════
       case 'quiz': {
-        const quizId = b.attributes?.quizId || (b as any).quizId;
-        const title = b.attributes?.title || (b as any).title || 'Untitled Quiz';
-        const description = b.attributes?.description || (b as any).description;
-        const timeLimit = b.attributes?.timeLimitMinutes || (b as any).time_limit_minutes;
-        const passingScore = b.attributes?.passingScore !== undefined ? b.attributes?.passingScore : (b as any).passing_score;
-        const maxAttempts = b.attributes?.maxAttempts || (b as any).max_attempts;
-        const isPublished = b.attributes?.isPublished !== undefined ? b.attributes?.isPublished : ((b as any).is_published ?? true);
+        const quizId = b.attributes?.quizId;
+        const title = b.attributes?.title || 'Untitled Quiz';
+        const description = b.attributes?.description;
+        const timeLimit = b.attributes?.timeLimitMinutes ?? b.attributes?.time_limit_minutes;
+        const passingScore = b.attributes?.passingScore ?? b.attributes?.passing_score;
+        const maxAttempts = b.attributes?.maxAttempts ?? b.attributes?.max_attempts;
+        const isPublished = b.attributes?.isPublished ?? b.attributes?.is_published ?? true;
 
         const handleQuizClick = () => {
           if (quizId && onQuizClick) {
@@ -260,11 +267,11 @@ const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({ contentBloc
 
         return (
           <div key={b.id} className="my-6">
-            <div 
+            <div
               className={`
                 relative overflow-hidden rounded-xl border-2 transition-all duration-200
-                ${isPublished 
-                  ? 'bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 border-purple-200 dark:border-purple-800 hover:border-purple-300 dark:hover:border-purple-700 cursor-pointer' 
+                ${isPublished
+                  ? 'bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 border-purple-200 dark:border-purple-800 hover:border-purple-300 dark:hover:border-purple-700 cursor-pointer'
                   : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 cursor-not-allowed opacity-75'
                 }
               `}
@@ -274,8 +281,8 @@ const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({ contentBloc
                 <div className="flex items-start gap-4">
                   <div className={`
                     flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center
-                    ${isPublished 
-                      ? 'bg-purple-100 dark:bg-purple-800/50 text-purple-600 dark:text-purple-400' 
+                    ${isPublished
+                      ? 'bg-purple-100 dark:bg-purple-800/50 text-purple-600 dark:text-purple-400'
                       : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
                     }
                   `}>
@@ -322,11 +329,11 @@ const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({ contentBloc
 
                   {isPublished && (
                     <div className="flex-shrink-0">
-                      <button 
+                      <button
                         className="
-                          flex items-center gap-2 px-4 py-2 
+                          flex items-center gap-2 px-4 py-2
                           bg-purple-600 hover:bg-purple-700 dark:bg-purple-600 dark:hover:bg-purple-500
-                          text-white text-sm font-medium rounded-lg 
+                          text-white text-sm font-medium rounded-lg
                           transition-colors shadow-sm hover:shadow-md
                         "
                         onClick={(e) => {
@@ -343,9 +350,9 @@ const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({ contentBloc
               </div>
 
               <div className={`
-                h-1 w-full 
-                ${isPublished 
-                  ? 'bg-gradient-to-r from-purple-500 to-indigo-500' 
+                h-1 w-full
+                ${isPublished
+                  ? 'bg-gradient-to-r from-purple-500 to-indigo-500'
                   : 'bg-gray-300 dark:bg-gray-600'
                 }
               `} />

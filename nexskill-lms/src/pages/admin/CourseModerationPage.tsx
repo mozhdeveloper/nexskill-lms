@@ -33,7 +33,7 @@ interface Report {
   id: string;
   courseId: string;
   courseTitle: string;
-  reporterType: 'student' | 'coach' | 'system' | 'admin';
+  reporterType: 'student' | 'coach' | 'system';
   reasonCategory: string;
   reasonSnippet: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
@@ -122,11 +122,11 @@ const CourseModerationPage: React.FC = () => {
 
         const lessonCounts: Record<string, number> = {};
         const quizCounts: Record<string, number> = {};
-        
-        if (lessonsData) {
-          const moduleIds = modulesData?.map(m => m.id) || [];
+
+        if (lessonsData && modulesData) {
+          const moduleIds = modulesData.map(m => m.id);
           const modulesMap = new Map(modulesData.map(m => [m.id, m.course_id]));
-          
+
           lessonsData.forEach(item => {
             const courseId = modulesMap.get(item.module_id);
             if (courseId) {
@@ -253,16 +253,51 @@ const CourseModerationPage: React.FC = () => {
     }
 
     try {
+      console.log('[Admin] Approving course:', courseId);
+
+      // Step 1: Publish module_content_items FIRST (course is still pending, so trigger won't reset anything)
+      const { data: modulesData, error: modulesError } = await supabase
+        .from('modules')
+        .select('id')
+        .eq('course_id', courseId);
+
+      console.log('[Admin] Modules found:', { modulesData, modulesError });
+
+      if (modulesData && modulesData.length > 0) {
+        const moduleIds = modulesData.map(m => m.id);
+        
+        console.log('[Admin] Publishing module_content_items for modules:', moduleIds);
+
+        const { data: updateData, error: updateError } = await supabase
+          .from('module_content_items')
+          .update({ is_published: true })
+          .in('module_id', moduleIds)
+          .select();
+
+        console.log('[Admin] Module content items update result:', { updateData, updateError });
+
+        if (updateError) {
+          console.error('[Admin] Module content items update error:', updateError);
+        }
+      }
+
+      // Step 2: THEN approve the course (nothing will touch it after this)
       const { data: courseData, error: courseError } = await supabase
         .from('courses')
         .update({
           verification_status: 'approved',
+          visibility: 'public',
           updated_at: new Date().toISOString()
         })
         .eq('id', courseId)
         .select();
 
-      if (courseError) throw courseError;
+      console.log('[Admin] Course update result:', { courseData, courseError });
+
+      if (courseError) {
+        console.error('[Admin] Course update error:', courseError);
+        throw courseError;
+      }
       if (!courseData || courseData.length === 0) throw new Error('Course not found');
 
       setCourses(prev => prev.map(c =>
@@ -271,8 +306,8 @@ const CourseModerationPage: React.FC = () => {
           : c
       ));
 
-      alert(`Course Approved!\n\nCourse: ${courseData[0].title}`);
-      
+      alert(`Course Approved!\n\nCourse: ${courseData[0].title}\n\nThe course is now visible to students.`);
+
     } catch (error: any) {
       console.error('Approval error:', error);
       alert(`Failed to approve\n\nError: ${error.message || error}\n\nCheck console (F12) for details.`);

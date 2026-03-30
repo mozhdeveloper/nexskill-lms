@@ -42,7 +42,7 @@ export const useVideoProgress = ({
     error: null,
   });
 
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedTimeRef = useRef<number>(0);
   const hasCompletedRef = useRef<boolean>(false);
   const isSavingRef = useRef<boolean>(false); // Prevent concurrent saves
