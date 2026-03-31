@@ -9,7 +9,7 @@ import {
     ChevronDown,
     Trash2,
 } from "lucide-react";
-import RichTextEditor from "../coach/lesson-editor/RichTextEditor";
+import ReactQuillEditor from "./ReactQuillEditor";
 import type { ContentBlock } from "../../types/quiz";
 
 interface ContentBlockRendererProps {
@@ -144,7 +144,7 @@ const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = React.memo(({
             {/* Block Content */}
             <div>
                 {block.type === "text" && (
-                    <RichTextEditor
+                    <ReactQuillEditor
                         content={block.content}
                         onUpdate={handleContentUpdate}
                         placeholder="Enter your text content..."
