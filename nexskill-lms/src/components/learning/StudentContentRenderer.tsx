@@ -1,5 +1,5 @@
 import React from 'react';
-import { Video, FileQuestion, FileText, File, Play } from 'lucide-react';
+import { Video, FileQuestion, FileText, File, Play, BookOpen } from 'lucide-react';
 import type { LessonContentItem } from '../../types/lesson-content-item';
 import { VideoProgressTracker } from './VideoProgressTracker';
 import { YouTubePlayer } from './YouTubePlayer';
@@ -98,6 +98,33 @@ export const StudentContentRenderer: React.FC<StudentContentRendererProps> = ({
                 <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">
                   {item.metadata?.file_name || 'Document'}
                 </span>
+              </div>
+            </div>
+          );
+        }
+
+        if (item.content_type === 'notes') {
+          return (
+            <div key={item.id} className="space-y-2">
+              <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
+                <BookOpen className="w-4 h-4 text-green-600" />
+                <span>{item.metadata?.title || 'Notes'}</span>
+              </div>
+              <div className="p-5 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
+                <div 
+                  className="notes-content prose prose-slate dark:prose-invert max-w-none text-gray-700 dark:text-gray-300"
+                  dangerouslySetInnerHTML={{ __html: item.metadata?.content || '' }}
+                />
+                {(item.metadata?.word_count || item.metadata?.reading_time) && (
+                  <div className="flex items-center gap-4 mt-4 pt-3 border-t border-green-200 dark:border-green-800 text-xs text-gray-500 dark:text-gray-400">
+                    {item.metadata?.word_count && (
+                      <span>{item.metadata.word_count} words</span>
+                    )}
+                    {item.metadata?.reading_time && (
+                      <span>~{item.metadata.reading_time} min read</span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           );

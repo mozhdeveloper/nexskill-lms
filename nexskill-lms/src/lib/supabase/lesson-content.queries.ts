@@ -67,7 +67,7 @@ export async function createContentItem(input: CreateContentItemInput) {
  */
 export async function updateContentItem(contentItemId: string, updates: UpdateContentItemInput) {
     const updateData: any = { ...updates };
-    
+
     // Convert metadata to JSON string if it exists
     if (updates.metadata) {
         updateData.metadata = updates.metadata;
@@ -160,7 +160,7 @@ export async function reorderContentItems(
 }
 
 /**
- * Update content item metadata (for video uploads, etc.)
+ * Update content item metadata (for video uploads, notes, etc.)
  */
 export async function updateContentItemMetadata(
     contentItemId: string,
