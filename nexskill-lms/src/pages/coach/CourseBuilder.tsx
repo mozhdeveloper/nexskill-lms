@@ -19,6 +19,7 @@ import type { Quiz, QuizQuestion } from "../../types/quiz";
 import type { ContentItem } from "../../types/content-item";
 import type { LessonContentItem } from "../../types/lesson-content-item";
 import { supabase } from "../../lib/supabaseClient";
+import { SupabaseStorageUploadService, THUMBNAIL_BUCKET } from "../../services/supabaseStorageUpload.service";
 import {
     fetchLessonContentItems,
     createContentItem,
@@ -706,6 +707,11 @@ const CourseBuilder: React.FC = () => {
   const handleDeleteThumbnail = async () => {
     if (!courseId) return;
 
+    // Remove file from Supabase Storage
+    if (thumbnailPublicId) {
+      await SupabaseStorageUploadService.deleteFile(THUMBNAIL_BUCKET, thumbnailPublicId);
+    }
+
     const { error } = await supabase
       .from('courses')
       .update({
@@ -723,6 +729,9 @@ const CourseBuilder: React.FC = () => {
 
   const handleDeleteVideo = async () => {
     if (!courseId) return;
+
+    // Note: Videos are stored on Cloudinary, not deleted automatically
+    // Add Cloudinary deletion logic here if needed in the future
 
     const { error } = await supabase
       .from('courses')
@@ -1214,6 +1223,8 @@ const CourseBuilder: React.FC = () => {
             courseDescription={settings.longDescription}
             instructorName={instructorName}
             learningObjectives={courseGoals}
+            thumbnailUrl={thumbnailUrl}
+            previewVideoUrl={previewVideoUrl}
           />
         );
       default:

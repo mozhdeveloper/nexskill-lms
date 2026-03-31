@@ -125,11 +125,11 @@ const CourseCatalog: React.FC = () => {
     return sourceCourses.map(course => {
       const isEnrolled = enrolledCourseIds.has(course.id);
       const progress = courseProgress[course.id];
-      
+
       // Use the real formatted duration if available (from enrolled courses hook)
       // For browse courses, we need to compute it or use fallback
       let duration = course.duration_hours ? formatDurationFromHours(course.duration_hours) : "0h";
-      
+
       // If this is an enrolled course and we have the real formatted duration, use it
       if (activeTab === 'enrolled' && (course as any).formattedDuration) {
         duration = (course as any).formattedDuration;
@@ -148,7 +148,7 @@ const CourseCatalog: React.FC = () => {
         originalPrice: undefined,
         isBestseller: false,
         isNew: new Date(course.created_at).getTime() > Date.now() - 7 * 24 * 60 * 60 * 1000,
-        thumbnail: 'gradient-blue-purple',
+        thumbnail_url: course.thumbnail_url || null,
         shortDescription: course.short_description || '',
         isEnrolled,
         progressPercent: progress?.percent || 0,

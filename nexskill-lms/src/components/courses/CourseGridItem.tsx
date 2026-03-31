@@ -13,7 +13,7 @@ interface Course {
   originalPrice?: number;
   isBestseller?: boolean;
   isNew?: boolean;
-  thumbnail: string;
+  thumbnail_url?: string | null;
   shortDescription: string;
   isEnrolled?: boolean;
   progressPercent?: number;
@@ -33,14 +33,6 @@ const CourseGridItem: React.FC<CourseGridItemProps> = ({ course, onClick }) => {
     Advanced: 'bg-purple-100/30 text-purple-700',
   };
 
-  const gradientClasses: Record<string, string> = {
-    'gradient-blue-purple': 'from-blue-100 to-purple-100',
-    'gradient-purple-pink': 'from-purple-100 to-pink-100',
-    'gradient-pink-orange': 'from-pink-100 to-orange-100',
-    'gradient-green-blue': 'from-green-100 to-blue-100',
-    'gradient-orange-red': 'from-orange-100 to-red-100',
-  };
-
   const reviewCount = course.reviewCount || 0;
   const isEnrolled = course.isEnrolled || false;
   const progressPercent = course.progressPercent || 0;
@@ -50,7 +42,19 @@ const CourseGridItem: React.FC<CourseGridItemProps> = ({ course, onClick }) => {
       onClick={() => onClick(course.id)}
       className="bg-white dark:bg-slate-800 rounded-3xl shadow-card hover:shadow-lg hover:scale-[1.02] transition-all cursor-pointer overflow-hidden group">
       {/* Thumbnail */}
-      <div className={`relative h-40 bg-gradient-to-br ${gradientClasses[course.thumbnail] || 'from-gray-100 to-gray-200'} dark:opacity-90 flex items-center justify-center`}>
+      <div className="relative h-40 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 overflow-hidden">
+        {course.thumbnail_url ? (
+          <img
+            src={course.thumbnail_url}
+            alt={course.title}
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <div className="text-6xl opacity-20">📚</div>
+          </div>
+        )}
+
         {/* Level Badge */}
         <div className="absolute top-4 left-4">
           <span className={`px-3 py-1 rounded-full text-xs font-medium ${levelColors[course.level]}`}>
@@ -61,24 +65,21 @@ const CourseGridItem: React.FC<CourseGridItemProps> = ({ course, onClick }) => {
         {/* Status Badges */}
         <div className="absolute top-4 right-4 flex flex-col gap-2">
           {course.isBestseller && (
-            <span className="px-3 py-1 bg-orange-500 text-white rounded-full text-xs font-medium">
+            <span className="px-3 py-1 bg-orange-500 text-white rounded-full text-xs font-medium shadow-lg">
               Bestseller
             </span>
           )}
           {course.isNew && (
-            <span className="px-3 py-1 bg-brand-primary text-white rounded-full text-xs font-medium">
+            <span className="px-3 py-1 bg-brand-primary text-white rounded-full text-xs font-medium shadow-lg">
               New
             </span>
           )}
           {isEnrolled && (
-            <span className="px-3 py-1 bg-green-500 text-white rounded-full text-xs font-medium">
+            <span className="px-3 py-1 bg-green-500 text-white rounded-full text-xs font-medium shadow-lg">
               Enrolled
             </span>
           )}
         </div>
-
-        {/* Placeholder Icon */}
-        <div className="text-6xl opacity-20">📚</div>
       </div>
 
       {/* Content */}

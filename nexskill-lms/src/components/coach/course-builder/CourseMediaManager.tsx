@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Image, Video, Upload, X, Loader2, Play, Trash2 } from 'lucide-react';
-import { CloudinaryImageUploadService } from '../../../services/cloudinaryImageUpload.service';
-import type { UploadProgress } from '../../../services/cloudinaryImageUpload.service';
+import { Image, Video, Upload, Loader2, Play, Trash2 } from 'lucide-react';
+import { SupabaseStorageUploadService } from '../../../services/supabaseStorageUpload.service';
+import type { UploadProgress as SupabaseUploadProgress } from '../../../services/supabaseStorageUpload.service';
 import { CloudinaryVideoUploadService } from '../../../services/cloudinaryVideoUpload.service';
+import type { UploadProgress as CloudinaryUploadProgress } from '../../../services/cloudinaryVideoUpload.service';
 
 interface CourseMediaManagerProps {
     courseId: string;
@@ -29,8 +30,8 @@ const CourseMediaManager: React.FC<CourseMediaManagerProps> = ({
 }) => {
     const [thumbnailUploading, setThumbnailUploading] = useState(false);
     const [videoUploading, setVideoUploading] = useState(false);
-    const [thumbnailProgress, setThumbnailProgress] = useState<UploadProgress | null>(null);
-    const [videoProgress, setVideoProgress] = useState<UploadProgress | null>(null);
+    const [thumbnailProgress, setThumbnailProgress] = useState<SupabaseUploadProgress | null>(null);
+    const [videoProgress, setVideoProgress] = useState<CloudinaryUploadProgress | null>(null);
     const [thumbnailError, setThumbnailError] = useState<string | null>(null);
     const [videoError, setVideoError] = useState<string | null>(null);
     const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(thumbnailUrl || null);
@@ -60,7 +61,7 @@ const CourseMediaManager: React.FC<CourseMediaManagerProps> = ({
         setThumbnailError(null);
 
         // Validate image
-        const validation = CloudinaryImageUploadService.validateImageFile(file);
+        const validation = SupabaseStorageUploadService.validateImageFile(file);
         if (!validation.valid) {
             setThumbnailError(validation.error || 'Invalid image file');
             return;
@@ -80,19 +81,18 @@ const CourseMediaManager: React.FC<CourseMediaManagerProps> = ({
         setThumbnailProgress(null);
 
         try {
-            // Upload to Cloudinary
-            const folder = `nexskill-lms/courses/${courseId}/thumbnails`;
-            const response = await CloudinaryImageUploadService.uploadImage(
+            // Upload to Supabase Storage
+            const response = await SupabaseStorageUploadService.uploadThumbnail(
                 file,
-                folder,
+                courseId,
                 (progress) => setThumbnailProgress(progress)
             );
 
-            // Save to database
-            await onThumbnailUpload(response.secure_url, response.public_id);
+            // Save URL + storage path to database
+            await onThumbnailUpload(response.url, response.path);
 
-            // Update preview with Cloudinary URL
-            setThumbnailPreview(response.secure_url);
+            // Update preview with Supabase public URL
+            setThumbnailPreview(response.url);
             thumbnailObjectUrlRef.current = null;
         } catch (error: any) {
             console.error('Thumbnail upload error:', error);
@@ -152,7 +152,7 @@ const CourseMediaManager: React.FC<CourseMediaManagerProps> = ({
                 (progress) => setVideoProgress(progress)
             );
 
-            // Save to database
+            // Save URL + public_id to database
             await onVideoUpload(response.secure_url, response.public_id);
 
             // Update preview with Cloudinary URL

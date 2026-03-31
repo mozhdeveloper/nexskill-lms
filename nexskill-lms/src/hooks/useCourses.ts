@@ -27,7 +27,8 @@ export const useCourses = () => {
                 category:categories(name)
             `)
             .eq('visibility', 'public')
-            .eq('verification_status', 'approved');
+            .eq('verification_status', 'approved')
+            .order('created_at', { ascending: false });
 
         if (error) throw error;
 
