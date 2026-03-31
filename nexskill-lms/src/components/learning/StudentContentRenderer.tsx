@@ -194,13 +194,20 @@ const VideoContent: React.FC<{
 
   // Fallback without progress tracking
   if (isYouTube) {
-    return <YouTubePlayer videoUrl={videoUrl} />;
+    return (
+      <YouTubePlayer
+        videoUrl={videoUrl}
+        onTimeUpdate={() => {}}
+        onDurationChange={() => {}}
+      />
+    );
   } else if (isDirectVideo) {
     return (
-      <video controls className="w-full rounded-lg">
-        <source src={videoUrl} type="video/mp4" />
-        Your browser does not support the video tag.
-      </video>
+      <HTML5VideoPlayer
+        videoUrl={videoUrl}
+        onTimeUpdate={() => {}}
+        onDurationChange={() => {}}
+      />
     );
   } else {
     return (

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
+import { supabase } from "../../lib/supabaseClient";
 import CoachAppLayout from "../../layouts/CoachAppLayout";
 import CourseBuilderSidebar from "../../components/coach/course-builder/CourseBuilderSidebar";
 import CourseSettingsForm from "../../components/coach/course-builder/CourseSettingsForm";
@@ -18,7 +19,6 @@ import type { Module } from "../../types/lesson";
 import type { Quiz, QuizQuestion } from "../../types/quiz";
 import type { ContentItem } from "../../types/content-item";
 import type { LessonContentItem } from "../../types/lesson-content-item";
-import { supabase } from "../../lib/supabaseClient";
 import { SupabaseStorageUploadService, THUMBNAIL_BUCKET } from "../../services/supabaseStorageUpload.service";
 import {
     fetchLessonContentItems,
@@ -462,6 +462,7 @@ const CourseBuilder: React.FC = () => {
         content_blocks: newLesson.content_blocks || [],
         estimated_duration_minutes: newLesson.estimated_duration_minutes || 15,
         is_published: newLesson.is_published || false,
+        course_id: courseId,
       }]);
 
       if (lessonError) { alert(`Error adding lesson: ${lessonError.message}`); return; }
