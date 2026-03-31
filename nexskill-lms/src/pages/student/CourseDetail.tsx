@@ -4,8 +4,6 @@ import StudentAppLayout from '../../layouts/StudentAppLayout';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 
-// coursesData removed - using live Supabase data
-
 // Define CourseDisplay interface
 interface CourseDisplay {
   id: string;
@@ -48,6 +46,69 @@ const CourseDetail: React.FC = () => {
   const [checkingEnrollment, setCheckingEnrollment] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
 
+  // Parse description to convert markdown-style lists to proper HTML
+  const renderDescription = (text: string) => {
+    if (!text) return <p className="text-text-secondary dark:text-dark-text-secondary leading-relaxed">No description available.</p>;
+
+    // Normalize newlines
+    const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const lines = normalizedText.split('\n');
+    
+    const elements: React.ReactNode[] = [];
+    let currentList: string[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmedLine = line.trim();
+      
+      // Check if line is a list item
+      if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('• ')) {
+        currentList.push(trimmedLine.substring(2));
+      } else {
+        // If we have pending list items, render them first
+        if (currentList.length > 0) {
+          elements.push(
+            <ul key={`list-${i}`} className="list-disc list-inside space-y-1 my-3 ml-2">
+              {currentList.map((item, idx) => (
+                <li key={idx} className="text-text-secondary dark:text-dark-text-secondary leading-relaxed">
+                  {item}
+                </li>
+              ))}
+            </ul>
+          );
+          currentList = [];
+        }
+        
+        // Render paragraph if not empty
+        if (trimmedLine) {
+          elements.push(
+            <p key={`p-${i}`} className="text-text-secondary dark:text-dark-text-secondary leading-relaxed mb-4">
+              {trimmedLine}
+            </p>
+          );
+        } else {
+          // Empty line = spacing
+          elements.push(<div key={`space-${i}`} className="h-2" />);
+        }
+      }
+    }
+
+    // Don't forget remaining list items
+    if (currentList.length > 0) {
+      elements.push(
+        <ul key="list-final" className="list-disc list-inside space-y-1 my-3 ml-2">
+          {currentList.map((item, idx) => (
+            <li key={idx} className="text-text-secondary dark:text-dark-text-secondary leading-relaxed">
+              {item}
+            </li>
+          ))}
+        </ul>
+      );
+    }
+
+    return <div className="space-y-2">{elements}</div>;
+  };
+
   // Check if user is enrolled in the course
   useEffect(() => {
     const checkEnrollment = async () => {
@@ -63,7 +124,6 @@ const CourseDetail: React.FC = () => {
           .single();
 
         if (error && error.code !== "PGRST116") {
-          // PGRST116 = no rows returned
           console.error("Error checking enrollment:", error);
         } else if (data) {
           setIsEnrolled(true);
@@ -88,7 +148,6 @@ const CourseDetail: React.FC = () => {
 
         const { data: { user } } = await supabase.auth.getUser();
 
-        // 1. Fetch Course Details
         const { data: courseData, error: courseError } = await supabase
           .from('courses')
           .select(`
@@ -101,14 +160,12 @@ const CourseDetail: React.FC = () => {
 
         if (courseError) throw courseError;
 
-        // 2. Fetch Course Goals
         const { data: goalsData } = await supabase
           .from('course_goals')
           .select('*')
           .eq('course_id', courseId)
           .order('position');
 
-        // 3. Fetch Modules
         const { data: modulesData, error: modulesError } = await supabase
           .from('modules')
           .select('*')
@@ -117,7 +174,6 @@ const CourseDetail: React.FC = () => {
 
         if (modulesError) throw modulesError;
 
-        // 4. Fetch Content Items (Lessons/Quizzes)
         const moduleIds = modulesData.map(m => m.id);
         const { data: itemsData, error: itemsError } = await supabase
           .from('module_content_with_data')
@@ -127,7 +183,6 @@ const CourseDetail: React.FC = () => {
 
         if (itemsError) throw itemsError;
 
-        // 5. Fetch Stats + Enrollment & Progress in parallel
         const [enrollCountResult, reviewsResult, wishlistResult] = await Promise.all([
           supabase.from('enrollments').select('profile_id', { count: 'exact', head: true }).eq('course_id', courseId),
           supabase.from('reviews').select('rating').eq('course_id', courseId),
@@ -139,7 +194,6 @@ const CourseDetail: React.FC = () => {
         const avgRating = reviewRows.length > 0 ? Math.round((reviewRows.reduce((sum, r) => sum + (r.rating || 0), 0) / reviewRows.length) * 10) / 10 : 0;
         if (wishlistResult.data) setIsWishlisted(true);
 
-        // Fetch coach stats and profile if coach exists
         let coachStudentsCount = 0;
         let coachCoursesCount = 0;
         let coachRating = 0;
@@ -180,7 +234,6 @@ const CourseDetail: React.FC = () => {
             enrollmentDate = enrollment.enrolled_at;
             setIsEnrolled(true);
 
-            // Fetch progress
             const { data: progressData } = await supabase
               .from('user_lesson_progress')
               .select('lesson_id, is_completed')
@@ -194,12 +247,8 @@ const CourseDetail: React.FC = () => {
           }
         }
 
-        // Helper to check if module is locked via drip
-        // Now returns true/false for date/days checks. 
-        // Sequential check happens in the loop below.
         const checkDripDateOrDays = (module: any) => {
           if (!isUserEnrolled) return true;
-
           if (module.drip_mode === 'specific-date' && module.drip_date) {
             return new Date() < new Date(module.drip_date);
           }
@@ -210,14 +259,10 @@ const CourseDetail: React.FC = () => {
           return false;
         };
 
-        // Organize content into modules with locking logic
-        let previousModuleCompleted = true; // Track previous module status for sequential unlocking
+        let previousModuleCompleted = true;
 
         const structuredCurriculum = modulesData.map((module, index) => {
-          // 1. Check basic time-based drip locks
           let isModuleLocked = checkDripDateOrDays(module);
-
-          // 2. Check sequential module lock (after-previous)
           if (module.drip_mode === 'after-previous') {
             if (index > 0 && !previousModuleCompleted) {
               isModuleLocked = true;
@@ -225,24 +270,19 @@ const CourseDetail: React.FC = () => {
           }
 
           const moduleItems = itemsData.filter(item => item.module_id === module.id) || [];
-
-          // 3. Sequential Lesson Check State (within module)
           let previousLessonCompleted = true;
 
           const lessonsWithStatus = moduleItems.map((item, idx) => {
             const itemId = item.lesson_id || item.quiz_id;
             const isCompleted = userProgress[itemId] || false;
-
             let isLessonLocked = isModuleLocked;
 
-            // Enforce sequential lesson order if module is sequential
             if (!isLessonLocked && module.is_sequential) {
               if (idx > 0 && !previousLessonCompleted) {
                 isLessonLocked = true;
               }
             }
 
-            // Update tracker for next lesson
             if (isCompleted) {
               previousLessonCompleted = true;
             } else {
@@ -259,15 +299,11 @@ const CourseDetail: React.FC = () => {
             };
           });
 
-          // Determine if THIS module is completed (all items completed)
-          // Treat empty modules as completed for flow purposes, unless we want to block?
-          // Assuming an empty module doesn't block progress.
           const isThisModuleCompleted = moduleItems.length === 0 || moduleItems.every(item => {
             const itemId = item.lesson_id || item.quiz_id;
             return userProgress[itemId] === true;
           });
 
-          // Update global tracker for the NEXT module
           previousModuleCompleted = isThisModuleCompleted;
 
           return {
@@ -278,7 +314,6 @@ const CourseDetail: React.FC = () => {
         });
 
         if (courseData) {
-          // Map goals to whatYouLearn
           const goals = goalsData ? goalsData.map(g => g.description) : [];
 
           setCourse({
@@ -473,7 +508,7 @@ const CourseDetail: React.FC = () => {
         <div className="flex gap-6">
           {/* Left: Tabbed Content */}
           <div className="flex-1 min-w-0">
-            {/* Tab Bar - Only Overview */}
+            {/* Tab Bar */}
             <div className="flex gap-2 mb-6 border-b border-[#EDF0FB] dark:border-gray-700">
               {(['overview', 'curriculum', 'reviews', 'coach'] as const).map((tab) => (
                 <button
@@ -497,9 +532,7 @@ const CourseDetail: React.FC = () => {
                     <h3 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary mb-4">
                       About this course
                     </h3>
-                    <p className="text-text-secondary dark:text-dark-text-secondary leading-relaxed">
-                      {course.description}
-                    </p>
+                    {renderDescription(course.description)}
                   </div>
 
                   {course.whatYouLearn && course.whatYouLearn.length > 0 && (
@@ -778,7 +811,6 @@ const CourseDetail: React.FC = () => {
                   </>
                 )}
 
-                {/* Enrollment Benefits */}
                 {!isEnrolled && (
                   <div className="mt-6 pt-6 border-t border-[#EDF0FB] dark:border-gray-700">
                     <h4 className="text-sm font-semibold text-text-primary dark:text-dark-text-primary mb-3">

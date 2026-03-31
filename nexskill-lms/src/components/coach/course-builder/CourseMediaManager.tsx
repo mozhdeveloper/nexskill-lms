@@ -202,168 +202,168 @@ const CourseMediaManager: React.FC<CourseMediaManagerProps> = ({
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
+            {/* Course Thumbnail */}
             <div>
-                <h4 className="text-sm font-semibold text-slate-900 dark:text-dark-text-primary mb-3 flex items-center gap-2">
-                    <Image className="w-4 h-4" />
+                <label className="block text-sm font-medium text-slate-700 dark:text-dark-text-secondary mb-1">
                     Course Thumbnail
-                </h4>
-                <div className="border-2 border-dashed border-slate-200 dark:border-gray-700 rounded-xl p-4 hover:border-[#304DB5] dark:hover:border-blue-500 transition-colors">
-                    {thumbnailPreview ? (
-                        <div className="relative">
+                </label>
+                {thumbnailPreview ? (
+                    <div className="relative inline-block border border-slate-200 dark:border-gray-700 rounded-md overflow-hidden">
+                        <div className="relative" style={{ maxWidth: '530px' }}>
                             <img
                                 src={thumbnailPreview}
                                 alt="Course thumbnail"
-                                className="w-full h-40 object-cover rounded-lg"
+                                className="w-full h-auto object-cover"
+                                style={{ aspectRatio: '16/9' }}
                             />
-                            <div className="absolute top-2 right-2 flex gap-2">
+                            <div className="absolute top-2 right-2 flex gap-1">
                                 <button
                                     onClick={() => thumbnailInputRef.current?.click()}
-                                    className="p-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors"
+                                    className="p-1 bg-white dark:bg-gray-800 rounded shadow-sm hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors"
                                     title="Replace thumbnail"
                                     disabled={thumbnailUploading}
                                 >
-                                    <Upload className="w-4 h-4 text-slate-600 dark:text-dark-text-secondary" />
+                                    <Upload className="w-3 h-3 text-slate-600 dark:text-dark-text-secondary" />
                                 </button>
                                 <button
                                     onClick={handleDeleteThumbnail}
-                                    className="p-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                    className="p-1 bg-white dark:bg-gray-800 rounded shadow-sm hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                                     title="Delete thumbnail"
                                     disabled={thumbnailUploading}
                                 >
-                                    <Trash2 className="w-4 h-4 text-red-600" />
+                                    <Trash2 className="w-3 h-3 text-red-600" />
                                 </button>
                             </div>
                             {thumbnailUploading && (
-                                <div className="absolute inset-0 bg-black/50 rounded-lg flex flex-col items-center justify-center">
-                                    <Loader2 className="w-8 h-8 text-white animate-spin mb-2" />
-                                    <p className="text-white text-sm">
-                                        {thumbnailProgress?.percentage.toFixed(0)}% Uploading...
+                                <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center">
+                                    <Loader2 className="w-4 h-4 text-white animate-spin mb-0.5" />
+                                    <p className="text-white text-[10px]">
+                                        {thumbnailProgress?.percentage.toFixed(0)}%
                                     </p>
                                 </div>
                             )}
                         </div>
-                    ) : (
-                        <button
-                            onClick={() => thumbnailInputRef.current?.click()}
-                            className="w-full h-40 flex flex-col items-center justify-center bg-slate-50 dark:bg-gray-800/50 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800 transition-colors"
-                            disabled={thumbnailUploading}
-                        >
-                            {thumbnailUploading ? (
-                                <>
-                                    <Loader2 className="w-8 h-8 text-[#304DB5] animate-spin mb-2" />
-                                    <p className="text-sm text-slate-600 dark:text-dark-text-secondary">
-                                        Uploading... {thumbnailProgress?.percentage.toFixed(0)}%
-                                    </p>
-                                </>
-                            ) : (
-                                <>
-                                    <Upload className="w-8 h-8 text-slate-400 mb-2" />
-                                    <p className="text-sm text-slate-600 dark:text-dark-text-secondary mb-1">
-                                        Click to upload thumbnail
-                                    </p>
-                                    <p className="text-xs text-slate-400 dark:text-gray-500">
-                                        JPG, PNG, or WebP · Max 2MB · 16:9 recommended
-                                    </p>
-                                </>
-                            )}
-                        </button>
-                    )}
-                    <input
-                        ref={thumbnailInputRef}
-                        type="file"
-                        accept="image/jpeg,image/jpg,image/png,image/webp"
-                        onChange={handleThumbnailSelect}
-                        className="hidden"
-                        disabled={thumbnailUploading}
-                    />
-                    {thumbnailError && (
-                        <p className="mt-2 text-sm text-red-600 dark:text-red-400">{thumbnailError}</p>
-                    )}
-                </div>
+                    </div>
+                ) : (
+                    <div className="border border-slate-200 dark:border-gray-700 rounded-md overflow-hidden">
+                        <div className="flex items-center gap-3 p-2">
+                            <div className="flex-shrink-0 w-24 h-16 bg-slate-100 dark:bg-gray-800 rounded flex items-center justify-center">
+                                <Image className="w-6 h-6 text-slate-400" />
+                            </div>
+                            <div className="flex-1">
+                                <p className="text-xs text-slate-600 dark:text-dark-text-secondary mb-1">
+                                    Upload your course image here. It must meet our course image quality standards to be accepted.
+                                </p>
+                                <p className="text-[11px] text-slate-400 dark:text-gray-500 mb-2">
+                                    Important guidelines: 750x422 pixels; jpg, jpeg, gif, or .png. no text on the image.
+                                </p>
+                                <button
+                                    onClick={() => thumbnailInputRef.current?.click()}
+                                    className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-gray-600 rounded text-xs text-slate-700 dark:text-dark-text-secondary hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors"
+                                    disabled={thumbnailUploading}
+                                >
+                                    {thumbnailUploading ? 'Uploading...' : 'Upload File'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                <input
+                    ref={thumbnailInputRef}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    onChange={handleThumbnailSelect}
+                    className="hidden"
+                    disabled={thumbnailUploading}
+                />
+                {thumbnailError && (
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{thumbnailError}</p>
+                )}
             </div>
 
+            {/* Promotional Video */}
             <div>
-                <h4 className="text-sm font-semibold text-slate-900 dark:text-dark-text-primary mb-3 flex items-center gap-2">
-                    <Video className="w-4 h-4" />
-                    Preview Video
-                </h4>
-                <div className="border-2 border-dashed border-slate-200 dark:border-gray-700 rounded-xl p-4 hover:border-[#304DB5] dark:hover:border-blue-500 transition-colors">
-                    {videoPreview ? (
-                        <div className="relative">
+                <label className="block text-sm font-medium text-slate-700 dark:text-dark-text-secondary mb-1">
+                    Promotional Video
+                </label>
+                {videoPreview ? (
+                    <div className="relative inline-block border border-slate-200 dark:border-gray-700 rounded-md overflow-hidden">
+                        <div className="relative" style={{ maxWidth: '530px' }}>
                             <video
                                 src={videoPreview}
                                 controls
-                                className="w-full rounded-lg"
+                                className="w-full h-auto"
+                                style={{ aspectRatio: '16/9' }}
                                 poster={thumbnailUrl || undefined}
                             >
                                 Your browser does not support the video tag.
                             </video>
-                            <div className="absolute top-2 right-2 flex gap-2">
+                            <div className="absolute top-2 right-2 flex gap-1">
                                 <button
                                     onClick={() => videoInputRef.current?.click()}
-                                    className="p-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors"
+                                    className="p-1 bg-white dark:bg-gray-800 rounded shadow-sm hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors"
                                     title="Replace video"
                                     disabled={videoUploading}
                                 >
-                                    <Upload className="w-4 h-4 text-slate-600 dark:text-dark-text-secondary" />
+                                    <Upload className="w-3 h-3 text-slate-600 dark:text-dark-text-secondary" />
                                 </button>
                                 <button
                                     onClick={handleDeleteVideo}
-                                    className="p-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                    className="p-1 bg-white dark:bg-gray-800 rounded shadow-sm hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                                     title="Delete video"
                                     disabled={videoUploading}
                                 >
-                                    <Trash2 className="w-4 h-4 text-red-600" />
+                                    <Trash2 className="w-3 h-3 text-red-600" />
                                 </button>
                             </div>
                             {videoUploading && (
-                                <div className="absolute inset-0 bg-black/50 rounded-lg flex flex-col items-center justify-center">
-                                    <Loader2 className="w-8 h-8 text-white animate-spin mb-2" />
-                                    <p className="text-white text-sm">
-                                        {videoProgress?.percentage.toFixed(0)}% Uploading...
+                                <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center">
+                                    <Loader2 className="w-4 h-4 text-white animate-spin mb-0.5" />
+                                    <p className="text-white text-[10px]">
+                                        {videoProgress?.percentage.toFixed(0)}%
                                     </p>
                                 </div>
                             )}
                         </div>
-                    ) : (
-                        <button
-                            onClick={() => videoInputRef.current?.click()}
-                            className="w-full h-40 flex flex-col items-center justify-center bg-slate-50 dark:bg-gray-800/50 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800 transition-colors"
-                            disabled={videoUploading}
-                        >
-                            {videoUploading ? (
-                                <>
-                                    <Loader2 className="w-8 h-8 text-[#304DB5] animate-spin mb-2" />
-                                    <p className="text-sm text-slate-600 dark:text-dark-text-secondary">
-                                        Uploading... {videoProgress?.percentage.toFixed(0)}%
-                                    </p>
-                                </>
-                            ) : (
-                                <>
-                                    <Play className="w-8 h-8 text-slate-400 mb-2" />
-                                    <p className="text-sm text-slate-600 dark:text-dark-text-secondary mb-1">
-                                        Click to upload preview video
-                                    </p>
-                                    <p className="text-xs text-slate-400 dark:text-gray-500">
+                    </div>
+                ) : (
+                    <div className="border border-slate-200 dark:border-gray-700 rounded-md overflow-hidden">
+                        <div className="p-3">
+                            <p className="text-xs text-slate-600 dark:text-dark-text-secondary mb-2">
+                                Your promo video is a quick and compelling way for students to preview what they'll learn in your course. Students considering your course are more likely to enroll if your promo video is well-made.
+                            </p>
+                            <div className="flex items-center gap-3">
+                                <div className="flex-shrink-0 w-24 h-16 bg-slate-100 dark:bg-gray-800 rounded flex items-center justify-center">
+                                    <Video className="w-6 h-6 text-slate-400" />
+                                </div>
+                                <div className="flex-1">
+                                    <button
+                                        onClick={() => videoInputRef.current?.click()}
+                                        className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-gray-600 rounded text-xs text-slate-700 dark:text-dark-text-secondary hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors"
+                                        disabled={videoUploading}
+                                    >
+                                        {videoUploading ? 'Uploading...' : 'Upload File'}
+                                    </button>
+                                    <p className="text-[11px] text-slate-400 dark:text-gray-500 mt-1">
                                         MP4 · Max 100MB · Max 2 minutes
                                     </p>
-                                </>
-                            )}
-                        </button>
-                    )}
-                    <input
-                        ref={videoInputRef}
-                        type="file"
-                        accept="video/mp4,video/quicktime,video/webm"
-                        onChange={handleVideoSelect}
-                        className="hidden"
-                        disabled={videoUploading}
-                    />
-                    {videoError && (
-                        <p className="mt-2 text-sm text-red-600 dark:text-red-400">{videoError}</p>
-                    )}
-                </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                <input
+                    ref={videoInputRef}
+                    type="file"
+                    accept="video/mp4,video/quicktime,video/webm"
+                    onChange={handleVideoSelect}
+                    className="hidden"
+                    disabled={videoUploading}
+                />
+                {videoError && (
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{videoError}</p>
+                )}
             </div>
         </div>
     );
