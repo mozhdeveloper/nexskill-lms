@@ -1,5 +1,6 @@
 import React from 'react';
 import { Video, FileQuestion, FileText, File, Play, BookOpen } from 'lucide-react';
+import DOMPurify from 'dompurify';
 import type { LessonContentItem } from '../../types/lesson-content-item';
 import { VideoProgressTracker } from './VideoProgressTracker';
 import { YouTubePlayer } from './YouTubePlayer';
@@ -78,14 +79,13 @@ export const StudentContentRenderer: React.FC<StudentContentRendererProps> = ({
 
         if (item.content_type === 'text') {
           return (
-            <div key={item.id} className="p-4 bg-gray-50 dark:bg-slate-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
-              <div className="flex items-center gap-2 mb-2">
-                <FileText className="w-4 h-4 text-green-500" />
-                <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Text Block</span>
-              </div>
-              <div className="text-gray-600 dark:text-gray-300 text-sm">
-                {item.metadata?.content || 'Text content'}
-              </div>
+            <div key={item.id} className="prose prose-slate dark:prose-invert max-w-none p-4 bg-gray-50 dark:bg-slate-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+              <div
+                className="text-content [&>h1]:text-2xl [&>h1]:font-bold [&>h1]:mb-4 [&>h1]:mt-6 [&>h2]:text-xl [&>h2]:font-bold [&>h2]:mb-3 [&>h2]:mt-5 [&>h3]:text-lg [&>h3]:font-semibold [&>h3]:mb-2 [&>h3]:mt-4 [&>h4]:text-base [&>h4]:font-semibold [&>h4]:mb-2 [&>h4]:mt-3 [&>ol]:list-decimal [&>ol]:ml-6 [&>ol]:my-3 [&>ul]:list-disc [&>ul]:ml-6 [&>ul]:my-3 [&>li]:mb-1 [&>p]:mb-3 [&>p]:leading-relaxed"
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(item.metadata?.content || 'Text content'),
+                }}
+              />
             </div>
           );
         }
@@ -111,7 +111,7 @@ export const StudentContentRenderer: React.FC<StudentContentRendererProps> = ({
                 <span>{item.metadata?.title || 'Notes'}</span>
               </div>
               <div className="p-5 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
-                <div 
+                <div
                   className="notes-content prose prose-slate dark:prose-invert max-w-none text-gray-700 dark:text-gray-300"
                   dangerouslySetInnerHTML={{ __html: item.metadata?.content || '' }}
                 />
