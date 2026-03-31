@@ -960,10 +960,11 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                                                                     uploadProgress: 0,
                                                                                 });
                                                                             }}
-                                                                            className="flex items-center text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                                                                            className="text-xs flex items-center text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
                                                                             title="Add content"
                                                                         >
-                                                                            <Plus className="w-4 h-4" />
+                                                                            <Plus className="w-4 h-4 mr-1" />
+                                                                             Add Content
                                                                         </button>
                                                                     )}
                                                                 </div>
