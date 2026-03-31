@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import ReactQuill from "react-quill";
+import "react-quill/dist/quill.snow.css";
 import {
     BookOpen,
     Plus,
@@ -65,9 +67,11 @@ interface ActivePlusMenu {
 interface ContentOptions {
     moduleId: string;
     lessonId: string;
-    mode: "picker" | "video-input" | "video-upload" | "quiz-input";
+    mode: "picker" | "video-input" | "video-upload" | "quiz-input" | "notes" | "notes-preview" | "notes-edit";
     videoUrl: string;
     quizTitle: string;
+    notesContent?: string;
+    notesContentItemId?: string; // ID of existing notes content item for editing
     isUploading: boolean;
     uploadProgress: number;
     uploadedVideoPreview?: string;
@@ -415,6 +419,42 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
     const handleQuizPickerClick = () => {
         if (!contentOptions) return;
         setContentOptions({ ...contentOptions, mode: "quiz-input", quizTitle: "" });
+    };
+
+    const handleSaveNotes = async (moduleId: string, lessonId: string) => {
+        if (!contentOptions?.notesContent?.trim()) return;
+
+        // Calculate word count and reading time
+        const text = contentOptions.notesContent.replace(/<[^>]*>/g, " ").trim();
+        const words = text.split(/\s+/).filter(word => word.length > 0);
+        const wordCount = words.length;
+        const readingTime = Math.ceil(wordCount / 200);
+
+        try {
+            // Save to new lesson_content_items table
+            if (onAddContentItem && courseId) {
+                await onAddContentItem(
+                    lessonId,
+                    moduleId,
+                    'text' as any, // Will be updated to support 'notes'
+                    {
+                        content: contentOptions.notesContent,
+                        title: 'Notes',
+                        word_count: wordCount,
+                        reading_time: readingTime,
+                    },
+                    undefined
+                );
+                // Refresh content items
+                if (onFetchContentItems) {
+                    await onFetchContentItems(lessonId);
+                }
+            }
+
+            setContentOptions(null);
+        } catch (error) {
+            console.error('Error creating notes content item:', error);
+        }
     };
 
     const handleSaveVideoUrl = async (moduleId: string, lessonId: string) => {
@@ -825,7 +865,10 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                                                                         {contentItem.content_type === 'quiz' && (
                                                                                             <FileQuestion className="w-4 h-4 text-purple-500" />
                                                                                         )}
-                                                                                        {contentItem.content_type === 'text' && (
+                                                                                        {contentItem.content_type === 'text' && contentItem.metadata?.content && (
+                                                                                            <FileText className="w-4 h-4 text-green-500" />
+                                                                                        )}
+                                                                                        {contentItem.content_type === 'text' && !contentItem.metadata?.content && (
                                                                                             <FileText className="w-4 h-4 text-green-500" />
                                                                                         )}
                                                                                         {contentItem.content_type === 'document' && (
@@ -836,6 +879,7 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                                                                     <span className="text-sm text-gray-700 dark:text-gray-200 flex-1 truncate" title={contentItem.content_type === 'video' ? contentItem.metadata?.url : undefined}>
                                                                                         {contentItem.content_type === 'video' ? (contentItem.metadata?.title || 'Video') :
                                                                                          contentItem.content_type === 'quiz' ? (contentItem.metadata?.title || 'Quiz') :
+                                                                                         contentItem.content_type === 'text' && contentItem.metadata?.content ? 'Notes' :
                                                                                          contentItem.content_type === 'text' ? 'Text' : 'Document'}
                                                                                     </span>
                                                                                     {/* Play button for videos */}
@@ -846,6 +890,28 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                                                                             title="Preview video"
                                                                                         >
                                                                                             <Play className="w-4 h-4" />
+                                                                                        </button>
+                                                                                    )}
+                                                                                    {/* Preview/Edit button for notes */}
+                                                                                    {contentItem.content_type === 'text' && contentItem.metadata?.content && (
+                                                                                        <button
+                                                                                            onClick={() => {
+                                                                                                setContentOptions({
+                                                                                                    moduleId: module.id,
+                                                                                                    lessonId: item.id,
+                                                                                                    mode: "notes-preview",
+                                                                                                    videoUrl: "",
+                                                                                                    quizTitle: "",
+                                                                                                    isUploading: false,
+                                                                                                    uploadProgress: 0,
+                                                                                                    notesContent: contentItem.metadata?.content,
+                                                                                                    notesContentItemId: contentItem.id,
+                                                                                                });
+                                                                                            }}
+                                                                                            className="px-3 py-1.5 text-sm font-medium text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors flex-shrink-0"
+                                                                                            title="Preview/Edit notes"
+                                                                                        >
+                                                                                            Preview/Edit
                                                                                         </button>
                                                                                     )}
                                                                                     {/* Edit button for quizzes */}
@@ -927,6 +993,16 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                                                         >
                                                                             <FileQuestion className="w-3.5 h-3.5" />
                                                                             Quiz
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                // Add notes content type
+                                                                                setContentOptions({ ...contentOptions, mode: "notes" });
+                                                                            }}
+                                                                            className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-gray-600 hover:border-green-300 dark:hover:border-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 text-gray-700 dark:text-gray-200 hover:text-green-600 dark:hover:text-green-400 rounded-lg text-xs font-medium transition-all"
+                                                                        >
+                                                                            <FileText className="w-3.5 h-3.5" />
+                                                                            Notes
                                                                         </button>
                                                                     </div>
                                                                 </div>
@@ -1346,6 +1422,415 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                                                         >
                                                                             <X className="w-4 h-4" />
                                                                         </button>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Notes Editor with React Quill */}
+                                                            {showingOpts && contentOptions?.mode === "notes" && (
+                                                                <div className="pt-2">
+                                                                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-slate-800">
+                                                                        {/* Header */}
+                                                                        <div className="bg-green-50 dark:bg-green-900/20 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <FileText className="w-5 h-5 text-green-600" />
+                                                                                <h3 className="font-semibold text-gray-700 dark:text-gray-200">Add Notes</h3>
+                                                                            </div>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <button
+                                                                                    onClick={() => handleSaveNotes(module.id, item.id)}
+                                                                                    disabled={!contentOptions.notesContent?.trim()}
+                                                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-md transition-colors text-sm font-medium"
+                                                                                >
+                                                                                    <Check className="w-4 h-4" />
+                                                                                    Save Notes
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => setContentOptions((c) => c ? { ...c, mode: "picker" } : c)}
+                                                                                    className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                                                                                >
+                                                                                    <X className="w-4 h-4" />
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* React Quill Editor */}
+                                                                        <div className="p-4">
+                                                                            <div className="notes-editor-container" style={{ height: '350px', display: 'flex', flexDirection: 'column' }}>
+                                                                                <ReactQuill
+                                                                                    theme="snow"
+                                                                                    value={contentOptions.notesContent || ''}
+                                                                                    onChange={(value) => setContentOptions((c) => c ? { ...c, notesContent: value } : c)}
+                                                                                    placeholder="Write your notes here with rich formatting..."
+                                                                                    modules={{
+                                                                                        toolbar: [
+                                                                                            [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+                                                                                            ['bold', 'italic', 'underline', 'strike'],
+                                                                                            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                                                                                            [{ 'indent': '-1' }, { 'indent': '+1' }],
+                                                                                            [{ 'align': [] }],
+                                                                                            ['link', 'blockquote', 'code-block'],
+                                                                                            [{ 'color': [] }, { 'background': [] }],
+                                                                                            ['clean'],
+                                                                                        ],
+                                                                                    }}
+                                                                                    formats={[
+                                                                                        'header',
+                                                                                        'bold', 'italic', 'underline', 'strike',
+                                                                                        'list', 'bullet',
+                                                                                        'indent',
+                                                                                        'align',
+                                                                                        'link', 'blockquote', 'code-block',
+                                                                                        'color', 'background',
+                                                                                    ]}
+                                                                                    style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
+                                                                                />
+                                                                            </div>
+                                                                            <div className="mt-3 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                                                                                <div className="flex items-center gap-4">
+                                                                                    <span className="flex items-center gap-1">
+                                                                                        <FileText className="w-3.5 h-3.5" />
+                                                                                        {contentOptions.notesContent?.replace(/<[^>]*>/g, ' ').trim().split(/\s+/).filter(w => w.length > 0).length || 0} words
+                                                                                    </span>
+                                                                                    <span>
+                                                                                        ~{Math.ceil((contentOptions.notesContent?.replace(/<[^>]*>/g, ' ').trim().split(/\s+/).filter(w => w.length > 0).length || 0) / 200)} min read
+                                                                                    </span>
+                                                                                </div>
+                                                                                <span>Rich text editor with formatting</span>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* Custom Styles for React Quill */}
+                                                                        <style>{`
+                                                                            .notes-editor-container .ql-toolbar {
+                                                                                border: 1px solid #e5e7eb !important;
+                                                                                border-bottom: none !important;
+                                                                                border-radius: 0.375rem 0.375rem 0 0;
+                                                                                background-color: #f9fafb;
+                                                                            }
+                                                                            .dark .notes-editor-container .ql-toolbar {
+                                                                                background-color: #1e293b;
+                                                                                border-color: #374151 !important;
+                                                                            }
+                                                                            .notes-editor-container .ql-container {
+                                                                                border: 1px solid #e5e7eb !important;
+                                                                                border-radius: 0 0 0.375rem 0.375rem;
+                                                                                font-family: inherit;
+                                                                                font-size: 0.875rem;
+                                                                                background-color: white;
+                                                                                flex: 1;
+                                                                                overflow-y: auto;
+                                                                            }
+                                                                            .dark .notes-editor-container .ql-container {
+                                                                                background-color: #0f172a;
+                                                                                border-color: #374151 !important;
+                                                                            }
+                                                                            .notes-editor-container .ql-editor {
+                                                                                min-height: 250px;
+                                                                                line-height: 1.7;
+                                                                            }
+                                                                            .notes-editor-container .ql-editor p {
+                                                                                margin-bottom: 1em;
+                                                                            }
+                                                                            .notes-editor-container .ql-editor blockquote {
+                                                                                border-left: 4px solid #10b981;
+                                                                                padding-left: 1em;
+                                                                                margin-left: 0;
+                                                                                margin-right: 0;
+                                                                                font-style: italic;
+                                                                                color: #6b7280;
+                                                                            }
+                                                                            .dark .notes-editor-container .ql-editor blockquote {
+                                                                                color: #9ca3af;
+                                                                            }
+                                                                            .notes-editor-container .ql-editor code {
+                                                                                background-color: #f3f4f6;
+                                                                                padding: 0.2em 0.4em;
+                                                                                border-radius: 0.25rem;
+                                                                                font-size: 0.9em;
+                                                                            }
+                                                                            .dark .notes-editor-container .ql-editor code {
+                                                                                background-color: #1e293b;
+                                                                            }
+                                                                            .notes-editor-container .ql-editor pre.ql-syntax {
+                                                                                background-color: #1e293b;
+                                                                                color: #e2e8f0;
+                                                                                padding: 1em;
+                                                                                border-radius: 0.375rem;
+                                                                                overflow-x: auto;
+                                                                            }
+                                                                        `}</style>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Notes Preview/Edit Panel */}
+                                                            {showingOpts && contentOptions?.mode === "notes-preview" && (
+                                                                <div className="pt-2">
+                                                                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-slate-800">
+                                                                        {/* Header */}
+                                                                        <div className="bg-green-50 dark:bg-green-900/20 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <FileText className="w-5 h-5 text-green-600" />
+                                                                                <h3 className="font-semibold text-gray-700 dark:text-gray-200">Preview Notes</h3>
+                                                                            </div>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <button
+                                                                                    onClick={() => setContentOptions((c) => c ? { ...c, mode: "notes-edit" } : c)}
+                                                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors text-sm font-medium"
+                                                                                >
+                                                                                    <PenLine className="w-4 h-4" />
+                                                                                    Edit
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => setContentOptions((c) => c ? { ...c, mode: "picker" } : c)}
+                                                                                    className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                                                                                >
+                                                                                    <X className="w-4 h-4" />
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* Preview Content - Rendered HTML */}
+                                                                        <div className="p-4">
+                                                                            <div 
+                                                                                className="prose prose-slate dark:prose-invert max-w-none"
+                                                                                dangerouslySetInnerHTML={{ __html: contentOptions.notesContent || '' }}
+                                                                            />
+                                                                            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                                                                                <span className="flex items-center gap-1">
+                                                                                    <FileText className="w-3.5 h-3.5" />
+                                                                                    {(contentOptions.notesContent || '').replace(/<[^>]*>/g, ' ').trim().split(/\s+/).filter(w => w.length > 0).length} words
+                                                                                </span>
+                                                                                <span>
+                                                                                    ~{Math.ceil(((contentOptions.notesContent || '').replace(/<[^>]*>/g, ' ').trim().split(/\s+/).filter(w => w.length > 0).length || 0) / 200)} min read
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* Custom Styles for Preview */}
+                                                                        <style>{`
+                                                                            .prose {
+                                                                                color: #374151;
+                                                                                line-height: 1.7;
+                                                                            }
+                                                                            .dark .prose {
+                                                                                color: #d1d5db;
+                                                                            }
+                                                                            .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+                                                                                font-weight: 600;
+                                                                                margin-top: 1.5em;
+                                                                                margin-bottom: 0.5em;
+                                                                                color: #111827;
+                                                                            }
+                                                                            .dark .prose h1, .dark .prose h2, .dark .prose h3, .dark .prose h4, .dark .prose h5, .dark .prose h6 {
+                                                                                color: #f3f4f6;
+                                                                            }
+                                                                            .prose p {
+                                                                                margin-bottom: 1em;
+                                                                            }
+                                                                            .prose ul, .prose ol {
+                                                                                padding-left: 1.5em;
+                                                                                margin-bottom: 1em;
+                                                                            }
+                                                                            .prose blockquote {
+                                                                                border-left: 4px solid #10b981;
+                                                                                padding-left: 1em;
+                                                                                margin-left: 0;
+                                                                                margin-right: 0;
+                                                                                font-style: italic;
+                                                                                color: #6b7280;
+                                                                            }
+                                                                            .dark .prose blockquote {
+                                                                                color: #9ca3af;
+                                                                            }
+                                                                            .prose code {
+                                                                                background-color: #f3f4f6;
+                                                                                padding: 0.2em 0.4em;
+                                                                                border-radius: 0.25rem;
+                                                                                font-size: 0.9em;
+                                                                            }
+                                                                            .dark .prose code {
+                                                                                background-color: #1e293b;
+                                                                            }
+                                                                            .prose pre {
+                                                                                background-color: #1e293b;
+                                                                                color: #e2e8f0;
+                                                                                padding: 1em;
+                                                                                border-radius: 0.375rem;
+                                                                                overflow-x: auto;
+                                                                                margin-bottom: 1em;
+                                                                            }
+                                                                            .prose a {
+                                                                                color: #10b981;
+                                                                                text-decoration: underline;
+                                                                            }
+                                                                            .dark .prose a {
+                                                                                color: #34d399;
+                                                                            }
+                                                                        `}</style>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Notes Edit Panel with React Quill */}
+                                                            {showingOpts && contentOptions?.mode === "notes-edit" && (
+                                                                <div className="pt-2">
+                                                                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-slate-800">
+                                                                        {/* Header */}
+                                                                        <div className="bg-green-50 dark:bg-green-900/20 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <FileText className="w-5 h-5 text-green-600" />
+                                                                                <h3 className="font-semibold text-gray-700 dark:text-gray-200">Edit Notes</h3>
+                                                                            </div>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        // Update the existing notes
+                                                                                        if (contentOptions.notesContentItemId && onUpdateContentItemMetadata) {
+                                                                                            const text = contentOptions.notesContent?.replace(/<[^>]*>/g, " ").trim() || '';
+                                                                                            const words = text.split(/\s+/).filter(w => w.length > 0);
+                                                                                            onUpdateContentItemMetadata(contentOptions.notesContentItemId, {
+                                                                                                content: contentOptions.notesContent,
+                                                                                                title: 'Notes',
+                                                                                                word_count: words.length,
+                                                                                                reading_time: Math.ceil(words.length / 200),
+                                                                                            }).then(() => {
+                                                                                                if (onFetchContentItems) {
+                                                                                                    onFetchContentItems(item.id);
+                                                                                                }
+                                                                                                setContentOptions(null);
+                                                                                            });
+                                                                                        }
+                                                                                    }}
+                                                                                    disabled={!contentOptions.notesContent?.trim()}
+                                                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-md transition-colors text-sm font-medium"
+                                                                                >
+                                                                                    <Check className="w-4 h-4" />
+                                                                                    Save Changes
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => setContentOptions((c) => c ? { ...c, mode: "notes-preview" } : c)}
+                                                                                    className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                                                                                    title="Preview"
+                                                                                >
+                                                                                    <Play className="w-4 h-4" />
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => setContentOptions((c) => c ? { ...c, mode: "picker" } : c)}
+                                                                                    className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                                                                                >
+                                                                                    <X className="w-4 h-4" />
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* React Quill Editor */}
+                                                                        <div className="p-4">
+                                                                            <div className="notes-editor-container" style={{ height: '350px', display: 'flex', flexDirection: 'column' }}>
+                                                                                <ReactQuill
+                                                                                    theme="snow"
+                                                                                    value={contentOptions.notesContent || ''}
+                                                                                    onChange={(value) => setContentOptions((c) => c ? { ...c, notesContent: value } : c)}
+                                                                                    placeholder="Edit your notes here..."
+                                                                                    modules={{
+                                                                                        toolbar: [
+                                                                                            [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+                                                                                            ['bold', 'italic', 'underline', 'strike'],
+                                                                                            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                                                                                            [{ 'indent': '-1' }, { 'indent': '+1' }],
+                                                                                            [{ 'align': [] }],
+                                                                                            ['link', 'blockquote', 'code-block'],
+                                                                                            [{ 'color': [] }, { 'background': [] }],
+                                                                                            ['clean'],
+                                                                                        ],
+                                                                                    }}
+                                                                                    formats={[
+                                                                                        'header',
+                                                                                        'bold', 'italic', 'underline', 'strike',
+                                                                                        'list', 'bullet',
+                                                                                        'indent',
+                                                                                        'align',
+                                                                                        'link', 'blockquote', 'code-block',
+                                                                                        'color', 'background',
+                                                                                    ]}
+                                                                                    style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
+                                                                                />
+                                                                            </div>
+                                                                            <div className="mt-3 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                                                                                <div className="flex items-center gap-4">
+                                                                                    <span className="flex items-center gap-1">
+                                                                                        <FileText className="w-3.5 h-3.5" />
+                                                                                        {contentOptions.notesContent?.replace(/<[^>]*>/g, ' ').trim().split(/\s+/).filter(w => w.length > 0).length || 0} words
+                                                                                    </span>
+                                                                                    <span>
+                                                                                        ~{Math.ceil((contentOptions.notesContent?.replace(/<[^>]*>/g, ' ').trim().split(/\s+/).filter(w => w.length > 0).length || 0) / 200)} min read
+                                                                                    </span>
+                                                                                </div>
+                                                                                <span>Edit existing notes - changes will be saved</span>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* Custom Styles for React Quill */}
+                                                                        <style>{`
+                                                                            .notes-editor-container .ql-toolbar {
+                                                                                border: 1px solid #e5e7eb !important;
+                                                                                border-bottom: none !important;
+                                                                                border-radius: 0.375rem 0.375rem 0 0;
+                                                                                background-color: #f9fafb;
+                                                                            }
+                                                                            .dark .notes-editor-container .ql-toolbar {
+                                                                                background-color: #1e293b;
+                                                                                border-color: #374151 !important;
+                                                                            }
+                                                                            .notes-editor-container .ql-container {
+                                                                                border: 1px solid #e5e7eb !important;
+                                                                                border-radius: 0 0 0.375rem 0.375rem;
+                                                                                font-family: inherit;
+                                                                                font-size: 0.875rem;
+                                                                                background-color: white;
+                                                                                flex: 1;
+                                                                                overflow-y: auto;
+                                                                            }
+                                                                            .dark .notes-editor-container .ql-container {
+                                                                                background-color: #0f172a;
+                                                                                border-color: #374151 !important;
+                                                                            }
+                                                                            .notes-editor-container .ql-editor {
+                                                                                min-height: 250px;
+                                                                                line-height: 1.7;
+                                                                            }
+                                                                            .notes-editor-container .ql-editor p {
+                                                                                margin-bottom: 1em;
+                                                                            }
+                                                                            .notes-editor-container .ql-editor blockquote {
+                                                                                border-left: 4px solid #10b981;
+                                                                                padding-left: 1em;
+                                                                                margin-left: 0;
+                                                                                margin-right: 0;
+                                                                                font-style: italic;
+                                                                                color: #6b7280;
+                                                                            }
+                                                                            .dark .notes-editor-container .ql-editor blockquote {
+                                                                                color: #9ca3af;
+                                                                            }
+                                                                            .notes-editor-container .ql-editor code {
+                                                                                background-color: #f3f4f6;
+                                                                                padding: 0.2em 0.4em;
+                                                                                border-radius: 0.25rem;
+                                                                                font-size: 0.9em;
+                                                                            }
+                                                                            .dark .notes-editor-container .ql-editor code {
+                                                                                background-color: #1e293b;
+                                                                            }
+                                                                            .notes-editor-container .ql-editor pre.ql-syntax {
+                                                                                background-color: #1e293b;
+                                                                                color: #e2e8f0;
+                                                                                padding: 1em;
+                                                                                border-radius: 0.375rem;
+                                                                                overflow-x: auto;
+                                                                            }
+                                                                        `}</style>
                                                                     </div>
                                                                 </div>
                                                             )}

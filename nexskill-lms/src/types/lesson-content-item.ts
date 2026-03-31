@@ -8,8 +8,8 @@ export interface LessonContentItem {
     lesson_id: string;
     course_id: string;
     module_id: string;
-    content_type: 'video' | 'quiz' | 'text' | 'document';
-    content_id: string | null; // UUID for quiz type, null for video/text/document
+    content_type: 'video' | 'quiz' | 'text' | 'document' | 'notes';
+    content_id: string | null; // UUID for quiz type, null for video/text/document/notes
     metadata: ContentMetadata;
     position: number;
     is_published: boolean;
@@ -107,7 +107,7 @@ export interface CreateContentItemInput {
     lesson_id: string;
     course_id: string;
     module_id: string;
-    content_type: 'video' | 'quiz' | 'text' | 'document';
+    content_type: 'video' | 'quiz' | 'text' | 'document' | 'notes';
     content_id?: string | null;
     metadata?: ContentMetadata;
     position?: number;
@@ -118,7 +118,7 @@ export interface CreateContentItemInput {
  * Helper type for updating content items
  */
 export interface UpdateContentItemInput {
-    content_type?: 'video' | 'quiz' | 'text' | 'document';
+    content_type?: 'video' | 'quiz' | 'text' | 'document' | 'notes';
     content_id?: string | null;
     metadata?: ContentMetadata;
     position?: number;
