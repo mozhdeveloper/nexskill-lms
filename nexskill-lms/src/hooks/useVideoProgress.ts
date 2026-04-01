@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 
 interface UseVideoProgressOptions {
   lessonId: string;
+  contentItemId?: string; // NEW: Optional content item ID for granular tracking
   videoUrl: string;
   duration?: number; // Optional: if known from metadata
   onComplete?: () => void; // Callback when video is completed
@@ -23,9 +24,11 @@ interface VideoProgressState {
 /**
  * Hook to track video watch progress and auto-complete lessons
  * Supports YouTube and direct video uploads (mp4, webm, etc.)
+ * NOW SUPPORTS: Per-content-item tracking (contentItemId) OR legacy per-lesson tracking
  */
 export const useVideoProgress = ({
   lessonId,
+  contentItemId, // NEW
   videoUrl,
   duration: initialDuration,
   onComplete,
@@ -50,7 +53,7 @@ export const useVideoProgress = ({
   // Load existing progress on mount (only once)
   useEffect(() => {
     let isMounted = true;
-    
+
     const loadProgress = async () => {
       if (!user || !lessonId || !videoUrl) {
         if (isMounted) setState(prev => ({ ...prev, isLoading: false }));
@@ -58,38 +61,75 @@ export const useVideoProgress = ({
       }
 
       try {
-        const { data, error } = await supabase
-          .from('lesson_video_progress')
-          .select('current_time_seconds, duration_seconds, watch_time_seconds, is_completed')
-          .eq('user_id', user.id)
-          .eq('lesson_id', lessonId)
-          .eq('video_url', videoUrl)
-          .maybeSingle();
+        // NEW: If contentItemId provided, use lesson_content_item_progress table
+        if (contentItemId) {
+          const { data, error } = await supabase
+            .from('lesson_content_item_progress')
+            .select('current_time_seconds, duration_seconds, watch_time_seconds, is_completed')
+            .eq('user_id', user.id)
+            .eq('lesson_id', lessonId)
+            .eq('content_item_id', contentItemId)
+            .maybeSingle();
 
-        if (error) throw error;
+          if (error) throw error;
 
-        if (isMounted) {
-          if (data) {
-            setState((prev) => ({
-              ...prev,
-              currentTime: data.current_time_seconds || 0,
-              duration: data.duration_seconds || initialDuration || 0,
-              watchTime: data.watch_time_seconds || 0,
-              isCompleted: data.is_completed || false,
-              isLoading: false,
-            }));
-            hasCompletedRef.current = data.is_completed || false;
-            
-            // Notify parent of loaded duration
-            if (data.duration_seconds && onDurationLoaded) {
-              onDurationLoaded(data.duration_seconds);
+          if (isMounted) {
+            if (data) {
+              setState((prev) => ({
+                ...prev,
+                currentTime: data.current_time_seconds || 0,
+                duration: data.duration_seconds || initialDuration || 0,
+                watchTime: data.watch_time_seconds || 0,
+                isCompleted: data.is_completed || false,
+                isLoading: false,
+              }));
+              hasCompletedRef.current = data.is_completed || false;
+
+              if (data.duration_seconds && onDurationLoaded) {
+                onDurationLoaded(data.duration_seconds);
+              }
+            } else {
+              setState((prev) => ({
+                ...prev,
+                duration: initialDuration || 0,
+                isLoading: false,
+              }));
             }
-          } else {
-            setState((prev) => ({
-              ...prev,
-              duration: initialDuration || 0,
-              isLoading: false,
-            }));
+          }
+        } else {
+          // LEGACY: Use lesson_video_progress table
+          const { data, error } = await supabase
+            .from('lesson_video_progress')
+            .select('current_time_seconds, duration_seconds, watch_time_seconds, is_completed')
+            .eq('user_id', user.id)
+            .eq('lesson_id', lessonId)
+            .eq('video_url', videoUrl)
+            .maybeSingle();
+
+          if (error) throw error;
+
+          if (isMounted) {
+            if (data) {
+              setState((prev) => ({
+                ...prev,
+                currentTime: data.current_time_seconds || 0,
+                duration: data.duration_seconds || initialDuration || 0,
+                watchTime: data.watch_time_seconds || 0,
+                isCompleted: data.is_completed || false,
+                isLoading: false,
+              }));
+              hasCompletedRef.current = data.is_completed || false;
+
+              if (data.duration_seconds && onDurationLoaded) {
+                onDurationLoaded(data.duration_seconds);
+              }
+            } else {
+              setState((prev) => ({
+                ...prev,
+                duration: initialDuration || 0,
+                isLoading: false,
+              }));
+            }
           }
         }
       } catch (err) {
@@ -105,11 +145,11 @@ export const useVideoProgress = ({
     };
 
     loadProgress();
-    
+
     return () => {
       isMounted = false;
     };
-  }, [user, lessonId, videoUrl]); // Removed onDurationLoaded from deps
+  }, [user, lessonId, videoUrl, contentItemId, initialDuration]); // Added contentItemId to deps
 
   // Save progress to database (debounced)
   const saveProgress = useCallback(
