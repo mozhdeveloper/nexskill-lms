@@ -421,7 +421,7 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
         setContentOptions({ ...contentOptions, mode: "quiz-input", quizTitle: "" });
     };
 
-    const handleSaveNotes = async (moduleId: string, lessonId: string) => {
+    const handleSaveNotes = async (moduleId: string, lessonId: string, keepPickerOpen: boolean = false) => {
         if (!contentOptions?.notesContent?.trim()) return;
 
         // Calculate word count and reading time
@@ -451,7 +451,12 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                 }
             }
 
-            setContentOptions(null);
+            // Clear notes content for next entry
+            setContentOptions({
+                ...contentOptions,
+                notesContent: '',
+                mode: keepPickerOpen ? "picker" : null
+            });
         } catch (error) {
             console.error('Error creating notes content item:', error);
         }
@@ -1439,7 +1444,16 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                                                             </div>
                                                                             <div className="flex items-center gap-2">
                                                                                 <button
-                                                                                    onClick={() => handleSaveNotes(module.id, item.id)}
+                                                                                    onClick={() => handleSaveNotes(module.id, item.id, true)}
+                                                                                    disabled={!contentOptions.notesContent?.trim()}
+                                                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-md transition-colors text-sm font-medium"
+                                                                                    title="Save and add another note"
+                                                                                >
+                                                                                    <Plus className="w-4 h-4" />
+                                                                                    Save & Add Another
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => handleSaveNotes(module.id, item.id, false)}
                                                                                     disabled={!contentOptions.notesContent?.trim()}
                                                                                     className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-md transition-colors text-sm font-medium"
                                                                                 >
