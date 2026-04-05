@@ -11,7 +11,7 @@ interface VideoProgressTrackerProps {
     onTimeUpdate: (currentTime: number, duration: number) => void;
     onDurationChange: (duration: number) => void;
     onVideoComplete: () => void; // Pass to player
-    isCompleted: boolean;
+    isCompleted: boolean; // Source of truth from lesson_content_item_progress.is_completed
     progressPercent: number;
     startTime: number; // Resume position
   }) => React.ReactNode;
@@ -21,6 +21,9 @@ interface VideoProgressTrackerProps {
  * Wrapper component that tracks video progress for any video player
  * Works with YouTube iframe API and HTML5 <video> elements
  * NOW TRACKS PER CONTENT ITEM - lesson only completes when ALL items are done
+ *
+ * isCompleted is sourced directly from useVideoProgress hook, which reads
+ * lesson_content_item_progress.is_completed as the single source of truth.
  */
 export const VideoProgressTracker: React.FC<VideoProgressTrackerProps> = ({
   lessonId,
@@ -32,16 +35,14 @@ export const VideoProgressTracker: React.FC<VideoProgressTrackerProps> = ({
 }) => {
   const [duration, setDuration] = useState<number>(0);
   const [currentTime, setCurrentTime] = useState<number>(0);
-  const [isCompleted, setIsCompleted] = useState<boolean>(false);
   const hasTriggeredRef = useRef(false);
 
-  const { updateProgress, updateDuration, markAsComplete, progressPercent } = useVideoProgress({
+  const { updateProgress, updateDuration, markAsComplete, progressPercent, isCompleted } = useVideoProgress({
     lessonId,
     contentItemId, // NEW: Pass content item ID
     videoUrl,
     duration: duration || undefined,
     onComplete: () => {
-      setIsCompleted(true);
       console.log('🎉 Video content item completed!');
       // Call parent callback - parent will check if ALL items are done
       if (onComplete && !hasTriggeredRef.current) {

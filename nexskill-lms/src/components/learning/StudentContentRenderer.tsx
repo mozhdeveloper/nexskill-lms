@@ -13,6 +13,10 @@ interface StudentContentRendererProps {
   onQuizClick: (quizId: string) => void;
   onContentItemComplete?: (contentItemId: string) => void; // NEW: Callback when ANY content item completes
   onVideoComplete?: () => void; // DEPRECATED: Kept for backward compatibility
+  // Navigation props
+  prevItem?: { id: string; type: 'lesson' | 'quiz' } | null;
+  nextItem?: { id: string; type: 'lesson' | 'quiz' } | null;
+  onNavigate?: (item: { id: string; type: 'lesson' | 'quiz' }) => void;
 }
 
 export const StudentContentRenderer: React.FC<StudentContentRendererProps> = ({
@@ -21,6 +25,9 @@ export const StudentContentRenderer: React.FC<StudentContentRendererProps> = ({
   onQuizClick,
   onContentItemComplete,
   onVideoComplete,
+  prevItem,
+  nextItem,
+  onNavigate,
 }) => {
   if (!contentItems || contentItems.length === 0) {
     return (
@@ -31,107 +38,191 @@ export const StudentContentRenderer: React.FC<StudentContentRendererProps> = ({
   }
 
   return (
-    <div className="space-y-6">
-      {contentItems.map((item, index) => {
-        if (item.content_type === 'video') {
-          return (
-            <div key={item.id} className="space-y-2">
-              <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
-                <Video className="w-4 h-4 text-blue-500" />
-                <span>{item.metadata?.title || `Video ${index + 1}`}</span>
-              </div>
-              <VideoContent
-                contentItemId={item.id} // NEW: Pass content item ID
-                videoUrl={item.metadata?.url}
-                videoType={item.metadata?.video_type}
+    <>
+      <div className="space-y-6">
+        {contentItems.map((item, index) => {
+          if (item.content_type === 'video') {
+            return (
+              <VideoItem
+                key={item.id}
+                item={item}
+                index={index}
                 lessonId={lessonId}
-                onComplete={() => onContentItemComplete?.(item.id)} // NEW: Notify parent
+                onComplete={() => onContentItemComplete?.(item.id)}
               />
-            </div>
-          );
-        }
+            );
+          }
 
-        if (item.content_type === 'quiz') {
-          return (
-            <div key={item.id} className="space-y-2">
-              <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
-                <FileQuestion className="w-4 h-4 text-purple-500" />
-                <span>{item.metadata?.title || `Quiz ${index + 1}`}</span>
-              </div>
-              <button
-                onClick={() => item.content_id && onQuizClick(item.content_id)}
-                className="w-full flex items-center justify-between p-4 bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-xl hover:border-purple-400 dark:hover:border-purple-600 transition-all group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                    <FileQuestion className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div className="text-left">
-                    <p className="font-medium text-purple-900 dark:text-purple-100">
-                      {item.metadata?.title || 'Quiz'}
-                    </p>
-                    <p className="text-sm text-purple-600 dark:text-purple-400">
-                      Click to start quiz
-                    </p>
-                  </div>
-                </div>
-                <Play className="w-5 h-5 text-purple-600 dark:text-purple-400 group-hover:translate-x-1 transition-transform" />
-              </button>
-            </div>
-          );
-        }
+          if (item.content_type === 'quiz') {
+            return (
+              <QuizItem
+                key={item.id}
+                item={item}
+                index={index}
+                lessonId={lessonId}
+                onQuizClick={onQuizClick}
+                onComplete={() => onContentItemComplete?.(item.id)}
+              />
+            );
+          }
 
-        if (item.content_type === 'text') {
-          return (
-            <TextContent
-              key={item.id}
-              contentItemId={item.id}
-              content={item.metadata?.content}
-              onComplete={() => onContentItemComplete?.(item.id)}
-            />
-          );
-        }
+          if (item.content_type === 'text') {
+            return (
+              <TextContent
+                key={item.id}
+                contentItemId={item.id}
+                content={item.metadata?.content}
+                onComplete={() => onContentItemComplete?.(item.id)}
+              />
+            );
+          }
 
-        if (item.content_type === 'document') {
-          return (
-            <DocumentContent
-              key={item.id}
-              contentItemId={item.id}
-              fileName={item.metadata?.file_name}
-              onComplete={() => onContentItemComplete?.(item.id)}
-            />
-          );
-        }
+          if (item.content_type === 'document') {
+            return (
+              <DocumentContent
+                key={item.id}
+                contentItemId={item.id}
+                fileName={item.metadata?.file_name}
+                onComplete={() => onContentItemComplete?.(item.id)}
+              />
+            );
+          }
 
-        if (item.content_type === 'notes') {
-          return (
-            <div key={item.id} className="space-y-2">
-              <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
-                <BookOpen className="w-4 h-4 text-green-600" />
-                <span>{item.metadata?.title || 'Notes'}</span>
-              </div>
-              <div className="p-5 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
-                <div
-                  className="notes-content prose prose-slate dark:prose-invert max-w-none text-gray-700 dark:text-gray-300"
-                  dangerouslySetInnerHTML={{ __html: item.metadata?.content || '' }}
-                />
-                {(item.metadata?.word_count || item.metadata?.reading_time) && (
-                  <div className="flex items-center gap-4 mt-4 pt-3 border-t border-green-200 dark:border-green-800 text-xs text-gray-500 dark:text-gray-400">
-                    {item.metadata?.word_count && (
-                      <span>{item.metadata.word_count} words</span>
-                    )}
-                    {item.metadata?.reading_time && (
-                      <span>~{item.metadata.reading_time} min read</span>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        }
+          if (item.content_type === 'notes') {
+            return (
+              <NotesItem
+                key={item.id}
+                item={item}
+                index={index}
+              />
+            );
+          }
 
-        return null;
-      })}
+          return null;
+        })}
+      </div>
+
+      {/* Next / Previous Navigation — positioned underneath last content item */}
+      <div className="flex items-center justify-between pt-6">
+        {prevItem ? (
+          <button
+            onClick={() => onNavigate?.(prevItem)}
+            className="px-5 py-2.5 text-sm font-medium text-text-secondary dark:text-dark-text-secondary border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
+          >
+            ← Previous {prevItem.type === 'quiz' ? 'Quiz' : 'Lesson'}
+          </button>
+        ) : <div />}
+        {nextItem ? (
+          <button
+            onClick={() => onNavigate?.(nextItem)}
+            className="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-brand-primary to-brand-primary-light rounded-full shadow-button-primary hover:shadow-lg hover:scale-[1.02] transition-all"
+          >
+            Next {nextItem.type === 'quiz' ? 'Quiz' : 'Lesson'} →
+          </button>
+        ) : <div />}
+      </div>
+    </>
+  );
+};
+
+// Video Item with completion checkmark in header
+const VideoItem: React.FC<{
+  item: LessonContentItem;
+  index: number;
+  lessonId: string;
+  onComplete?: () => void;
+}> = ({ item, index, lessonId, onComplete }) => {
+  return (
+    <VideoContent
+      contentItemId={item.id}
+      videoUrl={item.metadata?.url}
+      videoType={item.metadata?.video_type}
+      lessonId={lessonId}
+      title={item.metadata?.title || `Video ${index + 1}`}
+      onComplete={onComplete}
+    />
+  );
+};
+
+// Quiz Item with completion checkmark in header
+const QuizItem: React.FC<{
+  item: LessonContentItem;
+  index: number;
+  lessonId: string;
+  onQuizClick: (quizId: string) => void;
+  onComplete?: () => void;
+}> = ({ item, index, lessonId, onQuizClick, onComplete }) => {
+  const { isCompleted } = useContentItemProgress({
+    lessonId,
+    contentItemId: item.id,
+    contentType: 'quiz',
+    onComplete,
+  });
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
+        <FileQuestion className="w-4 h-4 text-purple-500" />
+        <span className={isCompleted ? 'text-green-600 dark:text-green-400' : ''}>
+          {item.metadata?.title || `Quiz ${index + 1}`}
+        </span>
+        {isCompleted && (
+          <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+          </svg>
+        )}
+      </div>
+      <button
+        onClick={() => item.content_id && onQuizClick(item.content_id)}
+        className="w-full flex items-center justify-between p-4 bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-xl hover:border-purple-400 dark:hover:border-purple-600 transition-all group"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+            <FileQuestion className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+          </div>
+          <div className="text-left">
+            <p className="font-medium text-purple-900 dark:text-purple-100">
+              {item.metadata?.title || 'Quiz'}
+            </p>
+            <p className="text-sm text-purple-600 dark:text-purple-400">
+              {isCompleted ? 'Completed — retake to improve score' : 'Click to start quiz'}
+            </p>
+          </div>
+        </div>
+        <Play className="w-5 h-5 text-purple-600 dark:text-purple-400 group-hover:translate-x-1 transition-transform" />
+      </button>
+    </div>
+  );
+};
+
+// Notes Item - NO completion checkmark
+const NotesItem: React.FC<{
+  item: LessonContentItem;
+  index: number;
+}> = ({ item, index }) => {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
+        <BookOpen className="w-4 h-4 text-green-600" />
+        <span>{item.metadata?.title || 'Notes'}</span>
+        {/* NO checkmark for notes */}
+      </div>
+      <div className="p-5 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
+        <div
+          className="notes-content prose prose-slate dark:prose-invert max-w-none text-gray-700 dark:text-gray-300"
+          dangerouslySetInnerHTML={{ __html: item.metadata?.content || '' }}
+        />
+        {(item.metadata?.word_count || item.metadata?.reading_time) && (
+          <div className="flex items-center gap-4 mt-4 pt-3 border-t border-green-200 dark:border-green-800 text-xs text-gray-500 dark:text-gray-400">
+            {item.metadata?.word_count && (
+              <span>{item.metadata.word_count} words</span>
+            )}
+            {item.metadata?.reading_time && (
+              <span>~{item.metadata.reading_time} min read</span>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -190,68 +281,75 @@ const DocumentContent: React.FC<{
   );
 };
 
-// Video Content Component with Progress Tracking
+// Video Content Component with Progress Tracking and completion checkmark in header
 const VideoContent: React.FC<{
-  contentItemId: string; // NEW
+  contentItemId: string;
   videoUrl?: string;
   videoType?: string;
   lessonId: string;
+  title: string;
   onComplete?: () => void;
-}> = ({ contentItemId, videoUrl, videoType, lessonId, onComplete }) => {
+}> = ({ contentItemId, videoUrl, videoType, lessonId, title, onComplete }) => {
   if (!videoUrl) return null;
 
   const isYouTube = videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be');
   const isDirectVideo = videoUrl.includes('cloudinary.com') || videoUrl.match(/\.(mp4|webm|ogg|mov)($|\?)/i);
 
   return (
-    <VideoProgressTracker
-      lessonId={lessonId}
-      contentItemId={contentItemId} // NEW: Track per content item
-      videoUrl={videoUrl}
-      onComplete={onComplete}
-    >
-      {({ onTimeUpdate, onDurationChange, onVideoComplete: playerOnComplete, isCompleted, startTime }) => (
-        <div>
-          {isYouTube ? (
-            <YouTubePlayer
-              videoUrl={videoUrl}
-              onTimeUpdate={onTimeUpdate}
-              onDurationChange={onDurationChange}
-              onVideoComplete={playerOnComplete}
-              isCompleted={isCompleted}
-              startTime={startTime}
-            />
-          ) : isDirectVideo ? (
-            <HTML5VideoPlayer
-              videoUrl={videoUrl}
-              onTimeUpdate={onTimeUpdate}
-              onDurationChange={onDurationChange}
-              onVideoComplete={playerOnComplete}
-              isCompleted={isCompleted}
-              startTime={startTime}
-            />
-          ) : (
-            <div className="aspect-video bg-black rounded-lg overflow-hidden">
-              <iframe
-                src={videoUrl}
-                title="Video player"
-                className="w-full h-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
+    <div className="space-y-2">
+      <VideoProgressTracker
+        lessonId={lessonId}
+        contentItemId={contentItemId}
+        videoUrl={videoUrl}
+        onComplete={onComplete}
+      >
+        {({ onTimeUpdate, onDurationChange, onVideoComplete: playerOnComplete, isCompleted, startTime }) => (
+          <>
+            {/* Header with icon, title, and checkmark — uses isCompleted from VideoProgressTracker */}
+            <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
+              <Video className="w-4 h-4 text-blue-500" />
+              <span>{title}</span>
+              {isCompleted && (
+                <span className="w-5 h-5 flex items-center justify-center bg-green-500 rounded-full text-white text-xs flex-shrink-0">
+                  ✓
+                </span>
+              )}
             </div>
-          )}
-          {isCompleted && (
-            <div className="flex items-center gap-2 mt-2 text-green-600 dark:text-green-400 text-sm">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              <span>Video completed</span>
+            <div>
+              {isYouTube ? (
+                <YouTubePlayer
+                  videoUrl={videoUrl}
+                  onTimeUpdate={onTimeUpdate}
+                  onDurationChange={onDurationChange}
+                  onVideoComplete={playerOnComplete}
+                  isCompleted={isCompleted}
+                  startTime={startTime}
+                />
+              ) : isDirectVideo ? (
+                <HTML5VideoPlayer
+                  videoUrl={videoUrl}
+                  onTimeUpdate={onTimeUpdate}
+                  onDurationChange={onDurationChange}
+                  onVideoComplete={playerOnComplete}
+                  isCompleted={isCompleted}
+                  startTime={startTime}
+                />
+              ) : (
+                <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                  <iframe
+                    src={videoUrl}
+                    title="Video player"
+                    className="w-full h-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      )}
-    </VideoProgressTracker>
+          </>
+        )}
+      </VideoProgressTracker>
+    </div>
   );
 };
 

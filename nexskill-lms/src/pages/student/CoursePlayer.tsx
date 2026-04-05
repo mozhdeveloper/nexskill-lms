@@ -480,6 +480,9 @@ const CoursePlayer: React.FC = () => {
                   onQuizClick={(quizId) => navigate(`/student/courses/${courseId}/quizzes/${quizId}/take`)}
                   onContentItemComplete={handleContentItemComplete}
                   onVideoComplete={handleVideoComplete}
+                  prevItem={prevItem}
+                  nextItem={nextItem}
+                  onNavigate={navigateToItem}
                 />
               ) : (
                 <ContentBlockRenderer
@@ -489,26 +492,6 @@ const CoursePlayer: React.FC = () => {
                   onVideoComplete={handleVideoComplete}
                 />
               )}
-            </div>
-
-            {/* Next / Previous Navigation */}
-            <div className="flex items-center justify-between">
-              {prevItem ? (
-                <button
-                  onClick={() => navigateToItem(prevItem)}
-                  className="px-5 py-2.5 text-sm font-medium text-text-secondary dark:text-dark-text-secondary border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
-                >
-                  ← Previous {prevItem.type === 'quiz' ? 'Quiz' : 'Lesson'}
-                </button>
-              ) : <div />}
-              {nextItem ? (
-                <button
-                  onClick={() => navigateToItem(nextItem)}
-                  className="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-brand-primary to-brand-primary-light rounded-full shadow-button-primary hover:shadow-lg hover:scale-[1.02] transition-all"
-                >
-                  Next {nextItem.type === 'quiz' ? 'Quiz' : 'Lesson'} →
-                </button>
-              ) : <div />}
             </div>
 
             {/* Bottom tools section — horizontal tab bar */}

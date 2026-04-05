@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import { useAuth } from '../../context/AuthContext';
 import { Video, FileQuestion } from 'lucide-react';
 
 interface ContentItem {
@@ -9,6 +10,8 @@ interface ContentItem {
   duration: string;
   isCompleted: boolean;
   itemNumber: number; // Sequential number across all modules
+  // NEW: Per-lesson content item progress
+  progressCount?: { completed: number; total: number };
 }
 
 interface SidebarModule {
@@ -96,6 +99,7 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
   const [sidebarModules, setSidebarModules] = useState<SidebarModule[]>([]);
   const [expandedModules, setExpandedModules] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   const fetchModules = useCallback(async () => {
     if (!courseId) return;
@@ -140,6 +144,67 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
           ? supabase.from('lesson_video_progress').select('lesson_id, duration_seconds').in('lesson_id', lessonIds)
           : Promise.resolve({ data: [] }),
       ]);
+
+      // NEW: Fetch per-lesson content item progress for progress counts
+      let lessonContentProgressMap: Record<string, { completed: number; total: number }> = {};
+      if (lessonIds.length > 0 && user) {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser) {
+          // Get all content items for these lessons
+          const { data: lessonContentItems } = await supabase
+            .from('lesson_content_items')
+            .select('id, lesson_id, content_type')
+            .in('lesson_id', lessonIds);
+
+          if (lessonContentItems) {
+            // Filter to required items only (videos and quizzes)
+            const requiredItemIds = lessonContentItems
+              .filter((item: any) => item.content_type === 'video' || item.content_type === 'quiz')
+              .map((item: any) => item.id);
+
+            // Count total required per lesson
+            const totalByLesson: Record<string, number> = {};
+            lessonContentItems.forEach((item: any) => {
+              if (item.content_type === 'video' || item.content_type === 'quiz') {
+                totalByLesson[item.lesson_id] = (totalByLesson[item.lesson_id] || 0) + 1;
+              }
+            });
+
+            // Get completed required items
+            if (requiredItemIds.length > 0) {
+              const { data: completedItems } = await supabase
+                .from('lesson_content_item_progress')
+                .select('content_item_id, lesson_id')
+                .eq('user_id', currentUser.id)
+                .in('content_item_id', requiredItemIds)
+                .eq('is_completed', true);
+
+              // Count completed per lesson
+              const completedByLesson: Record<string, number> = {};
+              (completedItems || []).forEach((item: any) => {
+                completedByLesson[item.lesson_id] = (completedByLesson[item.lesson_id] || 0) + 1;
+              });
+
+              // Build the map
+              lessonIds.forEach((lid: string) => {
+                const total = totalByLesson[lid] || 0;
+                const completed = completedByLesson[lid] || 0;
+                if (total > 0) {
+                  lessonContentProgressMap[lid] = { completed, total };
+                }
+              });
+
+              // Notes-only lessons: if a lesson has zero required items (no videos/quizzes),
+              // treat it as a single item showing "1/1" regardless of how many notes exist.
+              lessonContentItems.forEach((item: any) => {
+                if (!totalByLesson[item.lesson_id]) {
+                  lessonContentProgressMap[item.lesson_id] = { completed: 1, total: 1 };
+                }
+              });
+            }
+          }
+        }
+      }
 
       const lessonsMap  = new Map((lessonsRes.data  ?? []).map((l: any) => [l.id, l]));
       const quizzesMap  = new Map((quizzesRes.data  ?? []).map((q: any) => [q.id, q]));
@@ -233,7 +298,8 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                 type:        'lesson' as const,
                 duration,
                 isCompleted: completedLessonIds.includes(l.id),
-                itemNumber: sequentialCounter++, // Assign sequential number
+                itemNumber: sequentialCounter++,
+                progressCount: lessonContentProgressMap[l.id],
               };
             }
 
@@ -373,15 +439,27 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-medium truncate ${
-                              completed 
-                                ? 'text-green-700 dark:text-green-400'
-                                : isActive 
-                                  ? 'text-brand-primary' 
-                                  : 'text-text-primary dark:text-dark-text-primary'
-                            }`}>
-                              {item.title}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className={`text-sm font-medium truncate ${
+                                completed
+                                  ? 'text-green-700 dark:text-green-400'
+                                  : isActive
+                                    ? 'text-brand-primary'
+                                    : 'text-text-primary dark:text-dark-text-primary'
+                              }`}>
+                                {item.title}
+                              </p>
+                              {/* Content item count beside lesson title */}
+                              {item.progressCount && (
+                                <span className={`text-xs font-medium flex-shrink-0 ${
+                                  completed
+                                    ? 'text-green-600 dark:text-green-400'
+                                    : 'text-text-muted dark:text-dark-text-muted'
+                                }`}>
+                                  {item.progressCount.completed}/{item.progressCount.total}
+                                </span>
+                              )}
+                            </div>
                             <div className="flex items-center gap-2 mt-0.5">
                               <div className="flex items-center gap-1">
                                 {/* Video or Quiz icon next to duration */}

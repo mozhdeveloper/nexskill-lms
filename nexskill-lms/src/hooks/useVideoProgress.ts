@@ -49,6 +49,7 @@ export const useVideoProgress = ({
   const lastSavedTimeRef = useRef<number>(0);
   const hasCompletedRef = useRef<boolean>(false);
   const isSavingRef = useRef<boolean>(false); // Prevent concurrent saves
+  const isLoadedRef = useRef<boolean>(false); // Guard: block saves until initial loadProgress finishes
 
   // Load existing progress on mount (only once)
   useEffect(() => {
@@ -56,7 +57,10 @@ export const useVideoProgress = ({
 
     const loadProgress = async () => {
       if (!user || !lessonId || !videoUrl) {
-        if (isMounted) setState(prev => ({ ...prev, isLoading: false }));
+        if (isMounted) {
+          setState(prev => ({ ...prev, isLoading: false }));
+          isLoadedRef.current = true; // unblock saves even on early exit
+        }
         return;
       }
 
@@ -65,7 +69,7 @@ export const useVideoProgress = ({
         if (contentItemId) {
           const { data, error } = await supabase
             .from('lesson_content_item_progress')
-            .select('current_time_seconds, duration_seconds, watch_time_seconds, is_completed')
+            .select('is_completed, progress_data, completed_at')
             .eq('user_id', user.id)
             .eq('lesson_id', lessonId)
             .eq('content_item_id', contentItemId)
@@ -75,18 +79,21 @@ export const useVideoProgress = ({
 
           if (isMounted) {
             if (data) {
+              // Extract timing data from progress_data JSONB field
+              const progressData = data.progress_data || {};
               setState((prev) => ({
                 ...prev,
-                currentTime: data.current_time_seconds || 0,
-                duration: data.duration_seconds || initialDuration || 0,
-                watchTime: data.watch_time_seconds || 0,
+                currentTime: progressData.current_time_seconds || 0,
+                duration: progressData.duration_seconds || initialDuration || 0,
+                watchTime: progressData.watch_time_seconds || 0,
                 isCompleted: data.is_completed || false,
                 isLoading: false,
               }));
               hasCompletedRef.current = data.is_completed || false;
+              isLoadedRef.current = true;
 
-              if (data.duration_seconds && onDurationLoaded) {
-                onDurationLoaded(data.duration_seconds);
+              if (progressData.duration_seconds && onDurationLoaded) {
+                onDurationLoaded(progressData.duration_seconds);
               }
             } else {
               setState((prev) => ({
@@ -94,6 +101,7 @@ export const useVideoProgress = ({
                 duration: initialDuration || 0,
                 isLoading: false,
               }));
+              isLoadedRef.current = true;
             }
           }
         } else {
@@ -119,6 +127,7 @@ export const useVideoProgress = ({
                 isLoading: false,
               }));
               hasCompletedRef.current = data.is_completed || false;
+              isLoadedRef.current = true; // ADD THIS
 
               if (data.duration_seconds && onDurationLoaded) {
                 onDurationLoaded(data.duration_seconds);
@@ -129,6 +138,7 @@ export const useVideoProgress = ({
                 duration: initialDuration || 0,
                 isLoading: false,
               }));
+              isLoadedRef.current = true; // ADD THIS
             }
           }
         }
@@ -140,6 +150,7 @@ export const useVideoProgress = ({
             isLoading: false,
             error: 'Failed to load progress',
           }));
+          isLoadedRef.current = true; // unblock saves even if load fails
         }
       }
     };
@@ -152,93 +163,138 @@ export const useVideoProgress = ({
   }, [user, lessonId, videoUrl, contentItemId, initialDuration]); // Added contentItemId to deps
 
   // Save progress to database (debounced)
+  // FIX: No longer writes directly to user_lesson_progress.
+  // When contentItemId is provided, saves to lesson_content_item_progress so the DB trigger
+  // (trg_mark_lesson_complete_on_content_done) handles lesson-level completion.
+  // The parent component (CoursePlayer) is the single source of truth for marking lessons complete.
   const saveProgress = useCallback(
-    async (currentTime: number, duration: number, watchTime: number, markLessonComplete = false, saveDuration = false) => {
+    async (currentTime: number, duration: number, watchTime: number, markComplete = false, saveDuration = false) => {
       // Prevent concurrent saves
-      if (isSavingRef.current) return;
+      if (isSavingRef.current) {
+        console.log('[VideoProgress] saveProgress BLOCKED - concurrent save already in progress');
+        return;
+      }
+
+      console.log('[VideoProgress] saveProgress called | isLoadedRef:', isLoadedRef.current, '| hasCompletedRef:', hasCompletedRef.current, '| currentTime:', currentTime, '| markComplete:', markComplete, '| caller:', new Error().stack?.split('\n')[2]?.trim());
+
+      // Block any saves until the initial DB load has completed.
+      // updateDuration fires from onLoadedMetadata almost immediately on mount,
+      // often before the async loadProgress query resolves. Without this guard,
+      // it writes is_completed: false, overwriting a previously completed status.
+      // The DB trigger won't self-heal this because it only fires on is_completed = true.
+      if (!isLoadedRef.current) {
+        console.log('[VideoProgress] saveProgress BLOCKED by isLoadedRef guard — premature call prevented');
+        return;
+      }
+
       isSavingRef.current = true;
 
       try {
         if (!user || !lessonId || !videoUrl || duration === 0) {
+          console.log('[VideoProgress] saveProgress EARLY RETURN — missing required params:', { user: !!user, lessonId, videoUrl: !!videoUrl, duration });
           isSavingRef.current = false;
           return;
         }
 
         const isCompleted = currentTime >= duration * threshold;
 
+        // FIX: Never downgrade is_completed from true to false on progress updates.
+        // When navigating back, updateDuration() fires with currentTime=0, which would
+        // normally set is_completed=false and overwrite the completed status.
+        // If already completed (hasCompletedRef), preserve it.
+        const finalIsCompleted = isCompleted || markComplete || hasCompletedRef.current;
+
         console.log('[VideoProgress] Saving progress:', {
           currentTime,
           duration,
           watchTime,
           isCompleted,
-          markLessonComplete,
+          markComplete,
           saveDuration,
+          contentItemId,
           threshold,
         });
 
-        // Build update object
-        const updateData: any = {
-          user_id: user.id,
-          lesson_id: lessonId,
-          video_url: videoUrl,
-          current_time_seconds: Math.floor(currentTime),
-          watch_time_seconds: Math.floor(watchTime),
-          is_completed: isCompleted,
-          completed_at: isCompleted ? new Date().toISOString() : null,
-          last_watched_at: new Date().toISOString(),
-        };
+        if (contentItemId) {
+          // NEW PATH: Save to lesson_content_item_progress table
+          // The DB trigger will handle lesson-level completion when ALL items are done
+          const updateData: any = {
+            user_id: user.id,
+            lesson_id: lessonId,
+            content_item_id: contentItemId,
+            content_type: 'video',
+            is_completed: finalIsCompleted,
+            completed_at: finalIsCompleted ? new Date().toISOString() : null,
+            updated_at: new Date().toISOString(),
+            progress_data: {
+              current_time_seconds: Math.floor(currentTime),
+              duration_seconds: Math.floor(duration),
+              watch_time_seconds: Math.floor(watchTime),
+            },
+          };
 
-        // Only save duration if it changed or explicitly requested
-        if (saveDuration || duration > 0) {
-          updateData.duration_seconds = Math.floor(duration);
-        }
+          const { error } = await supabase.from('lesson_content_item_progress').upsert(
+            updateData,
+            { onConflict: 'user_id,lesson_id,content_item_id' }
+          );
 
-        // Save video progress
-        const { error: videoError } = await supabase.from('lesson_video_progress').upsert(
-          updateData,
-          { onConflict: 'user_id,lesson_id,video_url' }
-        );
+          if (error) {
+            console.error('[VideoProgress] Error saving content item progress:', error);
+          } else {
+            console.log('[VideoProgress] Content item progress saved successfully');
 
-        if (videoError) {
-          console.error('[VideoProgress] Error saving video progress:', videoError);
-        } else {
-          console.log('[VideoProgress] Video progress saved successfully');
-
-          // Mark lesson as complete if threshold reached
-          if (isCompleted && markLessonComplete) {
-            console.log('[VideoProgress] Marking lesson as complete...');
-            const { error: lessonError, data: lessonData } = await supabase
-              .from('user_lesson_progress')
-              .upsert(
-                {
-                  user_id: user.id,
-                  lesson_id: lessonId,
-                  is_completed: true,
-                  completed_at: new Date().toISOString(),
-                },
-                { onConflict: 'user_id,lesson_id' }
-              )
-              .select();
-
-            if (lessonError) {
-              console.error('[VideoProgress] Error marking lesson complete:', lessonError);
-            } else {
-              console.log('[VideoProgress] Lesson marked complete!', lessonData);
+            // Trigger completion callback for parent to check ALL items
+            if (finalIsCompleted && !hasCompletedRef.current && onComplete) {
+              hasCompletedRef.current = true;
+              console.log('[VideoProgress] Video content item completed — parent will check remaining items');
+              onComplete();
             }
+
+            setState((prev) => ({
+              ...prev,
+              isCompleted: finalIsCompleted,
+            }));
+          }
+        } else {
+          // LEGACY PATH: Save to lesson_video_progress table
+          // Does NOT mark lesson complete — parent component handles that
+          const updateData: any = {
+            user_id: user.id,
+            lesson_id: lessonId,
+            video_url: videoUrl,
+            current_time_seconds: Math.floor(currentTime),
+            watch_time_seconds: Math.floor(watchTime),
+            is_completed: finalIsCompleted,
+            completed_at: finalIsCompleted ? new Date().toISOString() : null,
+            last_watched_at: new Date().toISOString(),
+          };
+
+          if (saveDuration || duration > 0) {
+            updateData.duration_seconds = Math.floor(duration);
           }
 
-          // Trigger completion callback
-          // Only trigger if newly completed (not if already completed before)
-          if (isCompleted && !hasCompletedRef.current && onComplete) {
-            hasCompletedRef.current = true;
-            console.log('[VideoProgress] Calling onComplete callback (debounced save)');
-            onComplete();
-          }
+          const { error: videoError } = await supabase.from('lesson_video_progress').upsert(
+            updateData,
+            { onConflict: 'user_id,lesson_id,video_url' }
+          );
 
-          setState((prev) => ({
-            ...prev,
-            isCompleted,
-          }));
+          if (videoError) {
+            console.error('[VideoProgress] Error saving video progress:', videoError);
+          } else {
+            console.log('[VideoProgress] Video progress saved successfully (legacy path)');
+
+            // Trigger completion callback for parent to handle
+            if (finalIsCompleted && !hasCompletedRef.current && onComplete) {
+              hasCompletedRef.current = true;
+              console.log('[VideoProgress] Video completed (legacy) — parent will handle lesson completion');
+              onComplete();
+            }
+
+            setState((prev) => ({
+              ...prev,
+              isCompleted: finalIsCompleted,
+            }));
+          }
         }
       } catch (err) {
         console.error('[VideoProgress] Error saving progress:', err);
@@ -246,7 +302,7 @@ export const useVideoProgress = ({
         isSavingRef.current = false;
       }
     },
-    [user, lessonId, videoUrl, threshold, onComplete]
+    [user, lessonId, videoUrl, contentItemId, threshold, onComplete]
   );
 
   // Debounced save (every 5 seconds)

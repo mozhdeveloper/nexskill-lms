@@ -678,7 +678,9 @@ const QuizSession: React.FC = () => {
       const { error: rErr } = await supabase.from('quiz_responses').insert(responses);
       if (rErr) console.error('Error saving responses:', rErr);
 
-      // Mark lesson as complete if passed
+      // Mark quiz content item as complete if passed
+      // FIX: Write to lesson_content_item_progress instead of directly to user_lesson_progress
+      // The CoursePlayer.handleContentItemComplete will check ALL items and mark the lesson complete
       if (passed) {
         try {
           const { data: quizData, error: quizErr } = await supabase
@@ -688,27 +690,59 @@ const QuizSession: React.FC = () => {
             .single();
 
           if (!quizErr && quizData?.lesson_id) {
-            const { error: progressErr } = await supabase
+            // Find the quiz content item in lesson_content_items
+            const { data: quizContentItem } = await supabase
+              .from('lesson_content_items')
+              .select('id')
+              .eq('lesson_id', quizData.lesson_id)
+              .eq('content_type', 'quiz')
+              .eq('content_id', quizMeta.id)
+              .maybeSingle();
+
+            if (quizContentItem) {
+              // Mark this quiz content item as complete
+              const { error: progressErr } = await supabase
+                .from('lesson_content_item_progress')
+                .upsert({
+                  user_id: user.id,
+                  lesson_id: quizData.lesson_id,
+                  content_item_id: quizContentItem.id,
+                  content_type: 'quiz',
+                  is_completed: true,
+                  completed_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                  progress_data: { quiz_score: scorePercent, passed: true },
+                }, {
+                  onConflict: 'user_id,lesson_id,content_item_id',
+                });
+
+              if (progressErr) {
+                console.error('Failed to mark quiz content item complete:', progressErr);
+              } else {
+                console.log('✅ Quiz content item marked complete — CoursePlayer will check remaining items');
+              }
+            }
+
+            // Also update user_lesson_progress for backward compatibility
+            // (CoursePlayer also writes here, so this is a safety net)
+            const { error: lessonProgressErr } = await supabase
               .from('user_lesson_progress')
               .upsert({
                 user_id: user.id,
                 lesson_id: quizData.lesson_id,
                 is_completed: true,
                 completed_at: new Date().toISOString(),
-              }, { 
+              }, {
                 onConflict: 'user_id,lesson_id',
                 ignoreDuplicates: false
-              })
-              .select();
-            
-            if (progressErr) {
-              console.error('Failed to update lesson progress:', progressErr);
-            } else {
-              console.log('✅ Lesson progress updated:', progressErr);
+              });
+
+            if (lessonProgressErr) {
+              console.error('Failed to update lesson progress:', lessonProgressErr);
             }
           }
         } catch (err) {
-          console.error('Error marking lesson complete:', err);
+          console.error('Error marking quiz completion:', err);
         }
       }
 
