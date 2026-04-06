@@ -31,6 +31,7 @@ const CoursePlayer: React.FC = () => {
   const [showGraduation, setShowGraduation] = useState(false);
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
   const [completedQuizIds, setCompletedQuizIds] = useState<string[]>([]);
+  const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0); // Increments to trigger sidebar progress refresh
   const [totalLessonsInCourse, setTotalLessonsInCourse] = useState(0);
   const [courseTitle, setCourseTitle] = useState('');
   const [currentLesson, setCurrentLesson] = useState<LessonWithModule | null>(null);
@@ -367,6 +368,9 @@ const CoursePlayer: React.FC = () => {
       const remaining = requiredItems.filter((item: any) => !completedIds.has(item.id));
       console.log('[CoursePlayer] Required items remaining:', remaining.length);
     }
+
+    // Trigger sidebar progress count refresh (without full page reload)
+    setSidebarRefreshKey(k => k + 1);
   }, [courseId, lessonId]);
   // Show graduation banner when all lessons are complete
   useEffect(() => {
@@ -548,6 +552,7 @@ const CoursePlayer: React.FC = () => {
               onSelectLesson={handleSelectLesson}
               completedLessonIds={completedLessons}
               completedQuizIds={completedQuizIds}
+              refreshKey={sidebarRefreshKey}
             />
           </aside>
 

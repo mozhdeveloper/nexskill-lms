@@ -39,6 +39,7 @@ interface QuizMeta {
   late_penalty_percent: number;
   is_published: boolean;
   requires_manual_grading: boolean;
+  lesson_id: string | null;
 }
 
 interface QuizAttempt {
@@ -291,6 +292,7 @@ const QuizSession: React.FC = () => {
           late_penalty_percent: quiz.late_penalty_percent,
           is_published: courseIsApproved,
           requires_manual_grading: quiz.requires_manual_grading,
+          lesson_id: quiz.lesson_id ?? null,
         });
 
         // Map and set questions
@@ -533,6 +535,12 @@ const QuizSession: React.FC = () => {
           passed,
           attemptNumber: attempt.attempt_number,
           penalizedScore: penalizedScore !== undefined ? Math.round((penalizedScore / totalPoints) * 100) : undefined,
+          // ← new fields
+          attemptsRemaining: quizMeta.max_attempts === null
+  ? null
+  : Math.max(0, quizMeta.max_attempts - (previousAttempts.length + 1)),
+          maxAttempts: quizMeta.max_attempts,
+          timeLimitMinutes: quizMeta.time_limit_minutes,
         },
       });
     } catch (err) {
@@ -699,8 +707,12 @@ const QuizSession: React.FC = () => {
               .eq('content_id', quizMeta.id)
               .maybeSingle();
 
+            // Mark quiz content item as complete.
+            // The DB trigger (mark_lesson_complete_if_all_content_done) will evaluate whether
+            // ALL required items (videos + quizzes) in this lesson are done. Only then will it
+            // mark user_lesson_progress.is_completed = true. This prevents premature lesson
+            // completion when videos haven't been watched yet.
             if (quizContentItem) {
-              // Mark this quiz content item as complete
               const { error: progressErr } = await supabase
                 .from('lesson_content_item_progress')
                 .upsert({
@@ -719,26 +731,8 @@ const QuizSession: React.FC = () => {
               if (progressErr) {
                 console.error('Failed to mark quiz content item complete:', progressErr);
               } else {
-                console.log('✅ Quiz content item marked complete — CoursePlayer will check remaining items');
+                console.log('✅ Quiz content item marked complete — DB trigger will check ALL required items');
               }
-            }
-
-            // Also update user_lesson_progress for backward compatibility
-            // (CoursePlayer also writes here, so this is a safety net)
-            const { error: lessonProgressErr } = await supabase
-              .from('user_lesson_progress')
-              .upsert({
-                user_id: user.id,
-                lesson_id: quizData.lesson_id,
-                is_completed: true,
-                completed_at: new Date().toISOString(),
-              }, {
-                onConflict: 'user_id,lesson_id',
-                ignoreDuplicates: false
-              });
-
-            if (lessonProgressErr) {
-              console.error('Failed to update lesson progress:', lessonProgressErr);
             }
           }
         } catch (err) {
@@ -765,6 +759,12 @@ const QuizSession: React.FC = () => {
           attemptNumber: currentAttempt.attempt_number,
           penalizedScore: penalizedScore !== undefined ? Math.round((penalizedScore / totalPoints) * 100) : undefined,
           requiresManualGrading,
+          // ← new fields
+          attemptsRemaining: quizMeta.max_attempts === null
+  ? null
+  : Math.max(0, quizMeta.max_attempts - (previousAttempts.length + 1)),
+          maxAttempts: quizMeta.max_attempts,
+          timeLimitMinutes: quizMeta.time_limit_minutes,
         },
       });
     } catch (err) {
@@ -805,6 +805,8 @@ const QuizSession: React.FC = () => {
   const canStartQuiz = sessionState === 'show_history' || sessionState === 'resume_or_restart';
   const attemptsUsed = previousAttempts.length;
   const displayMaxAttempts = quizMeta?.max_attempts || '∞';
+  // Current/next attempt number (e.g., 1, 2, or 3 out of 3)
+  const currentAttemptNumber = previousAttempts.length + 1;
 
   // ============================================
   // Render Loading State
@@ -865,88 +867,23 @@ const QuizSession: React.FC = () => {
             isPublished={quizMeta.is_published}
           />
 
-          {/* Quiz Info Header Card */}
-          <div className="glass-card rounded-2xl p-6 mb-6">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex-1">
-                <h1 className="text-xl font-bold text-text-primary mb-2">{quizMeta.title}</h1>
-                <div className="flex flex-wrap gap-4 text-sm text-text-secondary">
-                  <div>
-                    <span className="font-semibold">Passing Score:</span> {quizMeta.passing_score}%
-                  </div>
-                  {quizMeta.time_limit_minutes && (
-                    <div>
-                      <span className="font-semibold">Time Limit:</span> {quizMeta.time_limit_minutes} minutes
-                    </div>
-                  )}
-                  <div>
-                    <span className="font-semibold">Attempts:</span> {attemptsUsed} of {displayMaxAttempts}
-                  </div>
-                </div>
-                {bestScore !== null && (
-                  <div className="flex items-center gap-2 mt-3 text-amber-600 dark:text-amber-400">
-                    <Trophy className="w-4 h-4" />
-                    <span className="text-sm font-medium">Previous Best: {bestScore}%</span>
-                  </div>
-                )}
-              </div>
-              
-              {sessionState === 'in_progress' && quizMeta.time_limit_minutes && timeRemaining !== null && (
-                <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${
-                  timeRemaining < 60 
-                    ? 'bg-red-100 dark:bg-red-900/30 animate-pulse' 
-                    : 'bg-[color:var(--bg-tertiary)]'
-                }`}>
-                  <svg className="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className={`text-sm font-bold font-mono ${
-                    timeRemaining < 60 ? 'text-red-600 dark:text-red-400' : 'text-text-primary'
-                  }`}>
-                    {formatTime(timeRemaining)}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Attempt History */}
-          {previousAttempts.length > 0 && sessionState !== 'in_progress' && (
+          {/* Attempt History — always render for show_history (handles empty + populated states) */}
+          {sessionState === 'show_history' && (
             <QuizAttemptHistory
               attempts={previousAttempts}
               maxAttempts={quizMeta.max_attempts}
               passingScore={quizMeta.passing_score}
               canRetake={attemptsRemaining === null || attemptsRemaining > 0}
-              onRetake={() => handleStartAttempt(false)}
+              attemptsRemaining={attemptsRemaining}
+              attemptsUsed={attemptsUsed}
+              displayMaxAttempts={displayMaxAttempts}
+              onStartAttempt={() => handleStartAttempt(false)}
+              timeLimitMinutes={quizMeta.time_limit_minutes}
+              courseId={courseId || ''}
+              lessonId={quizMeta.lesson_id ?? null}
             />
           )}
 
-          {/* No Attempts Remaining State */}
-          {sessionState === 'no_attempts_remaining' && (
-            <div className="glass-card rounded-2xl p-8 text-center">
-              <Lock className="w-12 h-12 text-red-500 mx-auto mb-4" />
-              <h2 className="text-xl font-bold text-text-primary mb-2">No Attempts Remaining</h2>
-              <p className="text-text-secondary mb-6">
-                You have used all {quizMeta.max_attempts} attempt{quizMeta.max_attempts !== 1 ? 's' : ''} for this quiz.
-              </p>
-              {bestScore !== null && (
-                <div className="inline-flex items-center gap-2 bg-amber-100 dark:bg-amber-900/30 px-4 py-2 rounded-full mb-6">
-                  <Trophy className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                  <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
-                    Best Score: {bestScore}%
-                  </span>
-                </div>
-              )}
-              <div>
-                <button
-                  onClick={() => navigate(`/student/courses/${courseId}`)}
-                  className="px-6 py-3 rounded-full font-semibold bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all"
-                >
-                  Back to Course
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Quiz Not Published State */}
           {sessionState === 'not_published' && (
@@ -994,43 +931,6 @@ const QuizSession: React.FC = () => {
           {/* Ready to Start / In Progress */}
           {(sessionState === 'show_history' || sessionState === 'in_progress') && (
             <>
-              {sessionState === 'show_history' && (
-                <div className="glass-card rounded-2xl p-8 text-center mb-6">
-                  <div className="mb-6">
-                    {isLateSubmission && (
-                      <div className="inline-flex items-center gap-2 bg-amber-100 dark:bg-amber-900/30 px-4 py-2 rounded-full mb-4">
-                        <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                        <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
-                          Late submission - {quizMeta.late_penalty_percent}% penalty will apply
-                        </span>
-                      </div>
-                    )}
-                    <p className="text-text-secondary mb-2">
-                      {attemptsRemaining === null 
-                        ? 'Unlimited attempts available'
-                        : attemptsRemaining === 1
-                        ? 'This is your last attempt'
-                        : `You have ${attemptsRemaining} attempt${attemptsRemaining !== 1 ? 's' : ''} remaining`
-                      }
-                    </p>
-                  </div>
-                  {attemptsRemaining === null || attemptsRemaining > 0 ? (
-                    <button
-                      onClick={() => handleStartAttempt()}
-                      className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-semibold bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all"
-                    >
-                      <Play className="w-5 h-5" />
-                      Start Attempt {attemptsUsed + 1} of {displayMaxAttempts}
-                    </button>
-                  ) : (
-                    <div className="text-center text-text-secondary">
-                      <p className="font-medium">No attempts remaining</p>
-                      <p className="text-sm mt-2">You have used all {quizMeta.max_attempts} attempts for this quiz.</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
               {sessionState === 'in_progress' && currentQuestion && (
                 <>
                   {/* Question Progress */}

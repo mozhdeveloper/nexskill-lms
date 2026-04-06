@@ -144,7 +144,7 @@ const VideoItem: React.FC<{
   );
 };
 
-// Quiz Item with completion checkmark in header
+// Quiz Item with completion checkmark in header — styled to match VideoItem
 const QuizItem: React.FC<{
   item: LessonContentItem;
   index: number;
@@ -161,15 +161,14 @@ const QuizItem: React.FC<{
 
   return (
     <div className="space-y-2">
+      {/* Header — matches VideoItem: black text, purple icon, green circular checkmark */}
       <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
         <FileQuestion className="w-4 h-4 text-purple-500" />
-        <span className={isCompleted ? 'text-green-600 dark:text-green-400' : ''}>
-          {item.metadata?.title || `Quiz ${index + 1}`}
-        </span>
+        <span>{item.metadata?.title || `Quiz ${index + 1}`}</span>
         {isCompleted && (
-          <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-          </svg>
+          <span className="w-5 h-5 flex items-center justify-center bg-green-500 rounded-full text-white text-xs flex-shrink-0">
+            ✓
+          </span>
         )}
       </div>
       <button

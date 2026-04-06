@@ -1,5 +1,6 @@
 import React from 'react';
-import { CheckCircle, XCircle, AlertCircle, Trophy } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { CheckCircle, XCircle, AlertCircle, Trophy, Play } from 'lucide-react';
 
 export interface PreviousAttempt {
   id: string;
@@ -20,6 +21,13 @@ interface QuizAttemptHistoryProps {
   passingScore: number;
   onRetake?: () => void;
   canRetake: boolean;
+  attemptsRemaining: number | null;
+  attemptsUsed: number;
+  displayMaxAttempts: string | number;
+  onStartAttempt?: () => void;
+  timeLimitMinutes: number | null;
+  courseId: string;
+  lessonId: string | null;
 }
 
 const QuizAttemptHistory: React.FC<QuizAttemptHistoryProps> = ({
@@ -28,9 +36,58 @@ const QuizAttemptHistory: React.FC<QuizAttemptHistoryProps> = ({
   passingScore,
   onRetake,
   canRetake,
+  attemptsRemaining,
+  attemptsUsed,
+  displayMaxAttempts,
+  onStartAttempt,
+  timeLimitMinutes,
+  courseId,
+  lessonId,
 }) => {
+  const navigate = useNavigate();
+
+  // Calculate the next attempt number (e.g., 1 for first attempt, 2 for second, etc.)
+  const nextAttemptNumber = attemptsUsed + 1;
+
+  // Empty state — first-time taker
   if (attempts.length === 0) {
-    return null;
+    return (
+      <div className="glass-card rounded-2xl p-8 text-center">
+        <div className="mb-6">
+          <h2 className="text-xl font-bold text-text-primary mb-2">Ready to take this quiz?</h2>
+          <p className="text-text-secondary">
+            Review the details below and start your first attempt when you're ready.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap justify-center gap-6 text-sm text-text-secondary mb-6">
+          <div>
+            <span className="font-semibold text-text-primary">Passing Score:</span>{' '}
+            {passingScore}%
+          </div>
+          {timeLimitMinutes && (
+            <div>
+              <span className="font-semibold text-text-primary">Time Limit:</span>{' '}
+              {timeLimitMinutes} minutes
+            </div>
+          )}
+          <div>
+            <span className="font-semibold text-text-primary">Attempts:</span>{' '}
+            {attemptsRemaining === null ? 'Unlimited' : `${nextAttemptNumber} of ${maxAttempts}`}
+          </div>
+        </div>
+
+        {onStartAttempt && (attemptsRemaining === null || attemptsRemaining > 0) && (
+          <button
+            onClick={onStartAttempt}
+            className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-semibold bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all"
+          >
+            <Play className="w-5 h-5" />
+            Start Attempt {nextAttemptNumber} of {maxAttempts ?? '∞'}
+          </button>
+        )}
+      </div>
+    );
   }
 
   // Find best score
@@ -94,7 +151,7 @@ const QuizAttemptHistory: React.FC<QuizAttemptHistoryProps> = ({
 
   const getScoreDisplay = (attempt: PreviousAttempt) => {
     const scorePercent = formatScore(attempt.score, attempt.max_score);
-    
+
     if (attempt.penalized_score !== undefined && attempt.penalized_score !== attempt.score) {
       const penalizedPercent = formatScore(attempt.penalized_score, attempt.max_score);
       return (
@@ -124,13 +181,29 @@ const QuizAttemptHistory: React.FC<QuizAttemptHistoryProps> = ({
     <div className="glass-card rounded-2xl p-6 mb-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-bold text-text-primary">Your Attempt History</h2>
-        {canRetake && onRetake && (
+        {attemptsRemaining !== null && attemptsRemaining <= 0 ? (
           <button
-            onClick={onRetake}
-            className="px-4 py-2 rounded-full font-semibold text-sm bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all"
+            onClick={() => {
+              if (lessonId) {
+                navigate(`/student/courses/${courseId}/lessons/${lessonId}`);
+              } else {
+                navigate(`/student/courses/${courseId}`);
+              }
+            }}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-sm bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all"
           >
-            Retake Quiz
+            ← Back to Lesson
           </button>
+        ) : (
+          canRetake && onStartAttempt && (attemptsRemaining === null || attemptsRemaining > 0) && (
+            <button
+              onClick={onStartAttempt}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-sm bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all"
+            >
+              <Play className="w-5 h-5" />
+              Start Attempt {nextAttemptNumber} of {maxAttempts ?? '∞'}
+            </button>
+          )
         )}
       </div>
 
@@ -183,17 +256,32 @@ const QuizAttemptHistory: React.FC<QuizAttemptHistoryProps> = ({
       {/* Summary Footer */}
       <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
         <div className="text-sm text-text-secondary">
-          {maxAttempts
-            ? `Attempt ${attempts.length} of ${maxAttempts}`
-            : 'Unlimited attempts'}
+          <span>
+            Attempt:{' '}
+            <span className="font-bold text-text-primary">
+              {attemptsRemaining === null
+                ? 'Unlimited'
+                : `${nextAttemptNumber}/${maxAttempts}`}
+            </span>
+          </span>
           {attempts.length > 0 && (
             <span className="ml-4">
-              Best Score: <span className="font-bold text-text-primary">{formatScore(bestAttempt.score, bestAttempt.max_score)}%</span>
+              Best Score:{' '}
+              <span className="font-bold text-text-primary">
+                {formatScore(bestAttempt.score, bestAttempt.max_score)}%
+              </span>
             </span>
           )}
         </div>
-        <div className="text-sm text-text-secondary">
-          Passing Score: <span className="font-bold text-text-primary">{passingScore}%</span>
+        <div className="flex items-center gap-4 text-sm text-text-secondary">
+          {timeLimitMinutes && (
+            <span>
+              Time Limit: <span className="font-bold text-text-primary">{timeLimitMinutes} minutes</span>
+            </span>
+          )}
+          <span>
+            Passing Score: <span className="font-bold text-text-primary">{passingScore}%</span>
+          </span>
         </div>
       </div>
     </div>

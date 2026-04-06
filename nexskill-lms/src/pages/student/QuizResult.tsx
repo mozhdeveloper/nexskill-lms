@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
 import QuestionFeedback from '../../components/quiz/QuestionFeedback';
 import { supabase } from '../../lib/supabaseClient';
+import { Play } from 'lucide-react';
 
 interface Question {
   id: string;
@@ -21,6 +22,9 @@ interface LocationState {
   passingScore: number;
   questions: Question[];
   userAnswers: Record<string, string | boolean>;
+  attemptsRemaining: number | null;
+  maxAttempts: number | null;
+  timeLimitMinutes: number | null;
 }
 
 const QuizResult: React.FC = () => {
@@ -33,6 +37,7 @@ const QuizResult: React.FC = () => {
   const [dbCorrect, setDbCorrect] = useState<number | null>(null);
   const [dbTotal, setDbTotal] = useState<number | null>(null);
   const [dbPassing, setDbPassing] = useState<number | null>(null);
+  const [lessonId, setLessonId] = useState<string | null>(null);
   const [loadingDb, setLoadingDb] = useState(!state);
 
   // If no state (page refresh), fetch the latest attempt from DB
@@ -62,10 +67,13 @@ const QuizResult: React.FC = () => {
 
         const { data: quiz } = await supabase
           .from('quizzes')
-          .select('passing_score')
+          .select('passing_score, lesson_id')
           .eq('id', quizId)
           .single();
-        if (quiz) setDbPassing(quiz.passing_score || 70);
+        if (quiz) {
+          setDbPassing(quiz.passing_score || 70);
+          setLessonId(quiz.lesson_id ?? null);
+        }
       } catch (err) {
         console.error('Error fetching quiz result:', err);
       } finally {
@@ -75,12 +83,24 @@ const QuizResult: React.FC = () => {
     fetchLatestAttempt();
   }, [quizId, state]);
 
+  // Fetch lesson_id from state or DB on initial load
+  useEffect(() => {
+    if (state?.lessonId) {
+      setLessonId(state.lessonId);
+    } else if (!state && quizId) {
+      // Will be fetched by the above useEffect
+    }
+  }, [state, quizId]);
+
   const score = state?.score ?? dbScore ?? 0;
   const correctCount = state?.correctCount ?? dbCorrect ?? 0;
   const totalQuestions = state?.totalQuestions ?? dbTotal ?? 0;
   const passingScore = state?.passingScore ?? dbPassing ?? 70;
   const questions = state?.questions ?? [];
   const userAnswers = state?.userAnswers ?? {};
+  const attemptsRemaining = state?.attemptsRemaining ?? null;
+  const maxAttempts = state?.maxAttempts ?? null;
+  const timeLimitMinutes = state?.timeLimitMinutes ?? null;
 
   const passed = score >= passingScore;
   const incorrectCount = totalQuestions - correctCount;
@@ -90,7 +110,11 @@ const QuizResult: React.FC = () => {
   };
 
   const handleBackToCourse = () => {
-    navigate(`/student/courses/${courseId}`);
+    if (lessonId) {
+      navigate(`/student/courses/${courseId}/lessons/${lessonId}`);
+    } else {
+      navigate(`/student/courses/${courseId}`);
+    }
   };
 
   // Generate feedback data for each question
@@ -162,6 +186,12 @@ const QuizResult: React.FC = () => {
                 <div className="text-3xl font-bold text-red-600 mb-1">{incorrectCount}</div>
                 <div className="text-sm text-text-secondary">Incorrect</div>
               </div>
+              {timeLimitMinutes && (
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-text-muted mb-1">{timeLimitMinutes}m</div>
+                  <div className="text-sm text-text-secondary">Time Limit</div>
+                </div>
+              )}
               <div className="text-center">
                 <div className="text-3xl font-bold text-text-muted mb-1">{passingScore}%</div>
                 <div className="text-sm text-text-secondary">Passing Score</div>
@@ -170,17 +200,20 @@ const QuizResult: React.FC = () => {
 
             {/* Action buttons */}
             <div className="flex gap-4 justify-center">
-              <button
-                onClick={handleRetry}
-                className="px-8 py-3 rounded-full font-semibold bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all"
-              >
-                Retry quiz
-              </button>
+              {(attemptsRemaining === null || attemptsRemaining > 0) && (
+                <button
+                  onClick={handleRetry}
+                  className="inline-flex items-center gap-2 px-8 py-3 rounded-full font-semibold bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all"
+                >
+                  <Play className="w-5 h-5" />
+                  Start Attempt {attemptsRemaining === null ? '∞' : attemptsRemaining} of {maxAttempts ?? '∞'} 
+                </button>
+              )}
               <button
                 onClick={handleBackToCourse}
                 className="px-8 py-3 rounded-full font-semibold text-brand-primary border-2 border-brand-primary hover:bg-brand-primary/5 transition-all"
               >
-                Back to course
+                Back to lesson
               </button>
             </div>
           </div>
@@ -214,7 +247,7 @@ const QuizResult: React.FC = () => {
               onClick={handleBackToCourse}
               className="text-text-secondary hover:text-brand-primary font-medium transition-colors"
             >
-              ← Return to course overview
+              ← Return to lesson
             </button>
           </div>
         </div>

@@ -27,6 +27,7 @@ interface LessonSidebarProps {
   onSelectLesson: (lessonId: string) => void;
   completedLessonIds?: string[];
   completedQuizIds?: string[];
+  refreshKey?: number; // Increments to trigger progress count re-fetch
 }
 
 // ─── YouTube Duration Helpers ─────────────────────────────────────────────────
@@ -217,6 +218,49 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
         }
       });
 
+      // NEW: Also fetch completed quizzes from lesson_content_item_progress
+      // This ensures quizzes inside lessons show the same green checkmark as videos
+      let completedQuizContentItemIds: string[] = [];
+      if (quizIds.length > 0 && user) {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser) {
+          // Find quiz content items inside lessons
+          const { data: quizContentItems } = await supabase
+            .from('lesson_content_items')
+            .select('content_id')
+            .eq('content_type', 'quiz')
+            .in('content_id', quizIds);
+
+          if (quizContentItems && quizContentItems.length > 0) {
+            const quizContentItemIds = quizContentItems.map((qi: any) => qi.content_id);
+
+            // Get completed quiz content items
+            const { data: completedQuizItems } = await supabase
+              .from('lesson_content_item_progress')
+              .select('content_item_id')
+              .eq('user_id', currentUser.id)
+              .eq('is_completed', true);
+
+            if (completedQuizItems && completedQuizItems.length > 0) {
+              // Map content_item_id back to content_id (quiz id) via lesson_content_items
+              const completedItemIds = completedQuizItems.map((ci: any) => ci.content_item_id);
+              const { data: quizItems } = await supabase
+                .from('lesson_content_items')
+                .select('content_id')
+                .eq('content_type', 'quiz')
+                .in('id', completedItemIds);
+
+              if (quizItems) {
+                completedQuizContentItemIds = quizItems.map((qi: any) => qi.content_id);
+              }
+            }
+          }
+        }
+      }
+
+      // Merge both sources: quiz_attempts (standalone quizzes) + lesson_content_item_progress (in-lesson quizzes)
+      const allCompletedQuizIds = [...new Set([...completedQuizIds, ...completedQuizContentItemIds])];
+
       // ── 3. Extract durations already stored in content_blocks ─────────────
       // Covers: Cloudinary uploads (media_metadata.duration) and
       //         previously-fetched YouTube metadata stored on save.
@@ -310,7 +354,7 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
               title:       q.title,
               type:        'quiz' as const,
               duration:    `${q.time_limit_minutes ?? 30}m`,
-              isCompleted: completedQuizIds.includes(q.id),
+              isCompleted: allCompletedQuizIds.includes(q.id),
               itemNumber: sequentialCounter++, // Assign sequential number
             };
           })
