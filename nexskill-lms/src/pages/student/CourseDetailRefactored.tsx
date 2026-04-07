@@ -40,6 +40,209 @@ const CourseDetailRefactored: React.FC = () => {
 
   // useCourse now resolves totalDurationSeconds on load — no tab dependency
   const { course, loading: loadingCourse, error } = useCourse(courseId);
+
+  // Debug: Log curriculum data whenever it changes
+  useEffect(() => {
+    if (course?.curriculum) {
+      console.log("[CourseDetailRefactored] Curriculum data:", course.curriculum);
+      course.curriculum.forEach((module, idx) => {
+        console.log(`[CourseDetailRefactored] Module ${idx + 1}: "${module.title}" has ${module.lessons?.length || 0} lessons`, module.lessons);
+      });
+    } else {
+      console.log("[CourseDetailRefactored] No curriculum data available");
+    }
+  }, [course?.curriculum]);
+
+  // Fetch curriculum directly on page load
+  const [directCurriculum, setDirectCurriculum] = useState<any[]>([]);
+  const [directCurriculumLoading, setDirectCurriculumLoading] = useState(true);
+  const [debugInfo, setDebugInfo] = useState<string>("");
+  
+  useEffect(() => {
+    if (!courseId) return;
+    
+    const fetchCurriculumDirectly = async () => {
+      setDirectCurriculumLoading(true);
+      setDebugInfo("");
+      console.log("[CourseDetailRefactored] Fetching curriculum directly for courseId:", courseId);
+      
+      // 1. Fetch ALL modules (ignore is_published for maximum compatibility)
+      const { data: modules } = await supabase
+        .from("modules")
+        .select("id, title, position, is_published")
+        .eq("course_id", courseId)
+        .order("position", { ascending: true });
+      
+      console.log("[CourseDetailRefactored] Modules fetched:", modules);
+      
+      if (modules && modules.length > 0) {
+        const moduleIds = modules.map(m => m.id);
+        console.log("[CourseDetailRefactored] Module IDs:", moduleIds);
+        
+        // 2. Fetch ALL content items (ignore is_published)
+        const { data: contentItems } = await supabase
+          .from("module_content_items")
+          .select("module_id, content_id, content_type, position, is_published")
+          .in("module_id", moduleIds)
+          .order("position", { ascending: true });
+        
+        console.log("[CourseDetailRefactored] Content items:", contentItems);
+        
+        // Check publishing status for debugging
+        const publishedModules = modules.filter(m => m.is_published);
+        const publishedContent = contentItems?.filter(c => c.is_published);
+        
+        if (publishedModules.length !== modules.length) {
+          setDebugInfo(`⚠️ ${modules.length - publishedModules.length} modules are not published`);
+        }
+        if ((publishedContent?.length || 0) !== (contentItems?.length || 0)) {
+          setDebugInfo(prev => prev + ` | ⚠️ ${(contentItems?.length || 0) - (publishedContent?.length || 0)} content items are not published`);
+        }
+        
+        if (contentItems && contentItems.length > 0) {
+          const lessonIds = contentItems
+            .filter(i => i.content_type === "lesson")
+            .map(i => i.content_id);
+          const quizIds = contentItems
+            .filter(i => i.content_type === "quiz")
+            .map(i => i.content_id);
+          
+          console.log("[CourseDetailRefactored] Lesson IDs to fetch:", lessonIds);
+          console.log("[CourseDetailRefactored] Quiz IDs to fetch:", quizIds);
+          
+          // 3. Fetch lessons and quizzes
+          const [lessonsRes, quizzesRes] = await Promise.all([
+            lessonIds.length > 0 
+              ? supabase.from("lessons").select("id, title, estimated_duration_minutes, is_published").in("id", lessonIds)
+              : Promise.resolve({ data: [] }),
+            quizIds.length > 0
+              ? supabase.from("quizzes").select("id, title, time_limit_minutes, is_published").in("id", quizIds)
+              : Promise.resolve({ data: [] })
+          ]);
+          
+          console.log("[CourseDetailRefactored] Lessons response:", lessonsRes);
+          console.log("[CourseDetailRefactored] Quizzes response:", quizzesRes);
+          
+          const lessonsMap = new Map((lessonsRes.data || []).map(l => [l.id, l]));
+          const quizzesMap = new Map((quizzesRes.data || []).map(q => [q.id, q]));
+          
+          // 4. Build curriculum
+          const curriculumData = modules.map(module => {
+            const moduleItems = contentItems.filter(i => i.module_id === module.id);
+            console.log(`[CourseDetailRefactored] Module "${module.title}" has ${moduleItems.length} content items`);
+            
+            const lessons = moduleItems.map(item => {
+              if (item.content_type === "lesson") {
+                const lesson = lessonsMap.get(item.content_id);
+                if (!lesson) {
+                  console.warn("[CourseDetailRefactored] Lesson not found for ID:", item.content_id);
+                  return null;
+                }
+                return {
+                  id: lesson.id,
+                  title: lesson.title,
+                  duration: `${lesson.estimated_duration_minutes || 15}m`,
+                  type: "lesson" as const
+                };
+              }
+              if (item.content_type === "quiz") {
+                const quiz = quizzesMap.get(item.content_id);
+                if (!quiz) {
+                  console.warn("[CourseDetailRefactored] Quiz not found for ID:", item.content_id);
+                  return null;
+                }
+                return {
+                  id: quiz.id,
+                  title: quiz.title,
+                  duration: `${quiz.time_limit_minutes || 30}m`,
+                  type: "quiz" as const
+                };
+              }
+              return null;
+            }).filter(Boolean);
+            
+            console.log(`[CourseDetailRefactored] Module "${module.title}" built with ${lessons?.length || 0} lessons`);
+            return {
+              id: module.id,
+              title: module.title,
+              lessons: lessons || []
+            };
+          });
+          
+          console.log("[CourseDetailRefactored] Final curriculum:", curriculumData);
+          setDirectCurriculum(curriculumData);
+        } else {
+          console.warn("[CourseDetailRefactored] No content items found for modules:", moduleIds);
+          setDebugInfo("⚠️ No content items found - modules may be empty");
+          // Create empty modules
+          setDirectCurriculum(modules.map(m => ({ id: m.id, title: m.title, lessons: [] })));
+        }
+      } else {
+        console.warn("[CourseDetailRefactored] No modules found for courseId:", courseId);
+        setDebugInfo("⚠️ No modules found for this course");
+        setDirectCurriculum([]);
+      }
+      
+      setDirectCurriculumLoading(false);
+    };
+    
+    fetchCurriculumDirectly();
+  }, [courseId]);
+  
+  // Function to fix curriculum visibility (simple version - just updates is_published flags)
+  const handleFixVisibility = async () => {
+    if (!courseId) return;
+    
+    try {
+      // Update modules to published
+      await supabase
+        .from("modules")
+        .update({ is_published: true })
+        .eq("course_id", courseId);
+      
+      // Update content items to published
+      await supabase
+        .from("module_content_items")
+        .update({ is_published: true })
+        .in("module_id", (await supabase.from("modules").select("id").eq("course_id", courseId)).data?.map(m => m.id) || []);
+      
+      // Update lessons to published
+      await supabase
+        .from("lessons")
+        .update({ is_published: true })
+        .in("id", 
+          (await supabase.from("module_content_items")
+            .select("content_id")
+            .in("module_id", (await supabase.from("modules").select("id").eq("course_id", courseId)).data?.map(m => m.id) || [])
+            .eq("content_type", "lesson")
+          ).data?.map(l => l.content_id) || []
+        );
+      
+      // Update quizzes to published
+      await supabase
+        .from("quizzes")
+        .update({ is_published: true })
+        .in("id", 
+          (await supabase.from("module_content_items")
+            .select("content_id")
+            .in("module_id", (await supabase.from("modules").select("id").eq("course_id", courseId)).data?.map(m => m.id) || [])
+            .eq("content_type", "quiz")
+          ).data?.map(q => q.content_id) || []
+        );
+      
+      setDebugInfo("✅ Curriculum published successfully!");
+      alert("Curriculum visibility fixed! Refreshing...");
+      
+      // Refresh curriculum
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (err: any) {
+      console.error("Error fixing visibility:", err);
+      alert("Failed to fix visibility: " + err.message);
+    }
+  };
+
   const {
     isEnrolled,
     checking,
@@ -383,14 +586,39 @@ const CourseDetailRefactored: React.FC = () => {
                 />
               )}
               {activeTab === "curriculum" && (
-                <CourseCurriculumTab
-                  curriculum={course.curriculum || []}
-                  courseId={courseId}
-                  isEnrolled={isEnrolled}
-                  completedLessonIds={completedLessonIds}
-                  completedQuizIds={completedQuizIds}
-                  // onTotalDurationLoaded removed — hook handles it now
-                />
+                <div>
+                  {/* Debug Info & Fix Button */}
+                  <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <h4 className="text-sm font-semibold text-yellow-800 dark:text-yellow-300 mb-1">
+                          Curriculum Debug Info
+                        </h4>
+                        <div className="text-xs text-yellow-700 dark:text-yellow-400 space-y-1">
+                          <div>Direct Curriculum: {directCurriculum.length} modules</div>
+                          <div>Course Curriculum: {course.curriculum?.length || 0} modules</div>
+                          <div>Loading: {directCurriculumLoading ? "Yes" : "No"}</div>
+                          {debugInfo && <div className="font-medium">{debugInfo}</div>}
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleFixVisibility}
+                        disabled={directCurriculumLoading}
+                        className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
+                      >
+                        🔧 Fix Visibility
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <CourseCurriculumTab
+                    curriculum={directCurriculum.length > 0 ? directCurriculum : (course.curriculum || [])}
+                    courseId={courseId}
+                    isEnrolled={isEnrolled}
+                    completedLessonIds={completedLessonIds}
+                    completedQuizIds={completedQuizIds}
+                  />
+                </div>
               )}
               {activeTab === "reviews" && (
                 <CourseReviewsTab

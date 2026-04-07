@@ -83,7 +83,7 @@ const StudentListTable: React.FC<StudentListTableProps> = ({
               <th className="text-left px-6 py-4 text-xs font-semibold text-[#5F6473] uppercase tracking-wider">
                 Email
               </th>
-              <th className="text-left px-6 py-4 text-xs font-semibold text-[#5F6473] uppercase tracking-wider">
+              <th className="text-left px-8 py-4 text-xs font-semibold text-[#5F6473] uppercase tracking-wider">
                 Status
               </th>
               <th className="text-left px-6 py-4 text-xs font-semibold text-[#5F6473] uppercase tracking-wider">

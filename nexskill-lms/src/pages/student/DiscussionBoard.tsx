@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import StudentAppLayout from '../../layouts/StudentAppLayout';
+import { ArrowLeft } from 'lucide-react';
 import PostComposer from '../../components/community/PostComposer';
 
 interface Thread {
@@ -37,26 +37,34 @@ const DiscussionBoard: React.FC = () => {
   };
 
   return (
-    <StudentAppLayout>
-      <div className="min-h-screen bg-gradient-to-br from-[#E7F0FF] via-[#F9F0FF] to-[#E3F4FF] dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 py-8 px-6 transition-colors">
-        <div className="max-w-1xl mx-auto">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Community discussions</h1>
-            <p className="text-slate-600 dark:text-slate-400">Ask questions, share insights, and learn with others.</p>
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-[#E7F0FF] via-[#F9F0FF] to-[#E3F4FF] dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 py-8 px-6 transition-colors">
+      <div className="max-w-4xl mx-auto">
+        {/* Back Button */}
+        <button
+          onClick={() => navigate('/student/my-courses')}
+          className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white mb-6 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          <span className="text-sm font-medium">Back to My Courses</span>
+        </button>
 
-          {/* Coming Soon Banner */}
-          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
-            <span className="text-xl flex-shrink-0">🚀</span>
-            <div>
-              <p className="font-semibold text-amber-800">Community Discussions — Coming Soon</p>
-              <p className="text-sm text-amber-700">We're building a discussion board for you to connect with fellow learners. Stay tuned!</p>
-            </div>
-          </div>
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Community discussions</h1>
+          <p className="text-slate-600 dark:text-slate-400">Ask questions, share insights, and learn with others.</p>
+        </div>
 
-          {/* Filter chips */}
-          <div className="flex gap-3 mb-6">
+        {/* Coming Soon Banner */}
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+          <span className="text-xl flex-shrink-0">🚀</span>
+          <div>
+            <p className="font-semibold text-amber-800">Community Discussions — Coming Soon</p>
+            <p className="text-sm text-amber-700">We're building a discussion board for you to connect with fellow learners. Stay tuned!</p>
+          </div>
+        </div>
+
+        {/* Filter chips */}
+        <div className="flex gap-3 mb-6">
             {filters.map((filter) => (
               <button
                 key={filter.id}
@@ -148,7 +156,7 @@ const DiscussionBoard: React.FC = () => {
           </div>
         </div>
       </div>
-    </StudentAppLayout>
+    
   );
 };
 

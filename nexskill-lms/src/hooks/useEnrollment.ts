@@ -16,23 +16,19 @@ export const useEnrollment = (courseId: string | undefined) => {
       try {
         setChecking(true);
 
-        // FIX: .single() returns 406 when no row exists (PostgREST requires
-        // exactly one row). .maybeSingle() returns null cleanly — no error.
-        const { data, error } = await supabase
+        // Use count to check if any enrollment exists (handles duplicates)
+        const { count, error } = await supabase
           .from("enrollments")
-          .select("profile_id")   // only fetch what we need, not *
+          .select("*", { count: "exact", head: true })
           .eq("profile_id", user.id)
-          .eq("course_id", courseId)
-          .maybeSingle();
+          .eq("course_id", courseId);
 
         if (error) {
-          // A real error (network, RLS, etc.) — log but don't crash
           console.error("[useEnrollment] Error checking enrollment:", error);
           return;
         }
 
-        // data is null → not enrolled, data is an object → enrolled
-        setIsEnrolled(data !== null);
+        setIsEnrolled((count || 0) > 0);
       } catch (err) {
         console.error("[useEnrollment] Unexpected error:", err);
       } finally {
