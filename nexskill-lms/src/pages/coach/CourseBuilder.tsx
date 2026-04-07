@@ -84,6 +84,25 @@ const CourseBuilder: React.FC = () => {
   const [adminFeedback, setAdminFeedback] = useState<string>("");
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [instructorName, setInstructorName] = useState<string>("Instructor");
+  const [isCoursePublished, setIsCoursePublished] = useState(false);
+
+  // Check if course is published (for determining save behavior)
+  useEffect(() => {
+    const checkCoursePublished = async () => {
+      if (!courseId) return;
+      const { data } = await supabase
+        .from('courses')
+        .select('verification_status')
+        .eq('id', courseId)
+        .single();
+      
+      const isPublished = data?.verification_status === 'approved';
+      setIsCoursePublished(isPublished);
+      console.log('[CourseBuilder] Course is published:', isPublished);
+    };
+    
+    checkCoursePublished();
+  }, [courseId]);
 
   const [settings, setSettings] = useState<CourseSettings>({
     title: initialData?.title || "",
@@ -337,24 +356,12 @@ const CourseBuilder: React.FC = () => {
           return;
         }
 
-        // If course was approved and curriculum changed, mark as pending_review
+        // NOTE: We do NOT change verification_status here
+        // The course stays "approved" and visible to students
+        // New/edited content is saved with is_published = false (if course is published)
+        // Admin will approve the unpublished content separately
         if (wasApproved) {
-          console.log('Course was approved, marking as pending_review due to curriculum changes');
-          const { error: updateError } = await supabase
-            .from('courses')
-            .update({
-              verification_status: 'pending_review',
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', courseId);
-
-          if (updateError) {
-            console.error('Error updating verification status:', updateError);
-          } else {
-            setVerificationStatus('pending_review');
-            // Show notification to coach
-            console.log('Course marked as pending_review. Changes will be visible after admin approval.');
-          }
+          console.log('Course remains approved. New content saved as unpublished (pending admin approval).');
         }
       } catch (err) {
         console.error("Error in module auto-save:", err);
@@ -453,6 +460,10 @@ const CourseBuilder: React.FC = () => {
     }
 
     const lessonId = uuidv4();
+    
+    // If course is already published, save new content as unpublished (pending approval)
+    const shouldSaveAsUnpublished = isCoursePublished;
+    console.log('[CourseBuilder] Adding lesson - isCoursePublished:', isCoursePublished, 'will save as unpublished:', shouldSaveAsUnpublished);
 
     try {
       const { error: lessonError } = await supabase.from("lessons").insert([{
@@ -461,7 +472,7 @@ const CourseBuilder: React.FC = () => {
         description: newLesson.description || "",
         content_blocks: newLesson.content_blocks || [],
         estimated_duration_minutes: newLesson.estimated_duration_minutes || 15,
-        is_published: newLesson.is_published || false,
+        is_published: shouldSaveAsUnpublished ? false : (newLesson.is_published || false),
         course_id: courseId,
       }]);
 
@@ -485,7 +496,7 @@ const CourseBuilder: React.FC = () => {
           content_type: "lesson",
           content_id: lessonId,
           position: newPosition,
-          is_published: newLesson.is_published || false,
+          is_published: shouldSaveAsUnpublished ? false : (newLesson.is_published || false),
         }]);
 
       if (linkError) {
@@ -502,11 +513,16 @@ const CourseBuilder: React.FC = () => {
         content_blocks: newLesson.content_blocks || [],
         duration: `${newLesson.estimated_duration_minutes || 15} min`,
         summary: newLesson.summary || "",
+        is_published: shouldSaveAsUnpublished ? false : (newLesson.is_published || false),
       };
 
       setCurriculum(curriculum.map((m) =>
         m.id === moduleId ? { ...m, lessons: [...m.lessons, updatedNewLesson] } : m
       ));
+      
+      if (shouldSaveAsUnpublished) {
+        alert('✅ Lesson added! Since this course is already published, your changes will be visible to students after admin approval.');
+      }
     } catch (err) {
       console.error("Error adding lesson:", err);
       alert("An unexpected error occurred while adding the lesson");

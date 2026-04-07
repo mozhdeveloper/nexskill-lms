@@ -165,94 +165,85 @@ export const useEnrolledCourses = () => {
             setLoading(true);
             setError(null);
 
-            // 1. Fetch enrollments with course details
-            const { data, error } = await supabase
+            // Step 1: Fetch enrollments
+            const { data: enrollments, error: enrollError } = await supabase
                 .from('enrollments')
-                .select(`
-                    enrolled_at,
-                    course:courses (
-                        *,
-                        category:categories(name),
-                        coach:profiles!courses_coach_id_fkey (
-                            first_name,
-                            last_name
-                        )
-                    )
-                `)
+                .select('course_id, enrolled_at')
                 .eq('profile_id', user.id)
                 .order('enrolled_at', { ascending: false });
 
-            if (error) throw error;
+            if (enrollError) throw enrollError;
+            if (!enrollments || enrollments.length === 0) {
+                setCourses([]);
+                setLoading(false);
+                return;
+            }
 
-            // 2. Fetch review counts, ratings, student counts, AND total durations for all enrolled courses
-            const enrolledCourses = await Promise.all(
-                (data || []).map(async (item: any) => {
-                    const course = item.course;
-                    
-                    // Fetch review count and rating
-                    const { count: reviewCount } = await supabase
-                        .from('reviews')
-                        .select('*', { count: 'exact', head: true })
-                        .eq('course_id', course.id);
+            // Step 2: Fetch course details
+            const courseIds = enrollments.map(e => e.course_id);
+            const { data: coursesData, error: coursesError } = await supabase
+                .from('courses')
+                .select('*')
+                .in('id', courseIds);
 
-                    const { data: reviewsData } = await supabase
-                        .from('reviews')
-                        .select('rating')
-                        .eq('course_id', course.id);
+            if (coursesError) throw coursesError;
 
-                    const avgRating = reviewsData && reviewsData.length > 0
-                        ? Math.round((reviewsData.reduce((sum, r) => sum + r.rating, 0) / reviewsData.length) * 10) / 10
-                        : 0;
+            // Step 3: Fetch coach profiles
+            const coachIds = [...new Set(coursesData?.map(c => c.coach_id).filter(Boolean) || [])];
+            let profilesMap: Record<string, string> = {};
+            if (coachIds.length > 0) {
+                const { data: profilesData } = await supabase
+                    .from('profiles')
+                    .select('id, first_name, last_name')
+                    .in('id', coachIds);
+                
+                if (profilesData) {
+                    profilesMap = profilesData.reduce((acc, p: any) => {
+                        acc[p.id] = `${p.first_name || ''} ${p.last_name || ''}`.trim();
+                        return acc;
+                    }, {} as Record<string, string>);
+                }
+            }
 
-                    // Fetch total enrollment count
-                    const { count: enrollmentCount } = await supabase
-                        .from('enrollments')
-                        .select('*', { count: 'exact', head: true })
-                        .eq('course_id', course.id);
+            // Step 4: Fetch reviews and enrollment counts for all courses
+            const reviewPromises = courseIds.map(async (courseId) => {
+                const { data: reviews } = await supabase
+                    .from('reviews')
+                    .select('rating')
+                    .eq('course_id', courseId);
+                
+                const { count: enrollCount } = await supabase
+                    .from('enrollments')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('course_id', courseId);
 
-                    // Fetch total duration for the course
-                    let totalDurationSeconds = 0;
-                    
-                    // Get all modules for this course
-                    const { data: modulesData } = await supabase
-                        .from('modules')
-                        .select('id')
-                        .eq('course_id', course.id)
-                        .eq('is_published', true);
+                const avgRating = reviews && reviews.length > 0
+                    ? Math.round((reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length) * 10) / 10
+                    : 0;
 
-                    if (modulesData && modulesData.length > 0) {
-                        const moduleIds = modulesData.map(m => m.id);
-                        
-                        // Get content items for these modules
-                        const { data: itemsData } = await supabase
-                            .from('module_content_items')
-                            .select('content_type, content_id')
-                            .in('module_id', moduleIds)
-                            .eq('is_published', true);
+                return {
+                    courseId,
+                    reviewCount: reviews?.length || 0,
+                    rating: avgRating,
+                    studentsCount: enrollCount || 0
+                };
+            });
 
-                        const lessonIds = (itemsData || [])
-                            .filter(i => i.content_type === 'lesson')
-                            .map(i => i.content_id);
+            const reviewResults = await Promise.all(reviewPromises);
+            const reviewsMap = reviewResults.reduce((acc, r) => {
+                acc[r.courseId] = { reviewCount: r.reviewCount, rating: r.rating, studentsCount: r.studentsCount };
+                return acc;
+            }, {} as Record<string, { reviewCount: number; rating: number; studentsCount: number }>);
 
-                        if (lessonIds.length > 0) {
-                            const { totalSeconds } = await resolveVideoDurations(lessonIds);
-                            totalDurationSeconds = totalSeconds;
-                        }
-                    }
-
-                    const formattedDuration = formatTotalDuration(totalDurationSeconds);
-
-                    return {
-                        ...course,
-                        enrolled_at: item.enrolled_at,
-                        reviewCount: reviewCount || 0,
-                        rating: avgRating,
-                        studentsCount: enrollmentCount || 0,
-                        totalDurationSeconds,
-                        formattedDuration,
-                    };
-                })
-            );
+            // Step 5: Combine all data
+            const enrolledCourses = (coursesData || []).map((course: any) => ({
+                ...course,
+                enrolled_at: enrollments.find(e => e.course_id === course.id)?.enrolled_at,
+                reviewCount: reviewsMap[course.id]?.reviewCount || 0,
+                rating: reviewsMap[course.id]?.rating || 0,
+                studentsCount: reviewsMap[course.id]?.studentsCount || 0,
+                instructor_name: profilesMap[course.coach_id] || 'Unknown Instructor',
+            }));
 
             setCourses(enrolledCourses as unknown as EnrolledCourse[]);
         } catch (err: any) {

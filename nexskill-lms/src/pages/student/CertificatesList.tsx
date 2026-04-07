@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import StudentAppLayout from '../../layouts/StudentAppLayout';
+import { ArrowLeft } from 'lucide-react';
 import CertificateCard from '../../components/certificates/CertificateCard';
 import { supabase } from '../../lib/supabaseClient';
 
@@ -125,24 +125,33 @@ const CertificatesList: React.FC = () => {
 
   if (loading) {
     return (
-      <StudentAppLayout>
-        <div className="flex-1 flex items-center justify-center p-8">
-          <div className="text-center">
-            <div className="text-6xl mb-4">🎓</div>
-            <p className="text-lg text-slate-600 dark:text-slate-400">Loading your achievements...</p>
-          </div>
+      <div className="min-h-screen bg-[color:var(--bg-primary)] flex items-center justify-center p-8">
+        <div className="text-center">
+          <div className="text-6xl mb-4">🎓</div>
+          <p className="text-lg text-[color:var(--text-secondary)]">Loading your achievements...</p>
         </div>
-      </StudentAppLayout>
+      </div>
     );
   }
 
   return (
-    <StudentAppLayout>
-      <div className="flex-1 overflow-y-auto p-8">
+    <div className="min-h-screen bg-[color:var(--bg-primary)]">
+      {/* Back Button */}
+      <div className="px-8 py-4">
+        <button
+          onClick={() => navigate('/student/my-courses')}
+          className="flex items-center gap-2 text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          <span className="text-sm font-medium">Back to My Courses</span>
+        </button>
+      </div>
+
+      <div className="p-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-3">Certificates & achievements</h1>
-          <p className="text-lg text-slate-600 dark:text-slate-400">Review, download, and share your accomplishments</p>
+          <h1 className="text-4xl font-bold text-[color:var(--text-primary)] mb-3">Certificates & achievements</h1>
+          <p className="text-lg text-[color:var(--text-secondary)]">Review, download, and share your accomplishments</p>
         </div>
 
         {/* Stats Row */}
@@ -234,7 +243,7 @@ const CertificatesList: React.FC = () => {
           </div>
         )}
       </div>
-    </StudentAppLayout>
+    </div>
   );
 };
 

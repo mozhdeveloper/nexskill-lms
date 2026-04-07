@@ -10,7 +10,7 @@ import EmailVerification from "./pages/auth/EmailVerification";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import ResetPassword from "./pages/auth/ResetPassword";
 import OnboardingPreferences from "./pages/student/OnboardingPreferences";
-import StudentDashboard from "./pages/student/StudentDashboard";
+import MyCoursesPage from "./pages/student/MyCoursesPage";
 
 import CourseCatalog from "./pages/student/CourseCatalog";
 import CourseDetail from "./pages/student/CourseDetailRefactored";
@@ -407,8 +407,16 @@ function App() {
 
                 {/* Student Routes */}
                 <Route
+                  path="/student"
+                  element={<CourseCatalog />}
+                />
+                <Route
                   path="/student/dashboard"
-                  element={<StudentDashboard />}
+                  element={<CourseCatalog />}
+                />
+                <Route
+                  path="/student/my-courses"
+                  element={<MyCoursesPage />}
                 />
                 <Route path="/student/courses" element={<CourseCatalog />} />
                 <Route

@@ -224,12 +224,12 @@ const CoachDashboard: React.FC = () => {
 
   return (
     <CoachAppLayout>
-      <div className="space-y-8">
+      <div className="space-y-8 p-10">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-bold text-[color:var(--text-primary)]">
-              Welcome back, {currentUser?.first_name || 'Coach'}! 👋
+              Welcome back, {currentUser?.firstName || 'Coach'}! 👋
             </h1>
             <p className="text-[color:var(--text-secondary)] mt-1">
               Here's what's happening with your courses today.

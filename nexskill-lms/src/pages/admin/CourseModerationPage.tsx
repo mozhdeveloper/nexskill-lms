@@ -108,20 +108,29 @@ const CourseModerationPage: React.FC = () => {
 
         const { data: modulesData } = await supabase
           .from('modules')
-          .select('course_id, id');
+          .select('course_id, id, is_published');
 
         const moduleCounts = modulesData?.reduce((acc: Record<string, number>, m: any) => {
           acc[m.course_id] = (acc[m.course_id] || 0) + 1;
           return acc;
         }, {});
+        
+        // Count unpublished modules per course
+        const unpublishedModuleCounts = modulesData?.reduce((acc: Record<string, number>, m: any) => {
+          if (!m.is_published) {
+            acc[m.course_id] = (acc[m.course_id] || 0) + 1;
+          }
+          return acc;
+        }, {});
 
         const { data: lessonsData } = await supabase
           .from('module_content_items')
-          .select('module_id, content_type')
+          .select('module_id, content_type, is_published')
           .in('module_id', modulesData?.map(m => m.id) || []);
 
         const lessonCounts: Record<string, number> = {};
         const quizCounts: Record<string, number> = {};
+        const unpublishedLessonCounts: Record<string, number> = {};
 
         if (lessonsData && modulesData) {
           const moduleIds = modulesData.map(m => m.id);
@@ -132,6 +141,9 @@ const CourseModerationPage: React.FC = () => {
             if (courseId) {
               if (item.content_type === 'lesson') {
                 lessonCounts[courseId] = (lessonCounts[courseId] || 0) + 1;
+                if (!item.is_published) {
+                  unpublishedLessonCounts[courseId] = (unpublishedLessonCounts[courseId] || 0) + 1;
+                }
               } else if (item.content_type === 'quiz') {
                 quizCounts[courseId] = (quizCounts[courseId] || 0) + 1;
               }
@@ -176,6 +188,10 @@ const CourseModerationPage: React.FC = () => {
           if ((moduleCounts?.[c.id] || 0) === 0) qualityFlags.push('No modules created');
           if ((lessonCounts?.[c.id] || 0) === 0) qualityFlags.push('No lessons added');
           if ((quizCounts?.[c.id] || 0) === 0) qualityFlags.push('No quizzes created');
+          
+          // Check if course has unpublished changes (pending admin approval)
+          const hasUnpublishedChanges = (unpublishedModuleCounts?.[c.id] || 0) > 0 || 
+                                        (unpublishedLessonCounts?.[c.id] || 0) > 0;
 
           return {
             id: c.id,
@@ -197,6 +213,9 @@ const CourseModerationPage: React.FC = () => {
             reportsCount: 0,
             description: c.description,
             is_published: c.is_published,
+            hasUnpublishedChanges, // Flag for pending changes
+            unpublishedModulesCount: unpublishedModuleCounts?.[c.id] || 0,
+            unpublishedLessonsCount: unpublishedLessonCounts?.[c.id] || 0,
           };
         });
 
@@ -255,7 +274,7 @@ const CourseModerationPage: React.FC = () => {
     try {
       console.log('[Admin] Approving course:', courseId);
 
-      // Step 1: Publish module_content_items FIRST (course is still pending, so trigger won't reset anything)
+      // Step 1: Get all modules for this course
       const { data: modulesData, error: modulesError } = await supabase
         .from('modules')
         .select('id')
@@ -263,25 +282,86 @@ const CourseModerationPage: React.FC = () => {
 
       console.log('[Admin] Modules found:', { modulesData, modulesError });
 
+      if (modulesError) throw modulesError;
+
       if (modulesData && modulesData.length > 0) {
         const moduleIds = modulesData.map(m => m.id);
-        
-        console.log('[Admin] Publishing module_content_items for modules:', moduleIds);
 
-        const { data: updateData, error: updateError } = await supabase
+        // Step 2: Publish all MODULES
+        console.log('[Admin] Publishing modules...');
+        const { error: modulesUpdateError } = await supabase
+          .from('modules')
+          .update({ is_published: true })
+          .in('id', moduleIds);
+
+        if (modulesUpdateError) {
+          console.error('[Admin] Modules update error:', modulesUpdateError);
+        } else {
+          console.log('[Admin] ✅ Modules published successfully');
+        }
+
+        // Step 3: Publish all MODULE_CONTENT_ITEMS
+        console.log('[Admin] Publishing module_content_items...');
+        const { error: contentItemsError } = await supabase
           .from('module_content_items')
           .update({ is_published: true })
+          .in('module_id', moduleIds);
+
+        if (contentItemsError) {
+          console.error('[Admin] Module content items error:', contentItemsError);
+        } else {
+          console.log('[Admin] ✅ Module content items published successfully');
+        }
+
+        // Step 4: Publish all LESSONS
+        console.log('[Admin] Publishing lessons...');
+        const { data: lessonContentItems } = await supabase
+          .from('module_content_items')
+          .select('content_id')
           .in('module_id', moduleIds)
-          .select();
+          .eq('content_type', 'lesson');
 
-        console.log('[Admin] Module content items update result:', { updateData, updateError });
+        if (lessonContentItems && lessonContentItems.length > 0) {
+          const lessonIds = lessonContentItems.map(l => l.content_id);
+          
+          const { error: lessonsError } = await supabase
+            .from('lessons')
+            .update({ is_published: true })
+            .in('id', lessonIds);
 
-        if (updateError) {
-          console.error('[Admin] Module content items update error:', updateError);
+          if (lessonsError) {
+            console.error('[Admin] Lessons error:', lessonsError);
+          } else {
+            console.log('[Admin] ✅ Lessons published successfully');
+          }
+        }
+
+        // Step 5: Publish all QUIZZES
+        console.log('[Admin] Publishing quizzes...');
+        const { data: quizContentItems } = await supabase
+          .from('module_content_items')
+          .select('content_id')
+          .in('module_id', moduleIds)
+          .eq('content_type', 'quiz');
+
+        if (quizContentItems && quizContentItems.length > 0) {
+          const quizIds = quizContentItems.map(q => q.content_id);
+          
+          const { error: quizzesError } = await supabase
+            .from('quizzes')
+            .update({ is_published: true })
+            .in('id', quizIds);
+
+          if (quizzesError) {
+            console.error('[Admin] Quizzes error:', quizzesError);
+          } else {
+            console.log('[Admin] ✅ Quizzes published successfully');
+          }
         }
       }
 
-      // Step 2: THEN approve the course (nothing will touch it after this)
+      // Step 6: Approve the course
+      console.log('[Admin] Approving course...');
       const { data: courseData, error: courseError } = await supabase
         .from('courses')
         .update({
@@ -292,21 +372,22 @@ const CourseModerationPage: React.FC = () => {
         .eq('id', courseId)
         .select();
 
-      console.log('[Admin] Course update result:', { courseData, courseError });
-
       if (courseError) {
         console.error('[Admin] Course update error:', courseError);
         throw courseError;
       }
       if (!courseData || courseData.length === 0) throw new Error('Course not found');
 
+      console.log('[Admin] ✅ Course approved successfully!');
+
+      // Update local state
       setCourses(prev => prev.map(c =>
         c.id === courseId
           ? { ...c, status: 'approved' as const, qualityScore: Math.max(c.qualityScore, 80) }
           : c
       ));
 
-      alert(`Course Approved!\n\nCourse: ${courseData[0].title}\n\nThe course is now visible to students.`);
+      alert(`✅ Course Approved!\n\nCourse: ${courseData[0].title}\n\nAll modules, lessons, and quizzes are now published and visible to students.`);
 
     } catch (error: any) {
       console.error('Approval error:', error);

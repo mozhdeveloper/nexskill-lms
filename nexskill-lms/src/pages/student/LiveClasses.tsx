@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import StudentAppLayout from '../../layouts/StudentAppLayout';
+import { ArrowLeft } from 'lucide-react';
 import { useLiveSessions } from '../../hooks/useLiveSessions';
 import { supabase } from '../../lib/supabaseClient';
 import type { LiveSession } from '../../types/db';
@@ -63,29 +63,29 @@ const LiveClasses: React.FC = () => {
   };
 
   return (
-    <StudentAppLayout>
-      <div className="px-8 py-6 border-b border-[#EDF0FB] dark:border-gray-700">
+    <div className="min-h-screen bg-[color:var(--bg-primary)]">
+      {/* Back Button */}
+      <div className="px-8 py-4">
+        <button
+          onClick={() => navigate('/student/my-courses')}
+          className="flex items-center gap-2 text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          <span className="text-sm font-medium">Back to My Courses</span>
+        </button>
+      </div>
+
+      <div className="px-8 py-6 border-b border-[color:var(--border-base)]">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-text-primary dark:text-dark-text-primary mb-1">Live Classes</h1>
-            <p className="text-sm text-text-secondary dark:text-dark-text-secondary">
+            <h1 className="text-2xl font-bold text-[color:var(--text-primary)] mb-1">Live Classes</h1>
+            <p className="text-sm text-[color:var(--text-secondary)]">
               Join interactive sessions with expert instructors
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/student/live-classes')}
-              className="px-4 py-2 text-sm font-medium text-text-secondary hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              📅 Browse Schedule
-            </button>
-            <button
-              className="px-4 py-2 text-sm font-medium text-brand-primary hover:bg-blue-50 border border-brand-primary rounded-lg transition-colors opacity-50 cursor-not-allowed"
-              disabled
-            >
-              🔍 Filter
-            </button>
-          </div>
+          <button className="px-4 py-2 text-sm font-medium rounded-lg transition-colors">
+            🔍 Filter
+          </button>
         </div>
       </div>
 
@@ -339,7 +339,7 @@ const LiveClasses: React.FC = () => {
 
         </div>
       </div>
-    </StudentAppLayout>
+    </div>
   );
 };
 
