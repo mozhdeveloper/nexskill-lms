@@ -181,7 +181,19 @@ const QuizAttemptHistory: React.FC<QuizAttemptHistoryProps> = ({
     <div className="glass-card rounded-2xl p-6 mb-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-bold text-text-primary">Your Attempt History</h2>
-        {attemptsRemaining !== null && attemptsRemaining <= 0 ? (
+        <div className="flex items-center gap-3">
+          {/* Start Attempt Button - Only show when attempts remain */}
+          {canRetake && onStartAttempt && (attemptsRemaining === null || attemptsRemaining > 0) && (
+            <button
+              onClick={onStartAttempt}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-sm bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all"
+            >
+              <Play className="w-5 h-5" />
+              Start Attempt {nextAttemptNumber} of {maxAttempts ?? '∞'}
+            </button>
+          )}
+          
+          {/* Back to Lesson Button - Always visible */}
           <button
             onClick={() => {
               if (lessonId) {
@@ -190,21 +202,11 @@ const QuizAttemptHistory: React.FC<QuizAttemptHistoryProps> = ({
                 navigate(`/student/courses/${courseId}`);
               }
             }}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-sm bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-sm glass-card text-text-primary border-2 border-[color:var(--border-base)] hover:shadow transition-all"
           >
             ← Back to Lesson
           </button>
-        ) : (
-          canRetake && onStartAttempt && (attemptsRemaining === null || attemptsRemaining > 0) && (
-            <button
-              onClick={onStartAttempt}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-sm bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all"
-            >
-              <Play className="w-5 h-5" />
-              Start Attempt {nextAttemptNumber} of {maxAttempts ?? '∞'}
-            </button>
-          )
-        )}
+        </div>
       </div>
 
       <div className="overflow-x-auto">
@@ -261,7 +263,9 @@ const QuizAttemptHistory: React.FC<QuizAttemptHistoryProps> = ({
             <span className="font-bold text-text-primary">
               {attemptsRemaining === null
                 ? 'Unlimited'
-                : `${nextAttemptNumber}/${maxAttempts}`}
+                : attemptsRemaining === 0
+                ? 'No more Attempts'
+                : `${nextAttemptNumber} of ${maxAttempts}`}
             </span>
           </span>
           {attempts.length > 0 && (

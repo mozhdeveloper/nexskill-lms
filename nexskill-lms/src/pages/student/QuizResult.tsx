@@ -25,6 +25,7 @@ interface LocationState {
   attemptsRemaining: number | null;
   maxAttempts: number | null;
   timeLimitMinutes: number | null;
+  lessonId?: string | null;
 }
 
 const QuizResult: React.FC = () => {
@@ -37,34 +38,42 @@ const QuizResult: React.FC = () => {
   const [dbCorrect, setDbCorrect] = useState<number | null>(null);
   const [dbTotal, setDbTotal] = useState<number | null>(null);
   const [dbPassing, setDbPassing] = useState<number | null>(null);
-  const [lessonId, setLessonId] = useState<string | null>(null);
+  const [lessonId, setLessonId] = useState<string | null>(state?.lessonId ?? null);
   const [loadingDb, setLoadingDb] = useState(!state);
 
-  // If no state (page refresh), fetch the latest attempt from DB
+  // Fetch data from DB if no state (page refresh) OR if lessonId is missing
   useEffect(() => {
-    if (state || !quizId) return;
-    const fetchLatestAttempt = async () => {
+    if (!quizId) return;
+    
+    const shouldFetch = !state || !lessonId;
+    if (!shouldFetch) return;
+
+    const fetchData = async () => {
       try {
         setLoadingDb(true);
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const { data: attempt } = await supabase
-          .from('quiz_attempts')
-          .select('score, max_score, passed')
-          .eq('user_id', user.id)
-          .eq('quiz_id', quizId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
+        // Fetch attempt data only if no state
+        if (!state) {
+          const { data: attempt } = await supabase
+            .from('quiz_attempts')
+            .select('score, max_score, passed')
+            .eq('user_id', user.id)
+            .eq('quiz_id', quizId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
 
-        if (attempt) {
-          const pct = attempt.max_score > 0 ? Math.round((attempt.score / attempt.max_score) * 100) : 0;
-          setDbScore(pct);
-          setDbCorrect(attempt.score);
-          setDbTotal(attempt.max_score);
+          if (attempt) {
+            const pct = attempt.max_score > 0 ? Math.round((attempt.score / attempt.max_score) * 100) : 0;
+            setDbScore(pct);
+            setDbCorrect(attempt.score);
+            setDbTotal(attempt.max_score);
+          }
         }
 
+        // Always fetch quiz data to get lesson_id if missing
         const { data: quiz } = await supabase
           .from('quizzes')
           .select('passing_score, lesson_id')
@@ -72,7 +81,9 @@ const QuizResult: React.FC = () => {
           .single();
         if (quiz) {
           setDbPassing(quiz.passing_score || 70);
-          setLessonId(quiz.lesson_id ?? null);
+          if (!lessonId) {
+            setLessonId(quiz.lesson_id ?? null);
+          }
         }
       } catch (err) {
         console.error('Error fetching quiz result:', err);
@@ -80,17 +91,8 @@ const QuizResult: React.FC = () => {
         setLoadingDb(false);
       }
     };
-    fetchLatestAttempt();
-  }, [quizId, state]);
-
-  // Fetch lesson_id from state or DB on initial load
-  useEffect(() => {
-    if (state?.lessonId) {
-      setLessonId(state.lessonId);
-    } else if (!state && quizId) {
-      // Will be fetched by the above useEffect
-    }
-  }, [state, quizId]);
+    fetchData();
+  }, [quizId, state, lessonId]);
 
   const score = state?.score ?? dbScore ?? 0;
   const correctCount = state?.correctCount ?? dbCorrect ?? 0;
@@ -104,6 +106,12 @@ const QuizResult: React.FC = () => {
 
   const passed = score >= passingScore;
   const incorrectCount = totalQuestions - correctCount;
+
+  // Calculate the next attempt number (completed attempts + 1)
+  const completedAttempts = maxAttempts !== null && attemptsRemaining !== null 
+    ? maxAttempts - attemptsRemaining 
+    : null;
+  const nextAttemptNumber = completedAttempts !== null ? completedAttempts + 1 : null;
 
   const handleRetry = () => {
     navigate(`/student/courses/${courseId}/quizzes/${quizId}/take`);
@@ -206,7 +214,7 @@ const QuizResult: React.FC = () => {
                   className="inline-flex items-center gap-2 px-8 py-3 rounded-full font-semibold bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all"
                 >
                   <Play className="w-5 h-5" />
-                  Start Attempt {attemptsRemaining === null ? '∞' : attemptsRemaining} of {maxAttempts ?? '∞'} 
+                  Start Attempt {attemptsRemaining === null ? '∞' : nextAttemptNumber} of {maxAttempts ?? '∞'}
                 </button>
               )}
               <button

@@ -541,6 +541,7 @@ const QuizSession: React.FC = () => {
   : Math.max(0, quizMeta.max_attempts - (previousAttempts.length + 1)),
           maxAttempts: quizMeta.max_attempts,
           timeLimitMinutes: quizMeta.time_limit_minutes,
+          lessonId: quizMeta.lesson_id ?? null,
         },
       });
     } catch (err) {
@@ -765,6 +766,7 @@ const QuizSession: React.FC = () => {
   : Math.max(0, quizMeta.max_attempts - (previousAttempts.length + 1)),
           maxAttempts: quizMeta.max_attempts,
           timeLimitMinutes: quizMeta.time_limit_minutes,
+          lessonId: quizMeta.lesson_id ?? null,
         },
       });
     } catch (err) {
@@ -867,8 +869,8 @@ const QuizSession: React.FC = () => {
             isPublished={quizMeta.is_published}
           />
 
-          {/* Attempt History — always render for show_history (handles empty + populated states) */}
-          {sessionState === 'show_history' && (
+          {/* Attempt History — always render for show_history or no_attempts_remaining */}
+          {(sessionState === 'show_history' || sessionState === 'no_attempts_remaining') && (
             <QuizAttemptHistory
               attempts={previousAttempts}
               maxAttempts={quizMeta.max_attempts}
