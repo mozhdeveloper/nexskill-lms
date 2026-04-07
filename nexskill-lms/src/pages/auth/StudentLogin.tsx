@@ -118,7 +118,6 @@ const StudentLogin: React.FC = () => {
                     return;
                 }
 
-                setTheme('dark');
                 navigate(defaultLandingRouteByRole['STUDENT']);
             }
         } catch (err) {
@@ -173,7 +172,6 @@ const StudentLogin: React.FC = () => {
                 }
 
                 // Redirect to student dashboard
-                setTheme('dark');
                 navigate(defaultLandingRouteByRole['STUDENT']);
             }
 

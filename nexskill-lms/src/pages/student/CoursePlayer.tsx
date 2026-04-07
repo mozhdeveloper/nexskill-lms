@@ -31,7 +31,7 @@ const CoursePlayer: React.FC = () => {
   const [showGraduation, setShowGraduation] = useState(false);
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
   const [completedQuizIds, setCompletedQuizIds] = useState<string[]>([]);
-  const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0); // Increments to trigger sidebar progress refresh
+  const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
   const [totalLessonsInCourse, setTotalLessonsInCourse] = useState(0);
   const [courseTitle, setCourseTitle] = useState('');
   const [currentLesson, setCurrentLesson] = useState<LessonWithModule | null>(null);
@@ -39,8 +39,6 @@ const CoursePlayer: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [flatItemList, setFlatItemList] = useState<FlatItem[]>([]);
   const [lessonContentItems, setLessonContentItems] = useState<LessonContentItem[]>([]);
-
-  // New state: active bottom tab
   const [activeTab, setActiveTab] = useState<BottomTab | null>(null);
 
   useEffect(() => {
@@ -51,7 +49,6 @@ const CoursePlayer: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        // Fetch course title
         const { data: courseData, error: courseError } = await supabase
           .from('courses')
           .select('title')
@@ -61,7 +58,6 @@ const CoursePlayer: React.FC = () => {
         if (courseError) throw courseError;
         setCourseTitle(courseData.title);
 
-        // Fetch lesson data including content_blocks
         const { data: lessonData, error: lessonError } = await supabase
           .from('lessons')
           .select('id, title, description, content_blocks, estimated_duration_minutes, is_published, created_at, updated_at')
@@ -70,7 +66,6 @@ const CoursePlayer: React.FC = () => {
 
         if (lessonError) throw lessonError;
 
-        // Also fetch module information for the lesson
         const { data: moduleData, error: moduleError } = await supabase
           .from('module_content_items')
           .select(`
@@ -90,7 +85,6 @@ const CoursePlayer: React.FC = () => {
 
         setCurrentLesson(lessonWithModule);
 
-        // Fetch content items for this lesson
         try {
           const contentItems = await fetchLessonContentItems(lessonId);
           setLessonContentItems(contentItems);
@@ -99,10 +93,8 @@ const CoursePlayer: React.FC = () => {
           setLessonContentItems([]);
         }
 
-        // Fetch completed lessons using user_lesson_progress
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          // Get all modules for this course
           const { data: mods } = await supabase
             .from('modules')
             .select('id, position')
@@ -120,7 +112,6 @@ const CoursePlayer: React.FC = () => {
               .eq('is_published', true)
               .order('position', { ascending: true });
 
-            // Build flat ordered item list (modules ordered by position, items within by position)
             const moduleOrder = new Map((mods || []).map((m: any, i: number) => [m.id, i]));
             const sorted = [...(contentItems || [])].sort((a, b) => {
               const modDiff = (moduleOrder.get(a.module_id) ?? 0) - (moduleOrder.get(b.module_id) ?? 0);
@@ -133,7 +124,6 @@ const CoursePlayer: React.FC = () => {
 
             setTotalLessonsInCourse(lessonIds.length);
 
-            // Fetch lesson completion
             if (lessonIds.length > 0) {
               const { data: progressRows } = await supabase
                 .from('user_lesson_progress')
@@ -144,7 +134,6 @@ const CoursePlayer: React.FC = () => {
               setCompletedLessons((progressRows || []).map((r: any) => r.lesson_id));
             }
 
-            // Fetch quiz completion
             if (quizIdsInCourse.length > 0) {
               const { data: quizRows } = await supabase
                 .from('quiz_attempts')
@@ -167,18 +156,15 @@ const CoursePlayer: React.FC = () => {
     fetchLessonData();
   }, [courseId, lessonId]);
 
-  // Calculate lesson number (1-based index of lessons only)
   const lessonNumber = flatItemList
     .filter(item => item.type === 'lesson')
     .findIndex(item => item.id === lessonId) + 1;
 
-  // Calculate progress based on completed lessons
   const progress = totalLessonsInCourse > 0
     ? Math.min(100, Math.round((completedLessons.length / totalLessonsInCourse) * 100))
     : 0;
 
   const handleSelectLesson = (newLessonId: string) => {
-    // Check if this is a quiz or a lesson
     const item = flatItemList.find((i) => i.id === newLessonId);
     if (item?.type === 'quiz') {
       navigate(`/student/courses/${courseId}/quizzes/${newLessonId}/take`);
@@ -187,7 +173,6 @@ const CoursePlayer: React.FC = () => {
     }
   };
 
-  // Next / Previous navigation helpers
   const currentIndex = flatItemList.findIndex((i) => i.id === lessonId);
   const prevItem = currentIndex > 0 ? flatItemList[currentIndex - 1] : null;
   const nextItem = currentIndex >= 0 && currentIndex < flatItemList.length - 1 ? flatItemList[currentIndex + 1] : null;
@@ -207,7 +192,6 @@ const CoursePlayer: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Upsert into user_lesson_progress
       const { error } = await supabase
         .from('user_lesson_progress')
         .upsert({
@@ -219,7 +203,6 @@ const CoursePlayer: React.FC = () => {
 
       if (error) throw error;
 
-      // Optimistically update local state
       setCompletedLessons(prev => prev.includes(lessonId) ? prev : [...prev, lessonId]);
       setShowCompleteModal(false);
     } catch (err) {
@@ -228,18 +211,15 @@ const CoursePlayer: React.FC = () => {
     }
   }, [lessonId, courseId]);
 
-  // Callback for video completion - refreshes the completed lessons list
   const handleVideoComplete = useCallback(() => {
     console.log('[CoursePlayer] Video complete - refreshing completion status');
 
-    // Re-fetch completed lessons to update UI (background refresh)
     const refreshCompletedLessons = async () => {
       if (!courseId) return;
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Get all modules for this course
       const { data: mods } = await supabase
         .from('modules')
         .select('id')
@@ -274,10 +254,6 @@ const CoursePlayer: React.FC = () => {
     refreshCompletedLessons();
   }, [courseId, lessonId, completedLessons]);
 
-  // NEW: Handle individual content item completion
-  // Only videos and quizzes count toward lesson completion
-  // Text/notes/documents are "supplementary" and don't block completion
-  // EXCEPTION: If lesson has ONLY text/notes (no videos/quizzes), viewing it auto-completes the lesson
   const handleContentItemComplete = useCallback(async (completedContentItemId: string) => {
     console.log('[CoursePlayer] Content item completed:', completedContentItemId);
 
@@ -286,7 +262,6 @@ const CoursePlayer: React.FC = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Get ALL content items for this lesson
     const { data: allContentItems } = await supabase
       .from('lesson_content_items')
       .select('id, content_type')
@@ -299,14 +274,12 @@ const CoursePlayer: React.FC = () => {
 
     console.log('[CoursePlayer] All content items:', allContentItems);
 
-    // Filter to only "required" content types (videos and quizzes)
     const requiredItems = allContentItems.filter(
       (item: any) => item.content_type === 'video' || item.content_type === 'quiz'
     );
 
     console.log('[CoursePlayer] Required content items (videos/quizzes):', requiredItems);
 
-    // SPECIAL CASE: If no required items (only text/notes/documents), auto-complete lesson
     if (requiredItems.length === 0) {
       console.log('[CoursePlayer] Lesson has only supplementary content (text/notes/docs) - auto-completing');
       
@@ -328,7 +301,6 @@ const CoursePlayer: React.FC = () => {
       return;
     }
 
-    // Get completed REQUIRED content items for this lesson
     const { data: completedItems } = await supabase
       .from('lesson_content_item_progress')
       .select('content_item_id')
@@ -339,7 +311,6 @@ const CoursePlayer: React.FC = () => {
     const completedIds = new Set((completedItems || []).map((item: any) => item.content_item_id));
     console.log('[CoursePlayer] Completed content items:', completedIds.size);
 
-    // Check if ALL REQUIRED content items are completed
     const allRequiredCompleted = requiredItems.every((item: any) => completedIds.has(item.id));
 
     console.log('[CoursePlayer] All required items completed?', allRequiredCompleted);
@@ -347,7 +318,6 @@ const CoursePlayer: React.FC = () => {
     if (allRequiredCompleted) {
       console.log('[CoursePlayer] All required content items completed! Marking lesson as complete...');
 
-      // Mark lesson as complete in user_lesson_progress
       const { error } = await supabase
         .from('user_lesson_progress')
         .upsert({
@@ -361,7 +331,6 @@ const CoursePlayer: React.FC = () => {
         console.error('[CoursePlayer] Error marking lesson complete:', error);
       } else {
         console.log('[CoursePlayer] Lesson marked as complete!');
-        // Update UI
         setCompletedLessons(prev => prev.includes(lessonId) ? prev : [...prev, lessonId]);
       }
     } else {
@@ -369,17 +338,15 @@ const CoursePlayer: React.FC = () => {
       console.log('[CoursePlayer] Required items remaining:', remaining.length);
     }
 
-    // Trigger sidebar progress count refresh (without full page reload)
     setSidebarRefreshKey(k => k + 1);
   }, [courseId, lessonId]);
-  // Show graduation banner when all lessons are complete
+
   useEffect(() => {
     if (totalLessonsInCourse > 0 && completedLessons.length >= totalLessonsInCourse) {
       setShowGraduation(true);
     }
   }, [completedLessons, totalLessonsInCourse]);
 
-  // Handle AI Summary tab — opens drawer instead of inline panel
   const handleTabClick = (tab: BottomTab) => {
     if (tab === 'ai-summary') {
       setShowAIDrawer(true);
@@ -449,33 +416,26 @@ const CoursePlayer: React.FC = () => {
     );
   }
 
-  return (
-    <StudentAppLayout>
-      {/* Header */}
-      <div className="px-8 py-4 border-b border-[#EDF0FB] dark:border-gray-700">
-        <div className="flex items-start justify-between mb-2">
-          <div className="flex-1">
-            <h1 className="text-xl font-bold text-text-primary dark:text-dark-text-primary mb-1">{courseTitle}</h1>
-            <h2 className="text-lg text-text-secondary dark:text-dark-text-secondary mb-2">{currentLesson.title}</h2>
-            <div className="flex items-center gap-4 text-sm text-text-muted dark:text-dark-text-muted">
-              <span>{currentLesson.moduleTitle ?? ''}</span>
-              <span>•</span>
-              <span>Lesson {lessonNumber > 0 ? lessonNumber : 1}</span>
-              <span>•</span>
-              <span>{currentLesson.estimated_duration_minutes} min</span>
-            </div>
-          </div>
-        </div>
+  // Custom header content to pass to StudentAppLayout
+  const customHeader = (
+    <div className="flex items-center justify-between w-full">
+      <h1 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary truncate max-w-md">
+        {courseTitle}
+      </h1>
+      <div className="flex items-center gap-4">
+        {/* You can add other nav items here if needed */}
       </div>
+    </div>
+  );
 
+  return (
+    <StudentAppLayout customHeader={customHeader} hideSearch={true}>
       {/* Main Content — Udemy-style 2-column layout */}
-      <div className="flex-1 overflow-y-auto px-8 py-6">
-        <div className="flex gap-6 h-full">
-
+      <div className="flex-1 overflow-y-auto px-8 py-6 pt-4">
+        <div className="flex gap-6 items-start">
           {/* Left: Main content area (expanded) */}
           <div className="flex-1 min-w-0 flex flex-col gap-6">
-
-            {/* Content renderer — larger, more padded */}
+            {/* Content renderer */}
             <div className="bg-white dark:bg-dark-background-card rounded-2xl p-8 shadow-lg border border-gray-100 dark:border-gray-700">
               {lessonContentItems && lessonContentItems.length > 0 ? (
                 <StudentContentRenderer
@@ -498,9 +458,8 @@ const CoursePlayer: React.FC = () => {
               )}
             </div>
 
-            {/* Bottom tools section — horizontal tab bar */}
+            {/* Bottom tools section */}
             <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden">
-              {/* Tab headers */}
               <div className="flex border-b border-gray-200 dark:border-gray-700">
                 {bottomTabs.map((tab) => (
                   <button
@@ -518,7 +477,6 @@ const CoursePlayer: React.FC = () => {
                 ))}
               </div>
 
-              {/* Active tab content — smooth transition */}
               {activeTab && activeTab !== 'ai-summary' && (
                 <div
                   className="p-6 transition-all duration-300 ease-in-out"
@@ -536,26 +494,26 @@ const CoursePlayer: React.FC = () => {
                 </div>
               )}
             </div>
-
           </div>
 
-          {/* Right: Course content sidebar (Udemy-style, full height, sticky) */}
-          <aside className="w-80 xl:w-96 flex-shrink-0 h-[calc(100vh-200px)] sticky top-4 overflow-y-auto rounded-2xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/60 shadow-sm
-            [&::-webkit-scrollbar]:w-1.5
-            [&::-webkit-scrollbar-track]:bg-transparent
-            [&::-webkit-scrollbar-thumb]:bg-gray-300
-            dark:[&::-webkit-scrollbar-thumb]:bg-gray-700
-            [&::-webkit-scrollbar-thumb]:rounded-full">
-            <LessonSidebar
-              courseId={courseId || ''}
-              activeLessonId={lessonId || ''}
-              onSelectLesson={handleSelectLesson}
-              completedLessonIds={completedLessons}
-              completedQuizIds={completedQuizIds}
-              refreshKey={sidebarRefreshKey}
-            />
-          </aside>
-
+          {/* Right: Course content sidebar - Fixed position */}
+          <div className="w-80 xl:w-96 flex-shrink-0 self-start">
+            <div className="fixed w-80 xl:w-96 max-h-[calc(100vh-105px)] rounded-2xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/60 shadow-sm overflow-y-auto
+              [&::-webkit-scrollbar]:w-1.5
+              [&::-webkit-scrollbar-track]:bg-transparent
+              [&::-webkit-scrollbar-thumb]:bg-gray-300
+              dark:[&::-webkit-scrollbar-thumb]:bg-gray-700
+              [&::-webkit-scrollbar-thumb]:rounded-full">
+              <LessonSidebar
+                courseId={courseId || ''}
+                activeLessonId={lessonId || ''}
+                onSelectLesson={handleSelectLesson}
+                completedLessonIds={completedLessons}
+                completedQuizIds={completedQuizIds}
+                refreshKey={sidebarRefreshKey}
+              />
+            </div>
+          </div>
         </div>
       </div>
 

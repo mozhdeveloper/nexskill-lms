@@ -116,8 +116,7 @@ const AdminLogin: React.FC = () => {
         return;
       }
 
-      setTheme('dark');
-      setTimeout(() => navigate('/admin/dashboard'), 100);
+            setTimeout(() => navigate('/admin/dashboard'), 100);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unexpected error');
       setIsLoading(false);
@@ -179,8 +178,7 @@ const AdminLogin: React.FC = () => {
       }
 
       // Enforce Dark Mode on successful login
-      setTheme('dark');
-
+      
       // Small delay to ensure state propagates
       setTimeout(() => {
         navigate('/admin/dashboard');
