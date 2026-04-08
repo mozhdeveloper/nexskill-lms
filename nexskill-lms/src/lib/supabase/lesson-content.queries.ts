@@ -37,11 +37,44 @@ export async function fetchLessonContentItemsWithData(lessonId: string) {
 /**
  * Create a new content item
  */
-export async function createContentItem(input: CreateContentItemInput) {
+export async function createContentItem(input: CreateContentItemInput, options?: { is_published?: boolean }) {
     const { lesson_id, course_id, module_id, content_type, content_id, metadata = {}, position } = input;
 
     // Get max position if not provided
     const finalPosition = position ?? await getMaxPosition(lesson_id);
+
+    // Phase 1: Determine publish status
+    // If course is already approved, new content should be unpublished (pending admin approval)
+    // Otherwise, use the provided value or default to true (for new courses being built)
+    let isPublished: boolean;
+    if (options?.is_published !== undefined) {
+        isPublished = options.is_published;
+    } else {
+        // Auto-detect: check if course is approved
+        try {
+            console.log('[createContentItem] Checking course status for course_id:', course_id);
+            const { data: course, error: courseError } = await supabase
+                .from('courses')
+                .select('verification_status')
+                .eq('id', course_id)
+                .single();
+            
+            if (courseError) {
+                console.error('[createContentItem] Error fetching course:', courseError);
+            } else {
+                console.log('[createContentItem] Course verification_status:', course?.verification_status);
+            }
+            
+            // If course is approved, save as unpublished (pending review)
+            // Otherwise, save as published (normal course building)
+            isPublished = course?.verification_status !== 'approved';
+            console.log('[createContentItem] isPublished will be:', isPublished);
+        } catch (err) {
+            console.error('[createContentItem] Exception checking course status:', err);
+            // If we can't determine course status, default to published
+            isPublished = true;
+        }
+    }
 
     const { data, error } = await supabase
         .from('lesson_content_items')
@@ -53,7 +86,7 @@ export async function createContentItem(input: CreateContentItemInput) {
             content_id,
             metadata,
             position: finalPosition,
-            is_published: true,
+            is_published: isPublished,
         }])
         .select()
         .single();

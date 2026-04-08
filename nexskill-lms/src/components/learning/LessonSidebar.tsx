@@ -133,15 +133,72 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
       const lessonIds = (itemsData ?? []).filter((i) => i.content_type === 'lesson').map((i) => i.content_id);
       const quizIds   = (itemsData ?? []).filter((i) => i.content_type === 'quiz').map((i) => i.content_id);
 
-      const [lessonsRes, quizzesRes, videoProgressRes] = await Promise.all([
+      // Fetch lesson content items to get all videos and quizzes per lesson
+      const { data: lessonContentItems } = lessonIds.length > 0
+        ? await supabase
+            .from('lesson_content_items')
+            .select('id, lesson_id, content_type, content_id, metadata')
+            .in('lesson_id', lessonIds)
+            .eq('is_published', true)
+        : Promise.resolve({ data: [] });
+
+      // Build maps for lesson content types and quiz content IDs
+      const lessonVideoContentItems: Record<string, Array<{ id: string; metadata: any }>> = {};
+      const lessonQuizContentIds: Record<string, string[]> = {};
+
+      (lessonContentItems || []).forEach((item: any) => {
+        if (item.content_type === 'video') {
+          if (!lessonVideoContentItems[item.lesson_id]) {
+            lessonVideoContentItems[item.lesson_id] = [];
+          }
+          lessonVideoContentItems[item.lesson_id].push({
+            id: item.id,
+            metadata: item.metadata || {},
+          });
+        }
+        if (item.content_type === 'quiz' && item.content_id) {
+          if (!lessonQuizContentIds[item.lesson_id]) {
+            lessonQuizContentIds[item.lesson_id] = [];
+          }
+          lessonQuizContentIds[item.lesson_id].push(item.content_id);
+        }
+      });
+
+      // Collect ALL quiz IDs (both from lessons AND module-level)
+      const allQuizIds = [...new Set([
+        ...Object.values(lessonQuizContentIds).flat(),
+        ...quizIds
+      ])];
+
+      // Fetch quiz details to get time_limit_minutes
+      const { data: quizzesData } = allQuizIds.length > 0
+        ? await supabase
+            .from('quizzes')
+            .select('id, title, time_limit_minutes')
+            .in('id', allQuizIds)
+        : Promise.resolve({ data: [] });
+
+      const quizDurationMap = new Map<string, number>();
+      (quizzesData || []).forEach((quiz: any) => {
+        const durationSeconds = (quiz.time_limit_minutes || 15) * 60;
+        quizDurationMap.set(quiz.id, durationSeconds);
+      });
+
+      // Calculate total quiz duration per lesson (ONLY for quizzes inside lessons)
+      const lessonQuizDurationMap = new Map<string, number>();
+      Object.entries(lessonQuizContentIds).forEach(([lessonId, quizIdsInLesson]) => {
+        const totalQuizSeconds = quizIdsInLesson.reduce((sum, quizId) => {
+          return sum + (quizDurationMap.get(quizId) || 15 * 60);
+        }, 0);
+        lessonQuizDurationMap.set(lessonId, totalQuizSeconds);
+      });
+
+      const [lessonsRes, videoProgressRes] = await Promise.all([
         lessonIds.length > 0
           ? supabase.from('lessons').select('id, title, estimated_duration_minutes, content_blocks').in('id', lessonIds)
           : Promise.resolve({ data: [] }),
-        quizIds.length > 0
-          ? supabase.from('quizzes').select('id, title, time_limit_minutes').in('id', quizIds)
-          : Promise.resolve({ data: [] }),
         lessonIds.length > 0
-          ? supabase.from('lesson_video_progress').select('lesson_id, duration_seconds').in('lesson_id', lessonIds)
+          ? supabase.from('lesson_video_progress').select('lesson_id, video_url, duration_seconds').in('lesson_id', lessonIds)
           : Promise.resolve({ data: [] }),
       ]);
 
@@ -212,7 +269,7 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
       }
 
       const lessonsMap  = new Map((lessonsRes.data  ?? []).map((l: any) => [l.id, l]));
-      const quizzesMap  = new Map((quizzesRes.data  ?? []).map((q: any) => [q.id, q]));
+      const quizzesMap  = new Map((quizzesData  ?? []).map((q: any) => [q.id, q]));
 
       const watchedDurationMap = new Map<string, number>();
       (videoProgressRes.data ?? []).forEach((v: any) => {
@@ -258,11 +315,41 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
 
       const allCompletedQuizIds = [...new Set([...completedQuizIds, ...completedQuizContentItemIds])];
 
-      const storedDurationMap = new Map<string, number>();
-      const youtubeIdsToFetch: string[] = [];
+      // ─── NEW: Calculate total video duration per lesson from lesson_content_items ───
+      const lessonVideoDurationMap = new Map<string, number>();
+      const youtubeVideoUrls: string[] = [];
+      const contentItemIdToYouTubeId = new Map<string, string>();
       const lessonIdForYouTubeId = new Map<string, string>();
 
+      // First, try to get durations from lesson_content_items metadata
+      Object.entries(lessonVideoContentItems).forEach(([lessonId, videoItems]) => {
+        let lessonTotalSeconds = 0;
+        let hasAllDurations = true;
+
+        videoItems.forEach((videoItem) => {
+          const duration = videoItem.metadata?.duration;
+          if (typeof duration === 'number' && duration > 0) {
+            lessonTotalSeconds += duration;
+          } else {
+            hasAllDurations = false;
+            // Check if it's a YouTube video
+            const url = videoItem.metadata?.url || '';
+            const ytId = extractYouTubeId(url);
+            if (ytId) {
+              youtubeVideoUrls.push(ytId);
+              contentItemIdToYouTubeId.set(videoItem.id, ytId);
+            }
+          }
+        });
+
+        if (hasAllDurations) {
+          lessonVideoDurationMap.set(lessonId, lessonTotalSeconds);
+        }
+      });
+
+      // Fallback to content_blocks for lessons without lesson_content_items video data
       (lessonsRes.data ?? []).forEach((l: any) => {
+        if (lessonVideoDurationMap.has(l.id)) return; // Already have duration from lesson_content_items
         if (!Array.isArray(l.content_blocks)) return;
 
         const videoBlock = l.content_blocks.find(
@@ -276,26 +363,67 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
           null;
 
         if (typeof metaDuration === 'number' && metaDuration > 0) {
-          storedDurationMap.set(l.id, metaDuration);
+          lessonVideoDurationMap.set(l.id, metaDuration);
           return;
         }
 
         const url: string = videoBlock.content ?? videoBlock.url ?? '';
         const ytId = extractYouTubeId(url);
         if (ytId) {
-          youtubeIdsToFetch.push(ytId);
+          youtubeVideoUrls.push(ytId);
           lessonIdForYouTubeId.set(ytId, l.id);
         }
       });
 
+      // Fetch YouTube durations for all videos
       const youtubeDurationMap = await fetchYouTubeDurations(
-        [...new Set(youtubeIdsToFetch)]
+        [...new Set(youtubeVideoUrls)]
       );
 
-      const youtubeLessonDurationMap = new Map<string, number>();
+      // Apply YouTube durations to lesson_content_items
+      Object.entries(lessonVideoContentItems).forEach(([lessonId, videoItems]) => {
+        if (lessonVideoDurationMap.has(lessonId)) return; // Already have duration
+
+        let lessonTotalSeconds = 0;
+        let hasAllDurations = true;
+
+        videoItems.forEach((videoItem) => {
+          const duration = videoItem.metadata?.duration;
+          if (typeof duration === 'number' && duration > 0) {
+            lessonTotalSeconds += duration;
+          } else {
+            const ytId = contentItemIdToYouTubeId.get(videoItem.id);
+            if (ytId && youtubeDurationMap.has(ytId)) {
+              lessonTotalSeconds += youtubeDurationMap.get(ytId)!;
+            } else {
+              hasAllDurations = false;
+            }
+          }
+        });
+
+        if (hasAllDurations && lessonTotalSeconds > 0) {
+          lessonVideoDurationMap.set(lessonId, lessonTotalSeconds);
+        }
+      });
+
+      // Apply YouTube durations to content_blocks fallback
       lessonIdForYouTubeId.forEach((lessonId, ytId) => {
-        const secs = youtubeDurationMap.get(ytId);
-        if (secs) youtubeLessonDurationMap.set(lessonId, secs);
+        if (!lessonVideoDurationMap.has(lessonId)) {
+          const secs = youtubeDurationMap.get(ytId);
+          if (secs) {
+            lessonVideoDurationMap.set(lessonId, secs);
+          }
+        }
+      });
+
+      // If still no video duration, fallback to watched duration
+      lessonIds.forEach((lessonId) => {
+        if (!lessonVideoDurationMap.has(lessonId)) {
+          const watchedSecs = watchedDurationMap.get(lessonId);
+          if (watchedSecs && watchedSecs > 0) {
+            lessonVideoDurationMap.set(lessonId, watchedSecs);
+          }
+        }
       });
 
       let sequentialCounter = 1;
@@ -308,13 +436,13 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
               const l = lessonsMap.get(item.content_id);
               if (!l) return null;
 
-              const ytSecs      = youtubeLessonDurationMap.get(l.id);
-              const storedSecs  = storedDurationMap.get(l.id);
-              const watchedSecs = watchedDurationMap.get(l.id);
-              const videoDuration = ytSecs ?? storedSecs ?? watchedSecs;
+              // Calculate total duration: videos + quizzes
+              const videoSeconds = lessonVideoDurationMap.get(l.id) || 0;
+              const quizSeconds = lessonQuizDurationMap.get(l.id) || 0;
+              const totalSeconds = videoSeconds + quizSeconds;
 
-              const duration = videoDuration && videoDuration > 0
-                ? formatDuration(videoDuration)
+              const duration = totalSeconds > 0
+                ? formatDuration(totalSeconds)
                 : `${(l.estimated_duration_minutes ?? 15).toString().padStart(2, '0')}:00`;
 
               const contentTypes = lessonContentTypesMap[l.id] || { hasVideo: false, hasQuiz: false };
@@ -538,9 +666,8 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                             </span>
                           </div>
                           <div className="flex-1 min-w-0">
-                            {/* UPDATED: Checkmark on LEFT side of lesson title */}
+                            {/* Checkmark on LEFT side of lesson title */}
                             <div className="flex items-center gap-2">
-                              {/* Checkmark BEFORE the lesson title when completed */}
                               {completed && (
                                 <span className="flex-shrink-0 w-3 h-3 flex items-center justify-center bg-green-500 rounded-full text-white">
                                   <Check className="w-3 h-3" />
