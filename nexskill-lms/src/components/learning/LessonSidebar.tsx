@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 import { Video, FileQuestion, Check } from 'lucide-react';
@@ -28,7 +28,7 @@ interface LessonSidebarProps {
   onSelectLesson: (lessonId: string) => void;
   completedLessonIds?: string[];
   completedQuizIds?: string[];
-  refreshKey?: number;
+  lastCompletedContentItemId?: string | null;
 }
 
 // ─── YouTube Duration Helpers ─────────────────────────────────────────────────
@@ -95,11 +95,13 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
   onSelectLesson,
   completedLessonIds = [],
   completedQuizIds = [],
+  lastCompletedContentItemId,
 }) => {
   const [sidebarModules, setSidebarModules] = useState<SidebarModule[]>([]);
   const [expandedModules, setExpandedModules] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const hasFetchedRef = useRef(false);
 
   const fetchModules = useCallback(async () => {
     if (!courseId) return;
@@ -357,11 +359,87 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [courseId, activeLessonId, completedLessonIds.length, completedQuizIds.length]);
+  }, [courseId]);
 
+  // Only fetch once on mount
   useEffect(() => {
-    fetchModules();
-  }, [fetchModules]);
+    if (!hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      fetchModules();
+    }
+  }, []);
+
+  // Optimistically update sidebar when a content item is completed
+  useEffect(() => {
+    if (!lastCompletedContentItemId) return;
+
+    setSidebarModules((prev) => {
+      const targetLessonId = activeLessonId;
+      if (!targetLessonId) return prev;
+
+      return prev.map((mod) => ({
+        ...mod,
+        items: mod.items.map((item) => {
+          if (item.type !== 'lesson') return item;
+          if (item.id !== targetLessonId) return item;
+
+          const pc = item.progressCount;
+          if (!pc) return item;
+
+          const newCompleted = Math.min(pc.completed + 1, pc.total);
+          const lessonComplete = newCompleted >= pc.total;
+
+          return {
+            ...item,
+            progressCount: { ...pc, completed: newCompleted },
+            isCompleted: lessonComplete || item.isCompleted,
+          };
+        }),
+      }));
+    });
+  }, [lastCompletedContentItemId, activeLessonId]);
+
+  // Optimistically update sidebar when a lesson is marked complete
+  useEffect(() => {
+    if (!completedLessonIds || completedLessonIds.length === 0) return;
+
+    setSidebarModules((prev) =>
+      prev.map((mod) => ({
+        ...mod,
+        items: mod.items.map((item) => {
+          if (item.type !== 'lesson') return item;
+          if (completedLessonIds.includes(item.id) && !item.isCompleted) {
+            const pc = item.progressCount;
+            return { 
+              ...item, 
+              isCompleted: true,
+              // Sync progressCount to show complete
+              progressCount: pc ? { ...pc, completed: pc.total } : undefined,
+            };
+          }
+          return item;
+        }),
+      }))
+    );
+  }, [completedLessonIds]);
+
+  // Optimistically update sidebar when a quiz is completed
+  useEffect(() => {
+    if (!completedQuizIds || completedQuizIds.length === 0) return;
+
+    setSidebarModules((prev) =>
+      prev.map((mod) => ({
+        ...mod,
+        items: mod.items.map((item) => {
+          if (item.type !== 'quiz') return item;
+          if (completedQuizIds.includes(item.id) && !item.isCompleted) {
+            return { ...item, isCompleted: true };
+          }
+          return item;
+        }),
+      }))
+    );
+  }, [completedQuizIds]);
 
   const toggleModule = (moduleId: string) => {
     setExpandedModules((prev) =>

@@ -31,7 +31,7 @@ const CoursePlayer: React.FC = () => {
   const [showGraduation, setShowGraduation] = useState(false);
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
   const [completedQuizIds, setCompletedQuizIds] = useState<string[]>([]);
-  const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
+  const [lastCompletedContentItemId, setLastCompletedContentItemId] = useState<string | null>(null);
   const [totalLessonsInCourse, setTotalLessonsInCourse] = useState(0);
   const [courseTitle, setCourseTitle] = useState('');
   const [currentLesson, setCurrentLesson] = useState<LessonWithModule | null>(null);
@@ -338,7 +338,7 @@ const CoursePlayer: React.FC = () => {
       console.log('[CoursePlayer] Required items remaining:', remaining.length);
     }
 
-    setSidebarRefreshKey(k => k + 1);
+    setLastCompletedContentItemId(completedContentItemId);
   }, [courseId, lessonId]);
 
   useEffect(() => {
@@ -510,7 +510,7 @@ const CoursePlayer: React.FC = () => {
                 onSelectLesson={handleSelectLesson}
                 completedLessonIds={completedLessons}
                 completedQuizIds={completedQuizIds}
-                refreshKey={sidebarRefreshKey}
+                lastCompletedContentItemId={lastCompletedContentItemId}
               />
             </div>
           </div>
