@@ -49,11 +49,11 @@ const QuizResult: React.FC = () => {
   // Fetch submission status
   const { submission, loading: submissionLoading } = useQuizSubmission(quizId);
 
-  // Fetch data from DB if no state (page refresh) OR if lessonId is missing
+  // Fetch data from DB if no state (page refresh) OR if lessonId is missing OR if requiresCoachApproval is missing
   useEffect(() => {
     if (!quizId) return;
 
-    const shouldFetch = !state || !lessonId;
+    const shouldFetch = !state || !lessonId || requiresCoachApproval === undefined;
     if (!shouldFetch) return;
 
     const fetchData = async () => {

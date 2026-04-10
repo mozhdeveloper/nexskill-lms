@@ -16,7 +16,6 @@ import CourseCatalog from "./pages/student/CourseCatalog";
 import CourseDetail from "./pages/student/CourseDetailRefactored";
 import CourseCurriculumPage from "./pages/student/CourseCurriculumPage";
 import CoursePlayer from "./pages/student/CoursePlayer";
-import QuizStart from "./pages/student/QuizStart";
 import QuizSession from "./pages/student/QuizSession";
 import QuizResult from "./pages/student/QuizResult";
 import QuizFeedbackView from "./pages/student/QuizFeedbackView";
@@ -55,6 +54,8 @@ import CoachProfilePage from "./pages/coach/CoachProfilePage";
 import CoachMessagesPage from "./pages/coach/CoachMessagesPage";
 import CoachStudentsPage from "./pages/coach/CoachStudentsPage";
 import CoachQuizzesPage from "./pages/coach/CoachQuizzesPage";
+import QuizReviewDashboard from "./pages/coach/QuizReviewDashboard";
+import QuizReviewDetail from "./pages/coach/QuizReviewDetail";
 import SubCoachManagement from "./pages/coach/SubCoachManagement";
 import CoachSettings from "./pages/coach/CoachSettings";
 import AdminLogin from "./pages/auth/AdminLogin";
@@ -264,6 +265,9 @@ function App() {
                 <Route path="/coach/messages" element={<CoachMessagesPage />} />
                 <Route path="/coach/students" element={<CoachStudentsPage />} />
                 <Route path="/coach/quizzes" element={<CoachQuizzesPage />} />
+                <Route path="/coach/quiz-reviews" element={<QuizReviewDashboard />} />
+                <Route path="/coach/courses/:courseId/quiz-reviews" element={<QuizReviewDashboard />} />
+                <Route path="/coach/courses/:courseId/quiz-reviews/:submissionId" element={<QuizReviewDetail />} />
                 <Route
                   path="/coach/subcoach-management"
                   element={<SubCoachManagement />}
@@ -436,7 +440,7 @@ function App() {
                 {/* Quiz Routes */}
                 <Route
                   path="/student/courses/:courseId/quizzes/:quizId"
-                  element={<QuizStart />}
+                  element={<QuizSession />}
                 />
                 <Route
                   path="/student/courses/:courseId/quizzes/:quizId/take"

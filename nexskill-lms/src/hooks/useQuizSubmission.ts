@@ -177,6 +177,8 @@ export function useCoachQuizSubmissions(courseId: string | undefined) {
       student_name?: string;
       quiz_title?: string;
       lesson_title?: string;
+      quiz_score?: number;
+      quiz_max_score?: number;
     })[]
   >([]);
   const [loading, setLoading] = useState(true);
@@ -193,33 +195,70 @@ export function useCoachQuizSubmissions(courseId: string | undefined) {
       setLoading(true);
       setError(null);
 
-      // Fetch all pending submissions for this coach's course
-      const { data, error } = await supabase
+      // Step 1: Get all quiz IDs for this course
+      const { data: modules, error: modErr } = await supabase
+        .from('modules')
+        .select('id')
+        .eq('course_id', courseId);
+
+      if (modErr) throw modErr;
+
+      const moduleIds = modules?.map(m => m.id) || [];
+      if (moduleIds.length === 0) {
+        setSubmissions([]);
+        setLoading(false);
+        return;
+      }
+
+      const { data: contentItems, error: ciErr } = await supabase
+        .from('module_content_items')
+        .select('content_id')
+        .in('module_id', moduleIds)
+        .eq('content_type', 'quiz');
+
+      if (ciErr) throw ciErr;
+
+      const quizIds = contentItems?.map(ci => ci.content_id) || [];
+      if (quizIds.length === 0) {
+        setSubmissions([]);
+        setLoading(false);
+        return;
+      }
+
+      // Step 2: Get quiz titles
+      const { data: quizzes, error: qErr } = await supabase
+        .from('quizzes')
+        .select('id, title')
+        .in('id', quizIds);
+
+      if (qErr) throw qErr;
+
+      const quizTitles: Record<string, string> = {};
+      quizzes?.forEach(q => { quizTitles[q.id] = q.title; });
+
+      // Step 3: Fetch submissions (without join to avoid timeout)
+      const { data, error: subErr } = await supabase
         .from('quiz_submissions')
-        .select(`
-          *,
-          quizzes!inner(
-            title,
-            module_content_items!inner(
-              modules!inner(
-                course_id
-              )
-            )
-          ),
-          quiz_attempts!inner(
-            user_id
-          )
-        `)
-        .eq('quizzes.module_content_items.modules.course_id', courseId)
+        .select('*')
+        .in('quiz_id', quizIds)
         .in('status', ['pending_review', 'failed', 'resubmission_required'])
         .order('submitted_at', { ascending: false });
 
-      if (error) throw error;
+      if (subErr) throw subErr;
 
-      // Fetch student profiles for the submissions
+      // Step 4: Fetch attempt scores separately (batched)
       if (data && data.length > 0) {
-        const userIds = [...new Set(data.map((s) => s.quiz_attempts.user_id))];
-        
+        const attemptIds = data.map(s => s.quiz_attempt_id);
+        const { data: attempts } = await supabase
+          .from('quiz_attempts')
+          .select('id, user_id, score, max_score')
+          .in('id', attemptIds);
+
+        const attemptMap: Record<string, { user_id: string; score: number; max_score: number }> = {};
+        attempts?.forEach(a => { attemptMap[a.id] = a; });
+
+        // Step 5: Fetch student profiles
+        const userIds = [...new Set(data.map(s => attemptMap[s.quiz_attempt_id]?.user_id).filter(Boolean))];
         const { data: profiles } = await supabase
           .from('profiles')
           .select('id, email, first_name, last_name')
@@ -234,12 +273,15 @@ export function useCoachQuizSubmissions(courseId: string | undefined) {
         });
 
         const enrichedSubmissions = data.map((submission) => {
-          const profile = profileMap.get(submission.quiz_attempts.user_id);
+          const attempt = attemptMap[submission.quiz_attempt_id];
+          const profile = attempt ? profileMap.get(attempt.user_id) : null;
           return {
             ...submission,
             student_email: profile?.email,
             student_name: profile?.name,
-            quiz_title: submission.quizzes.title,
+            quiz_title: quizTitles[submission.quiz_id] || 'Unknown Quiz',
+            quiz_score: attempt?.score,
+            quiz_max_score: attempt?.max_score,
           };
         });
 
@@ -249,7 +291,7 @@ export function useCoachQuizSubmissions(courseId: string | undefined) {
       }
     } catch (err: any) {
       console.error('Error fetching coach quiz submissions:', err);
-      setError(err.message);
+      setError(err.message || 'Failed to fetch submissions');
       setSubmissions([]);
     } finally {
       setLoading(false);

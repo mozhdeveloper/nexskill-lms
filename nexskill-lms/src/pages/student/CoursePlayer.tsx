@@ -13,6 +13,7 @@ import MarkLessonCompleteModal from '../../components/learning/MarkLessonComplet
 import type { Lesson } from '../../types/lesson';
 import type { LessonContentItem } from '../../types/lesson-content-item';
 import { fetchLessonContentItems } from '../../lib/supabase/lesson-content.queries';
+import { useLessonAccessStatus } from '../../hooks/useQuizSubmission';
 
 type LessonWithModule = Lesson & { moduleTitle?: string };
 
@@ -39,9 +40,13 @@ const CoursePlayer: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [flatItemList, setFlatItemList] = useState<FlatItem[]>([]);
   const [lessonContentItems, setLessonContentItems] = useState<LessonContentItem[]>([]);
+  const [lockedLessonIds, setLockedLessonIds] = useState<Set<string>>(new Set());
 
   // New state: active bottom tab
   const [activeTab, setActiveTab] = useState<BottomTab | null>(null);
+
+  // Fetch lesson access status (locked/unlocked)
+  const { isLessonLocked } = useLessonAccessStatus(courseId);
 
   useEffect(() => {
     const fetchLessonData = async () => {
@@ -183,6 +188,11 @@ const CoursePlayer: React.FC = () => {
     if (item?.type === 'quiz') {
       navigate(`/student/courses/${courseId}/quizzes/${newLessonId}/take`);
     } else {
+      // Check if lesson is locked
+      if (isLessonLocked(newLessonId)) {
+        alert('This lesson is locked. Complete the previous quiz to unlock it.');
+        return;
+      }
       navigate(`/student/courses/${courseId}/lessons/${newLessonId}`);
     }
   };

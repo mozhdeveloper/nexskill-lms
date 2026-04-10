@@ -8,10 +8,21 @@ import QuestionImageChoice from '../../components/quiz/QuestionImageChoice';
 import QuestionFileUpload from '../../components/quiz/QuestionFileUpload';
 import QuestionVideoSubmission from '../../components/quiz/QuestionVideoSubmission';
 import QuizAttemptHistory, { type PreviousAttempt } from '../../components/quiz/QuizAttemptHistory';
-import QuizStatusBanner from '../../components/quiz/QuizStatusBanner';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
-import { Trophy, AlertCircle, Play, Calendar, Lock } from 'lucide-react';
+import { useQuizSubmission } from '../../hooks/useQuizSubmission';
+import {
+  Trophy,
+  AlertCircle,
+  Play,
+  Calendar,
+  Lock,
+  Clock,
+  CheckCircle,
+  XCircle,
+  ArrowLeft,
+  MessageSquare,
+} from 'lucide-react';
 
 // ============================================
 // Type Definitions
@@ -40,6 +51,8 @@ interface QuizQuestion {
 interface QuizMeta {
   id: string;
   title: string;
+  description?: string;
+  instructions?: string;
   passing_score: number;
   time_limit_minutes: number | null;
   max_attempts: number | null;
@@ -78,15 +91,27 @@ interface QuizResponse {
   is_correct: boolean;
 }
 
+interface PreviousResponseWithQuestion {
+  id: string;
+  question_id: string;
+  question_text: string;
+  question_type: string;
+  response_data: { answer: string | boolean | null };
+  points_earned: number;
+  points_possible: number;
+  is_correct: boolean;
+}
+
 type QuizSessionState =
   | 'loading'
+  | 'start_screen'
+  | 'pending_review'
   | 'not_published'
   | 'not_available'
   | 'closed'
   | 'no_attempts_remaining'
   | 'show_history'
   | 'resume_or_restart'
-  | 'ready_to_start'
   | 'in_progress';
 
 // ============================================
@@ -118,6 +143,12 @@ const stripHtml = (html: string): string => {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .trim();
+};
+
+const extractQuestionText = (content: any): string => {
+  if (!content) return 'Untitled Question';
+  const contentBlock = Array.isArray(content) ? (content[0] ?? {}) : (content ?? {});
+  return contentBlock?.text || contentBlock?.content || 'Untitled Question';
 };
 
 const mapQuizQuestions = (rows: Record<string, unknown>[]): QuizQuestion[] => {
@@ -185,25 +216,27 @@ const QuizSession: React.FC = () => {
   const navigate = useNavigate();
   const { courseId, quizId } = useParams();
   const { user } = useAuth();
-  
+
   // Quiz state
   const [quizMeta, setQuizMeta] = useState<QuizMeta | null>(null);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const [questionCount, setQuestionCount] = useState(0);
   const [sessionState, setSessionState] = useState<QuizSessionState>('loading');
-  
+
   // Attempt state
   const [currentAttempt, setCurrentAttempt] = useState<QuizAttempt | null>(null);
   const [previousAttempts, setPreviousAttempts] = useState<PreviousAttempt[]>([]);
   const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null);
   const [bestScore, setBestScore] = useState<number | null>(null);
-  
+  const [attemptCount, setAttemptCount] = useState(0);
+
   // Quiz taking state
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string | boolean>>({});
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [isLateSubmission, setIsLateSubmission] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  
+
   // Resume dialog state
   const [showResumeDialog, setShowResumeDialog] = useState(false);
 
@@ -212,7 +245,13 @@ const QuizSession: React.FC = () => {
   const [uploadedVideos, setUploadedVideos] = useState<Record<string, File | null>>({});
   const [uploadingFiles, setUploadingFiles] = useState<boolean>(false);
 
+  // Previous submission responses for pending review view
+  const [previousResponses, setPreviousResponses] = useState<PreviousResponseWithQuestion[]>([]);
+
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Fetch submission status for pending review check
+  const { submission, loading: submissionLoading } = useQuizSubmission(quizId);
 
   // ============================================
   // Fetch Quiz Data (Optimized - Parallel Queries)
@@ -233,48 +272,46 @@ const QuizSession: React.FC = () => {
         if (quizError) throw quizError;
 
         // Fetch course approval status via lesson_id or module_content_items
-        // Note: We fetch this but don't block access - quizzes are accessible regardless
-        let courseIsApproved = true; // Default to true to allow access
-        
+        let courseIsApproved = true;
+
         if (quiz.lesson_id) {
           const { data: lessonData } = await supabase
             .from('lessons')
             .select('course_id')
             .eq('id', quiz.lesson_id)
             .single();
-          
+
           if (lessonData?.course_id) {
             const { data: courseData } = await supabase
               .from('courses')
               .select('verification_status')
               .eq('id', lessonData.course_id)
               .single();
-            
+
             courseIsApproved = courseData?.verification_status === 'approved';
           }
         } else {
-          // Try via module_content_items
           const { data: contentItem } = await supabase
             .from('module_content_items')
             .select('module_id')
             .eq('content_id', quizId)
             .eq('content_type', 'quiz')
             .single();
-          
+
           if (contentItem?.module_id) {
             const { data: moduleData } = await supabase
               .from('modules')
               .select('course_id')
               .eq('id', contentItem.module_id)
               .single();
-            
+
             if (moduleData?.course_id) {
               const { data: courseData } = await supabase
                 .from('courses')
                 .select('verification_status')
                 .eq('id', moduleData.course_id)
                 .single();
-              
+
               courseIsApproved = courseData?.verification_status === 'approved';
             }
           }
@@ -288,6 +325,8 @@ const QuizSession: React.FC = () => {
           .order('position', { ascending: true });
 
         if (questionsError) throw questionsError;
+
+        setQuestionCount(rows?.length || 0);
 
         // Fetch attempts in parallel
         const [attemptsResult, inProgressResult] = await Promise.all([
@@ -305,10 +344,12 @@ const QuizSession: React.FC = () => {
             .maybeSingle(),
         ]);
 
-        // Set quiz meta - use course approval instead of quiz.is_published
+        // Set quiz meta
         setQuizMeta({
           id: quiz.id,
           title: quiz.title,
+          description: quiz.description,
+          instructions: quiz.instructions,
           passing_score: quiz.passing_score ?? 70,
           time_limit_minutes: quiz.time_limit_minutes,
           max_attempts: quiz.max_attempts,
@@ -327,8 +368,9 @@ const QuizSession: React.FC = () => {
 
         // Process attempts
         const attempts = attemptsResult.data || [];
+        setAttemptCount(attempts.length);
         const submittedCount = attempts.length;
-        
+
         if (quiz.max_attempts !== null) {
           setAttemptsRemaining(Math.max(0, quiz.max_attempts - submittedCount));
         } else {
@@ -359,6 +401,39 @@ const QuizSession: React.FC = () => {
         }));
         setPreviousAttempts(formattedAttempts);
 
+        // Check if there's a pending submission that blocks new attempts
+        if (quiz.requires_coach_approval && submission && submission.status === 'pending_review') {
+          // Fetch previous responses for view-only mode
+          if (submission.latest_attempt_id) {
+            const { data: prevResponses } = await supabase
+              .from('quiz_responses')
+              .select(`
+                *,
+                quiz_questions!inner(
+                  question_content,
+                  question_type
+                )
+              `)
+              .eq('attempt_id', submission.latest_attempt_id);
+
+            if (prevResponses) {
+              const mapped = prevResponses.map((r: any) => ({
+                id: r.id,
+                question_id: r.question_id,
+                question_text: extractQuestionText(r.quiz_questions?.question_content),
+                question_type: r.quiz_questions?.question_type,
+                response_data: r.response_data,
+                points_earned: r.points_earned,
+                points_possible: r.points_possible,
+                is_correct: r.is_correct,
+              }));
+              setPreviousResponses(mapped);
+            }
+          }
+          setSessionState('pending_review');
+          return;
+        }
+
         // Handle in-progress attempt
         const inProgress = inProgressResult.data;
         if (inProgress) {
@@ -370,7 +445,6 @@ const QuizSession: React.FC = () => {
             const remaining = totalTime - elapsed;
 
             if (remaining <= 0) {
-              // Time expired - will auto-submit on start
               setTimeRemaining(0);
             } else {
               setTimeRemaining(remaining);
@@ -398,12 +472,11 @@ const QuizSession: React.FC = () => {
           setShowResumeDialog(true);
         }
 
-        // Determine initial state - quizzes are always accessible now
+        // Determine initial state
         const now = Date.now();
         const availableFrom = quiz.available_from ? new Date(quiz.available_from).getTime() : null;
         const dueDate = quiz.due_date ? new Date(quiz.due_date).getTime() : null;
 
-        // Skip is_published check - allow access to all quizzes
         if (availableFrom && now < availableFrom) {
           setSessionState('not_available');
         } else if (dueDate && now > dueDate && !quiz.late_submission_allowed) {
@@ -414,8 +487,10 @@ const QuizSession: React.FC = () => {
           }
           if (attemptsRemaining !== null && attemptsRemaining <= 0) {
             setSessionState('no_attempts_remaining');
+          } else if (inProgress) {
+            setSessionState('resume_or_restart');
           } else {
-            setSessionState('show_history');
+            setSessionState('start_screen');
           }
         }
 
@@ -426,7 +501,7 @@ const QuizSession: React.FC = () => {
     };
 
     fetchQuiz();
-  }, [quizId, user]);
+  }, [quizId, user, submission]);
 
   // ============================================
   // Timer Management
@@ -463,10 +538,13 @@ const QuizSession: React.FC = () => {
   // Memoized Values (for performance)
   // ============================================
 
-  const currentQuestion = useMemo(() => 
-    questions[currentQuestionIndex], 
+  const currentQuestion = useMemo(() =>
+    questions[currentQuestionIndex],
     [questions, currentQuestionIndex]
   );
+
+  const isLastQuestion = currentQuestionIndex === questions.length - 1;
+  const isFirstQuestion = currentQuestionIndex === 0;
 
   // ============================================
   // Quiz Actions
@@ -474,9 +552,8 @@ const QuizSession: React.FC = () => {
 
   const autoSubmitAttempt = async (attempt: QuizAttempt) => {
     if (!quizMeta || !user) return;
-    
+
     try {
-      // Calculate score from saved answers
       let earnedPoints = 0;
       let totalPoints = 0;
 
@@ -496,7 +573,6 @@ const QuizSession: React.FC = () => {
         }
       });
 
-      // Apply late penalty if applicable
       let finalScore = earnedPoints;
       let penalizedScore: number | undefined;
 
@@ -509,7 +585,6 @@ const QuizSession: React.FC = () => {
       const scorePercent = totalPoints > 0 ? Math.round((finalScore / totalPoints) * 100) : 0;
       const passed = scorePercent >= quizMeta.passing_score;
 
-      // Update attempt
       await supabase
         .from('quiz_attempts')
         .update({
@@ -521,7 +596,6 @@ const QuizSession: React.FC = () => {
         })
         .eq('id', attempt.id);
 
-      // Save responses
       const responses = questions.map((q) => {
         const userAnswer = selectedAnswers[q.id];
         let isCorrect = false;
@@ -544,7 +618,6 @@ const QuizSession: React.FC = () => {
 
       await supabase.from('quiz_responses').insert(responses);
 
-      // Navigate to result
       navigate(`/student/courses/${courseId}/quizzes/${quizId}/result`, {
         state: {
           score: scorePercent,
@@ -562,10 +635,9 @@ const QuizSession: React.FC = () => {
           passed,
           attemptNumber: attempt.attempt_number,
           penalizedScore: penalizedScore !== undefined ? Math.round((penalizedScore / totalPoints) * 100) : undefined,
-          // ← new fields
           attemptsRemaining: quizMeta.max_attempts === null
-  ? null
-  : Math.max(0, quizMeta.max_attempts - (previousAttempts.length + 1)),
+            ? null
+            : Math.max(0, quizMeta.max_attempts - (previousAttempts.length + 1)),
           maxAttempts: quizMeta.max_attempts,
           timeLimitMinutes: quizMeta.time_limit_minutes,
           lessonId: quizMeta.lesson_id ?? null,
@@ -580,7 +652,6 @@ const QuizSession: React.FC = () => {
   const handleStartAttempt = async (resume: boolean = false) => {
     if (!quizMeta || !user) return;
 
-    // Check if attempts remaining
     if (quizMeta.max_attempts !== null && attemptsRemaining !== null && attemptsRemaining <= 0) {
       alert('You have used all attempts for this quiz.');
       return;
@@ -589,12 +660,10 @@ const QuizSession: React.FC = () => {
     setShowResumeDialog(false);
 
     if (resume && currentAttempt) {
-      // Resume existing attempt
       setSessionState('in_progress');
       return;
     }
 
-    // Create new attempt
     try {
       const nextAttemptNumber = (previousAttempts.length || 0) + 1;
 
@@ -633,7 +702,6 @@ const QuizSession: React.FC = () => {
 
       const uploadedFileUrls: Record<string, any> = {};
 
-      // Upload files for file-upload questions
       for (const question of questions) {
         if (question.type === 'file-upload' && uploadedFiles[question.id]) {
           try {
@@ -652,7 +720,6 @@ const QuizSession: React.FC = () => {
           }
         }
 
-        // Upload video for video-submission questions
         if (question.type === 'video-submission' && uploadedVideos[question.id]) {
           try {
             const url = await uploadVideoToStorage(
@@ -682,7 +749,6 @@ const QuizSession: React.FC = () => {
       let totalPoints = 0;
       let requiresManualGrading = false;
 
-      // Mark questions with uploads as requiring manual grading
       questions.forEach((q) => {
         if ((q.type === 'file-upload' || q.type === 'video-submission') && uploadedFileUrls[q.id]) {
           requiresManualGrading = true;
@@ -709,7 +775,6 @@ const QuizSession: React.FC = () => {
         }
       });
 
-      // Apply late penalty if applicable
       let finalScore = earnedPoints;
       let penalizedScore: number | undefined;
 
@@ -722,10 +787,8 @@ const QuizSession: React.FC = () => {
       const scorePercent = totalPoints > 0 ? Math.round((finalScore / totalPoints) * 100) : 0;
       const passed = scorePercent >= quizMeta.passing_score;
 
-      // Determine final status
       let finalStatus: 'submitted' | 'graded' = requiresManualGrading ? 'submitted' : 'graded';
 
-      // Update attempt
       const { error: updateErr } = await supabase
         .from('quiz_attempts')
         .update({
@@ -739,7 +802,6 @@ const QuizSession: React.FC = () => {
 
       if (updateErr) throw updateErr;
 
-      // Save responses
       const responses = questions.map((q) => {
         const userAnswer = selectedAnswers[q.id];
         let isCorrect = false;
@@ -747,20 +809,17 @@ const QuizSession: React.FC = () => {
         if (q.type === 'true-false') {
           isCorrect = userAnswer === q.correctAnswer;
         } else if (q.type === 'file-upload' || q.type === 'video-submission') {
-          // File/video uploads always require manual grading
-          isCorrect = false; // Will be graded by coach
+          isCorrect = false;
         } else {
           isCorrect = userAnswer === q.correctOptionId;
         }
 
         let pointsEarned = isCorrect ? q.points : 0;
-        
-        // Apply penalty to individual question points if late submission
+
         if (isLateSubmission && quizMeta.late_penalty_percent > 0 && isCorrect) {
           pointsEarned = Math.max(0, q.points - Math.round((q.points * quizMeta.late_penalty_percent) / 100));
         }
 
-        // Include uploaded file/video URLs in response_data
         const responseData: any = {
           answer: userAnswer ?? null,
           uploaded_files: uploadedFileUrls[q.id] || null,
@@ -780,9 +839,6 @@ const QuizSession: React.FC = () => {
       const { error: rErr } = await supabase.from('quiz_responses').insert(responses);
       if (rErr) console.error('Error saving responses:', rErr);
 
-      // Mark quiz content item as complete if passed
-      // FIX: Write to lesson_content_item_progress instead of directly to user_lesson_progress
-      // The CoursePlayer.handleContentItemComplete will check ALL items and mark the lesson complete
       if (passed) {
         try {
           const { data: quizData, error: quizErr } = await supabase
@@ -792,7 +848,6 @@ const QuizSession: React.FC = () => {
             .single();
 
           if (!quizErr && quizData?.lesson_id) {
-            // Find the quiz content item in lesson_content_items
             const { data: quizContentItem } = await supabase
               .from('lesson_content_items')
               .select('id')
@@ -801,11 +856,6 @@ const QuizSession: React.FC = () => {
               .eq('content_id', quizMeta.id)
               .maybeSingle();
 
-            // Mark quiz content item as complete.
-            // The DB trigger (mark_lesson_complete_if_all_content_done) will evaluate whether
-            // ALL required items (videos + quizzes) in this lesson are done. Only then will it
-            // mark user_lesson_progress.is_completed = true. This prevents premature lesson
-            // completion when videos haven't been watched yet.
             if (quizContentItem) {
               const { error: progressErr } = await supabase
                 .from('lesson_content_item_progress')
@@ -829,12 +879,27 @@ const QuizSession: React.FC = () => {
               }
             }
           }
+
+          // If quiz does NOT require coach approval, unlock the next lesson immediately
+          if (!quizMeta.requires_coach_approval) {
+            console.log('🔓 Quiz passed without coach approval requirement — unlocking next lesson');
+            const { error: unlockErr } = await supabase
+              .rpc('unlock_next_lesson', {
+                p_user_id: user.id,
+                p_quiz_id: quizMeta.id,
+              });
+
+            if (unlockErr) {
+              console.error('Failed to unlock next lesson:', unlockErr);
+            } else {
+              console.log('✅ Next lesson unlocked successfully');
+            }
+          }
         } catch (err) {
           console.error('Error marking quiz completion:', err);
         }
       }
 
-      // Navigate to result
       navigate(`/student/courses/${courseId}/quizzes/${quizId}/result`, {
         state: {
           score: scorePercent,
@@ -853,10 +918,9 @@ const QuizSession: React.FC = () => {
           attemptNumber: currentAttempt.attempt_number,
           penalizedScore: penalizedScore !== undefined ? Math.round((penalizedScore / totalPoints) * 100) : undefined,
           requiresManualGrading,
-          // ← new fields
           attemptsRemaining: quizMeta.max_attempts === null
-  ? null
-  : Math.max(0, quizMeta.max_attempts - (previousAttempts.length + 1)),
+            ? null
+            : Math.max(0, quizMeta.max_attempts - (previousAttempts.length + 1)),
           maxAttempts: quizMeta.max_attempts,
           timeLimitMinutes: quizMeta.time_limit_minutes,
           lessonId: quizMeta.lesson_id ?? null,
@@ -889,17 +953,13 @@ const QuizSession: React.FC = () => {
     setSelectedAnswers((prev) => ({ ...prev, [currentQuestion.id]: answer }));
   };
 
-  // File upload handler
   const handleFilesChange = useCallback((questionId: string, files: File[]) => {
     setUploadedFiles((prev) => ({ ...prev, [questionId]: files }));
-    // Mark question as answered
     setSelectedAnswers((prev) => ({ ...prev, [questionId]: `file_upload_${files.length}_files` }));
   }, []);
 
-  // Video upload handler
   const handleVideoChange = useCallback((questionId: string, file: File | null) => {
     setUploadedVideos((prev) => ({ ...prev, [questionId]: file }));
-    // Mark question as answered
     if (file) {
       setSelectedAnswers((prev) => ({ ...prev, [questionId]: `video_upload_${file.name}` }));
     } else {
@@ -911,7 +971,6 @@ const QuizSession: React.FC = () => {
     }
   }, []);
 
-  // Upload files to Supabase storage
   const uploadFilesToStorage = async (
     files: File[],
     attemptId: string,
@@ -942,7 +1001,6 @@ const QuizSession: React.FC = () => {
     return uploadedUrls;
   };
 
-  // Upload video to Supabase storage
   const uploadVideoToStorage = async (
     video: File,
     attemptId: string,
@@ -968,24 +1026,207 @@ const QuizSession: React.FC = () => {
   };
 
   // ============================================
-  // Render Helpers
+  // Render: Start Screen (replaces QuizStart)
   // ============================================
 
-  const isLastQuestion = currentQuestionIndex === questions.length - 1;
-  const isFirstQuestion = currentQuestionIndex === 0;
-  const hasAnsweredCurrent = selectedAnswers[currentQuestion?.id] !== undefined;
+  const renderStartScreen = () => {
+    if (!quizMeta) return null;
+    const maxReached = quizMeta.max_attempts ? attemptCount >= quizMeta.max_attempts : false;
 
-  const canStartQuiz = sessionState === 'show_history' || sessionState === 'resume_or_restart';
-  const attemptsUsed = previousAttempts.length;
-  const displayMaxAttempts = quizMeta?.max_attempts || '∞';
-  // Current/next attempt number (e.g., 1, 2, or 3 out of 3)
-  const currentAttemptNumber = previousAttempts.length + 1;
+    return (
+      <div className="max-w-3xl mx-auto">
+        <button
+          onClick={() => navigate(`/student/courses/${courseId}`)}
+          className="flex items-center gap-2 text-text-secondary hover:text-brand-primary mb-6 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          Back to course
+        </button>
+
+        <div className="glass-card rounded-3xl p-8">
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold text-text-primary mb-2">{quizMeta.title}</h1>
+          </div>
+
+          <div className="flex flex-wrap gap-4 mb-6 pb-6 border-b border-[color:var(--border-base)]">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-text-secondary">📝 {questionCount} questions</span>
+            </div>
+            {quizMeta.time_limit_minutes && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-text-secondary">⏱ {quizMeta.time_limit_minutes} minutes</span>
+              </div>
+            )}
+            {quizMeta.passing_score && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-text-secondary">✅ Pass: {quizMeta.passing_score}%</span>
+              </div>
+            )}
+            {quizMeta.max_attempts && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-text-secondary">🔄 Attempts: {attemptCount}/{quizMeta.max_attempts}</span>
+              </div>
+            )}
+          </div>
+
+          {quizMeta.description && (
+            <div className="mb-6">
+              <h3 className="font-semibold text-text-primary mb-2">About this quiz</h3>
+              <p className="text-text-secondary leading-relaxed">{quizMeta.description}</p>
+            </div>
+          )}
+
+          {quizMeta.instructions && (
+            <div className="mb-6 p-4 bg-brand-primary/5 rounded-2xl">
+              <h3 className="font-semibold text-text-primary mb-2">Instructions</h3>
+              <p className="text-sm text-text-secondary leading-relaxed">{quizMeta.instructions}</p>
+            </div>
+          )}
+
+          <div className="flex gap-4">
+            <button
+              onClick={() => handleStartAttempt(false)}
+              disabled={maxReached}
+              className={`flex-1 font-semibold py-4 px-8 rounded-full transition-all ${
+                maxReached
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-brand-neon to-brand-electric text-white hover:shadow-lg'
+              }`}
+            >
+              {maxReached ? 'Max attempts reached' : 'Start quiz'}
+            </button>
+            <button
+              onClick={() => navigate(`/student/courses/${courseId}`)}
+              className="px-8 py-4 rounded-full font-semibold text-brand-primary border-2 border-brand-primary hover:bg-brand-primary/5 transition-all"
+            >
+              Review lesson first
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // ============================================
-  // Render Loading State
+  // Render: Pending Review (View Only - Cannot Retake)
   // ============================================
 
-  if (sessionState === 'loading') {
+  const renderPendingReview = () => {
+    if (!quizMeta || !submission) return null;
+
+    return (
+      <div className="max-w-4xl mx-auto">
+        <button
+          onClick={() => navigate(`/student/courses/${courseId}`)}
+          className="flex items-center gap-2 text-text-secondary hover:text-brand-primary mb-6 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          Back to course
+        </button>
+
+        <div className="glass-card rounded-3xl p-8 mb-6">
+          <h1 className="text-3xl font-bold text-text-primary mb-4">{quizMeta.title}</h1>
+
+          {/* Pending Review Status Banner */}
+          <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6 mb-6">
+            <div className="flex items-start gap-4">
+              <Clock className="w-8 h-8 text-blue-600 flex-shrink-0" />
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-blue-900 mb-2">Awaiting Coach Review</h3>
+                <p className="text-blue-800 mb-4">
+                  Your quiz submission is currently being reviewed by your coach.
+                  You cannot retake this quiz until your coach has approved or rejected your submission.
+                </p>
+                <div className="flex items-center gap-4 text-sm text-blue-700">
+                  <span>
+                    Submitted: {new Date(submission.submitted_at).toLocaleDateString('en-US', {
+                      month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                    })}
+                  </span>
+                </div>
+                {submission.review_notes && (
+                  <div className="mt-4 p-4 bg-white rounded-lg">
+                    <p className="text-sm font-semibold text-blue-900 mb-1 flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4" />
+                      Coach's Note:
+                    </p>
+                    <p className="text-sm text-blue-800">{submission.review_notes}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Previous Answers (View Only) */}
+          {previousResponses.length > 0 && (
+            <div>
+              <h3 className="text-xl font-bold text-text-primary mb-4">Your Previous Answers</h3>
+              <div className="space-y-4">
+                {previousResponses.map((response, index) => (
+                  <div
+                    key={response.id}
+                    className={`p-4 rounded-lg border-2 ${
+                      response.is_correct
+                        ? 'bg-green-50 border-green-200'
+                        : 'bg-orange-50 border-orange-200'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <h4 className="font-semibold text-text-primary flex-1">
+                        Q{index + 1}: {response.question_text}
+                      </h4>
+                      {response.is_correct ? (
+                        <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 ml-2" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-orange-600 flex-shrink-0 ml-2" />
+                      )}
+                    </div>
+                    <p className="text-sm text-text-secondary">
+                      Your answer:{' '}
+                      <span className="font-medium text-text-primary">
+                        {typeof response.response_data.answer === 'boolean'
+                          ? response.response_data.answer
+                            ? 'True'
+                            : 'False'
+                          : response.response_data.answer || 'No answer'}
+                      </span>
+                    </p>
+                    <p className="text-sm font-medium text-text-primary mt-1">
+                      Points: {response.points_earned}/{response.points_possible}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="mt-6 flex gap-4">
+            <button
+              onClick={() => navigate(`/student/courses/${courseId}/quizzes/${quizId}/result`)}
+              className="px-6 py-3 rounded-full font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-all"
+            >
+              View Full Results
+            </button>
+            {submission.has_feedback && (
+              <button
+                onClick={() => navigate(`/student/courses/${courseId}/quizzes/${quizId}/feedback`)}
+                className="px-6 py-3 rounded-full font-semibold text-blue-600 border-2 border-blue-600 hover:bg-blue-50 transition-all"
+              >
+                View Coach Feedback
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ============================================
+  // Render: Loading State
+  // ============================================
+
+  if (sessionState === 'loading' || !quizMeta) {
     return (
       <StudentAppLayout>
         <div className="min-h-screen bg-[color:var(--bg-primary)] flex items-center justify-center">
@@ -999,21 +1240,92 @@ const QuizSession: React.FC = () => {
   }
 
   // ============================================
-  // Render Error States
+  // Render: Start Screen
   // ============================================
 
-  if (!quizMeta || questions.length === 0) {
+  if (sessionState === 'start_screen') {
+    return (
+      <StudentAppLayout>
+        <div className="min-h-screen bg-[color:var(--bg-primary)] py-8 px-6">
+          {renderStartScreen()}
+        </div>
+      </StudentAppLayout>
+    );
+  }
+
+  // ============================================
+  // Render: Pending Review
+  // ============================================
+
+  if (sessionState === 'pending_review') {
+    return (
+      <StudentAppLayout>
+        <div className="min-h-screen bg-[color:var(--bg-primary)] py-8 px-6">
+          {renderPendingReview()}
+        </div>
+      </StudentAppLayout>
+    );
+  }
+
+  // ============================================
+  // Render: Error States
+  // ============================================
+
+  if (sessionState === 'not_published') {
     return (
       <StudentAppLayout>
         <div className="min-h-screen bg-[color:var(--bg-primary)] flex items-center justify-center">
           <div className="text-center">
-            <AlertCircle className="w-12 h-12 text-text-secondary mx-auto mb-4" />
-            <p className="text-text-secondary mb-4">No questions found for this quiz.</p>
+            <Lock className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-text-primary mb-2">Quiz Not Available</h2>
+            <p className="text-text-secondary">This quiz has not been published yet.</p>
+          </div>
+        </div>
+      </StudentAppLayout>
+    );
+  }
+
+  if (sessionState === 'not_available') {
+    return (
+      <StudentAppLayout>
+        <div className="min-h-screen bg-[color:var(--bg-primary)] flex items-center justify-center">
+          <div className="text-center">
+            <Calendar className="w-12 h-12 text-blue-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-text-primary mb-2">Coming Soon</h2>
+            <p className="text-text-secondary">This quiz is not yet available.</p>
+          </div>
+        </div>
+      </StudentAppLayout>
+    );
+  }
+
+  if (sessionState === 'closed') {
+    return (
+      <StudentAppLayout>
+        <div className="min-h-screen bg-[color:var(--bg-primary)] flex items-center justify-center">
+          <div className="text-center">
+            <Lock className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-text-primary mb-2">Quiz Closed</h2>
+            <p className="text-text-secondary">This quiz is no longer accepting submissions.</p>
+          </div>
+        </div>
+      </StudentAppLayout>
+    );
+  }
+
+  if (sessionState === 'no_attempts_remaining') {
+    return (
+      <StudentAppLayout>
+        <div className="min-h-screen bg-[color:var(--bg-primary)] flex items-center justify-center">
+          <div className="text-center">
+            <XCircle className="w-12 h-12 text-orange-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-text-primary mb-2">No Attempts Remaining</h2>
+            <p className="text-text-secondary mb-4">You have used all your attempts for this quiz.</p>
             <button
               onClick={() => navigate(`/student/courses/${courseId}`)}
-              className="text-brand-primary hover:underline"
+              className="px-6 py-3 rounded-full font-semibold text-brand-primary border-2 border-brand-primary hover:bg-brand-primary/5 transition-all"
             >
-              Back to course
+              Back to Course
             </button>
           </div>
         </div>
@@ -1022,230 +1334,160 @@ const QuizSession: React.FC = () => {
   }
 
   // ============================================
-  // Main Render
+  // Render: Attempt History / Resume
   // ============================================
+
+  if (sessionState === 'show_history' || sessionState === 'resume_or_restart') {
+    return (
+      <StudentAppLayout>
+        <div className="min-h-screen bg-[color:var(--bg-primary)] py-8 px-6">
+          <div className="max-w-4xl mx-auto">
+            <button
+              onClick={() => navigate(`/student/courses/${courseId}`)}
+              className="flex items-center gap-2 text-text-secondary hover:text-brand-primary mb-6 transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              Back to course
+            </button>
+
+            <div className="glass-card rounded-3xl p-8 mb-6">
+              <h1 className="text-3xl font-bold text-text-primary mb-2">{quizMeta.title}</h1>
+              <p className="text-text-secondary mb-6">Review your previous attempts or start a new one.</p>
+
+              <QuizAttemptHistory
+                attempts={previousAttempts}
+                maxAttempts={quizMeta.max_attempts}
+                passingScore={quizMeta.passing_score}
+                canRetake={attemptsRemaining === null || attemptsRemaining > 0}
+                attemptsRemaining={attemptsRemaining}
+                attemptsUsed={previousAttempts.length}
+                displayMaxAttempts={quizMeta.max_attempts?.toString() || '∞'}
+                onStartAttempt={() => handleStartAttempt(false)}
+                timeLimitMinutes={quizMeta.time_limit_minutes}
+                courseId={courseId || ''}
+                lessonId={quizMeta.lesson_id ?? null}
+              />
+            </div>
+          </div>
+        </div>
+      </StudentAppLayout>
+    );
+  }
+
+  // ============================================
+  // Render: Quiz In Progress
+  // ============================================
+
+  if (sessionState === 'in_progress' && currentQuestion) {
+    return (
+      <StudentAppLayout>
+        <div className="min-h-screen bg-[color:var(--bg-primary)] py-8 px-6">
+          <div className="max-w-4xl mx-auto">
+            {/* Question Progress */}
+            <QuestionProgressBar currentIndex={currentQuestionIndex} total={questions.length} />
+
+            {/* Question Card */}
+            <div className="glass-card rounded-3xl p-8 mb-6 mt-6">
+              {currentQuestion.type === 'multiple-choice' && (
+                <QuestionMultipleChoice
+                  question={{ ...currentQuestion, options: currentQuestion.options || [] }}
+                  selectedOptionId={selectedAnswers[currentQuestion.id] as string}
+                  onSelect={handleAnswerSelect}
+                />
+              )}
+              {currentQuestion.type === 'true-false' && (
+                <QuestionTrueFalse
+                  question={currentQuestion}
+                  value={selectedAnswers[currentQuestion.id] as boolean}
+                  onChange={handleAnswerSelect}
+                />
+              )}
+              {currentQuestion.type === 'image-choice' && (
+                <QuestionImageChoice
+                  question={{
+                    ...currentQuestion,
+                    options: (currentQuestion.options || []).map((o) => ({
+                      id: o.id,
+                      label: o.label,
+                      imageUrl: o.imageUrl || '',
+                    })),
+                  }}
+                  selectedOptionId={selectedAnswers[currentQuestion.id] as string}
+                  onSelect={handleAnswerSelect}
+                />
+              )}
+              {currentQuestion.type === 'file-upload' && (
+                <QuestionFileUpload
+                  question={{
+                    ...currentQuestion,
+                    answerConfig: currentQuestion.answerConfig,
+                  }}
+                  onFilesChange={handleFilesChange}
+                  existingFiles={uploadedFiles[currentQuestion.id] || []}
+                />
+              )}
+              {currentQuestion.type === 'video-submission' && (
+                <QuestionVideoSubmission
+                  question={{
+                    ...currentQuestion,
+                    answerConfig: currentQuestion.answerConfig,
+                  }}
+                  onVideoChange={handleVideoChange}
+                  existingVideo={uploadedVideos[currentQuestion.id] || null}
+                />
+              )}
+            </div>
+
+            {/* Navigation Controls */}
+            <div className="flex items-center justify-between">
+              <button
+                onClick={handlePrevious}
+                disabled={isFirstQuestion}
+                className={`px-6 py-3 rounded-full font-semibold transition-all ${
+                  isFirstQuestion
+                    ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+                    : 'glass-card text-text-primary border-2 border-[color:var(--border-base)] hover:shadow'
+                }`}
+              >
+                ← Previous
+              </button>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => navigate(`/student/courses/${courseId}`)}
+                  className="px-6 py-3 rounded-full font-semibold text-text-secondary hover:text-text-primary transition-colors"
+                >
+                  Exit Quiz
+                </button>
+                {isLastQuestion ? (
+                  <button
+                    onClick={handleSubmit}
+                    disabled={submitting || uploadingFiles}
+                    className="px-8 py-3 rounded-full font-semibold bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
+                  >
+                    {uploadingFiles ? 'Uploading Files...' : submitting ? 'Submitting...' : 'Submit Quiz'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleNext}
+                    className="px-8 py-3 rounded-full font-semibold bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all"
+                  >
+                    Next →
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </StudentAppLayout>
+    );
+  }
 
   return (
     <StudentAppLayout>
-      <div className="min-h-screen bg-[color:var(--bg-primary)] py-8 px-6">
-        <div className="max-w-4xl mx-auto">
-          {/* Status Banner */}
-          <QuizStatusBanner
-            availableFrom={quizMeta.available_from}
-            dueDate={quizMeta.due_date}
-            lateSubmissionAllowed={quizMeta.late_submission_allowed}
-            latePenaltyPercent={quizMeta.late_penalty_percent}
-            attemptsRemaining={attemptsRemaining}
-            maxAttempts={quizMeta.max_attempts}
-            isPublished={quizMeta.is_published}
-          />
-
-          {/* Attempt History — always render for show_history or no_attempts_remaining */}
-          {(sessionState === 'show_history' || sessionState === 'no_attempts_remaining') && (
-            <QuizAttemptHistory
-              attempts={previousAttempts}
-              maxAttempts={quizMeta.max_attempts}
-              passingScore={quizMeta.passing_score}
-              canRetake={attemptsRemaining === null || attemptsRemaining > 0}
-              attemptsRemaining={attemptsRemaining}
-              attemptsUsed={attemptsUsed}
-              displayMaxAttempts={displayMaxAttempts}
-              onStartAttempt={() => handleStartAttempt(false)}
-              timeLimitMinutes={quizMeta.time_limit_minutes}
-              courseId={courseId || ''}
-              lessonId={quizMeta.lesson_id ?? null}
-            />
-          )}
-
-
-          {/* Quiz Not Published State */}
-          {sessionState === 'not_published' && (
-            <div className="glass-card rounded-2xl p-8 text-center">
-              <Lock className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-              <h2 className="text-xl font-bold text-text-primary mb-2">Quiz Not Available</h2>
-              <p className="text-text-secondary">This quiz has not been published yet.</p>
-            </div>
-          )}
-
-          {/* Quiz Not Yet Available State */}
-          {sessionState === 'not_available' && quizMeta.available_from && (
-            <div className="glass-card rounded-2xl p-8 text-center">
-              <Calendar className="w-12 h-12 text-blue-500 mx-auto mb-4" />
-              <h2 className="text-xl font-bold text-text-primary mb-2">Coming Soon</h2>
-              <p className="text-text-secondary mb-4">
-                This quiz will be available on {new Date(quizMeta.available_from).toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  month: 'long',
-                  day: 'numeric',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </p>
-            </div>
-          )}
-
-          {/* Quiz Closed State */}
-          {sessionState === 'closed' && quizMeta.due_date && (
-            <div className="glass-card rounded-2xl p-8 text-center">
-              <Lock className="w-12 h-12 text-red-500 mx-auto mb-4" />
-              <h2 className="text-xl font-bold text-text-primary mb-2">Quiz Closed</h2>
-              <p className="text-text-secondary">
-                This quiz closed on {new Date(quizMeta.due_date).toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  month: 'long',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}
-              </p>
-            </div>
-          )}
-
-          {/* Ready to Start / In Progress */}
-          {(sessionState === 'show_history' || sessionState === 'in_progress') && (
-            <>
-              {sessionState === 'in_progress' && currentQuestion && (
-                <>
-                  {/* Question Progress */}
-                  <QuestionProgressBar currentIndex={currentQuestionIndex} total={questions.length} />
-
-                  {/* Question Card */}
-                  <div className="glass-card rounded-3xl p-8 mb-6 mt-6">
-                    {currentQuestion.type === 'multiple-choice' && (
-                      <QuestionMultipleChoice
-                        question={{ ...currentQuestion, options: currentQuestion.options || [] }}
-                        selectedOptionId={selectedAnswers[currentQuestion.id] as string}
-                        onSelect={handleAnswerSelect}
-                      />
-                    )}
-                    {currentQuestion.type === 'true-false' && (
-                      <QuestionTrueFalse
-                        question={currentQuestion}
-                        value={selectedAnswers[currentQuestion.id] as boolean}
-                        onChange={handleAnswerSelect}
-                      />
-                    )}
-                    {currentQuestion.type === 'image-choice' && (
-                      <QuestionImageChoice
-                        question={{
-                          ...currentQuestion,
-                          options: (currentQuestion.options || []).map((o) => ({
-                            id: o.id,
-                            label: o.label,
-                            imageUrl: o.imageUrl || '',
-                          })),
-                        }}
-                        selectedOptionId={selectedAnswers[currentQuestion.id] as string}
-                        onSelect={handleAnswerSelect}
-                      />
-                    )}
-                    {currentQuestion.type === 'file-upload' && (
-                      <QuestionFileUpload
-                        question={{
-                          ...currentQuestion,
-                          answerConfig: currentQuestion.answerConfig,
-                        }}
-                        onFilesChange={handleFilesChange}
-                        existingFiles={uploadedFiles[currentQuestion.id] || []}
-                      />
-                    )}
-                    {currentQuestion.type === 'video-submission' && (
-                      <QuestionVideoSubmission
-                        question={{
-                          ...currentQuestion,
-                          answerConfig: currentQuestion.answerConfig,
-                        }}
-                        onVideoChange={handleVideoChange}
-                        existingVideo={uploadedVideos[currentQuestion.id] || null}
-                      />
-                    )}
-                  </div>
-
-                  {/* Navigation Controls */}
-                  <div className="flex items-center justify-between">
-                    <button
-                      onClick={handlePrevious}
-                      disabled={isFirstQuestion}
-                      className={`px-6 py-3 rounded-full font-semibold transition-all ${
-                        isFirstQuestion
-                          ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-                          : 'glass-card text-text-primary border-2 border-[color:var(--border-base)] hover:shadow'
-                      }`}
-                    >
-                      ← Previous
-                    </button>
-
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => navigate(`/student/courses/${courseId}`)}
-                        className="px-6 py-3 rounded-full font-semibold text-text-secondary hover:text-text-primary transition-colors"
-                      >
-                        Exit Quiz
-                      </button>
-                      {isLastQuestion ? (
-                        <button
-                          onClick={handleSubmit}
-                          disabled={submitting || uploadingFiles}
-                          className="px-8 py-3 rounded-full font-semibold bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
-                        >
-                          {uploadingFiles ? 'Uploading Files...' : submitting ? 'Submitting...' : 'Submit Quiz'}
-                        </button>
-                      ) : (
-                        <button
-                          onClick={handleNext}
-                          className="px-8 py-3 rounded-full font-semibold bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all"
-                        >
-                          Next →
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </>
-              )}
-            </>
-          )}
-
-          {/* Resume Dialog */}
-          {showResumeDialog && currentAttempt && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <div className="glass-card rounded-2xl p-8 max-w-md w-full">
-                <h2 className="text-xl font-bold text-text-primary mb-4">Resume Quiz?</h2>
-                <p className="text-text-secondary mb-6">
-                  You have an in-progress attempt from {new Date(currentAttempt.started_at).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}.
-                  {quizMeta.time_limit_minutes && timeRemaining && (
-                    <span className="block mt-2 font-medium text-text-primary">
-                      Time remaining: {formatTime(timeRemaining)}
-                    </span>
-                  )}
-                </p>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => {
-                      setShowResumeDialog(false);
-                      handleStartAttempt(true);
-                    }}
-                    className="flex-1 px-6 py-3 rounded-full font-semibold bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all"
-                  >
-                    Resume
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowResumeDialog(false);
-                      handleStartAttempt(false);
-                    }}
-                    className="flex-1 px-6 py-3 rounded-full font-semibold glass-card text-text-primary border-2 border-[color:var(--border-base)] hover:shadow transition-all"
-                  >
-                    Start New
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+      <div className="min-h-screen bg-[color:var(--bg-primary)] flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-text-secondary">Loading...</p>
         </div>
       </div>
     </StudentAppLayout>

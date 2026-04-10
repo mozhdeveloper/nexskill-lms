@@ -104,6 +104,9 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
+  // Fetch lesson access status for lock indicators
+  const { isLessonLocked: checkLessonLocked, loading: lockLoading } = useLessonAccessStatus(courseId);
+
   const fetchModules = useCallback(async () => {
     if (!courseId) return;
 
@@ -452,17 +455,25 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                   {module.items.map((item) => {
                     const isActive = item.id === activeLessonId;
                     const completed = item.isCompleted;
-                    
+                    // Check if lesson is locked (only for lessons, not quizzes)
+                    const isLocked = item.type === 'lesson' ? checkLessonLocked(item.id) : false;
+
                     return (
                       <button
                         key={item.id}
-                        onClick={() => onSelectLesson(item.id)}
+                        onClick={() => {
+                          if (isLocked) return; // Don't navigate if locked
+                          onSelectLesson(item.id);
+                        }}
+                        disabled={isLocked}
                         className={`w-full flex items-center justify-between p-3 rounded-xl transition-all ${
-                          isActive
+                          isLocked
+                            ? 'opacity-60 cursor-not-allowed bg-gray-100 dark:bg-gray-800'
+                            : isActive
                             ? 'bg-brand-primary-soft border-2 border-brand-primary'
                             : 'hover:bg-white dark:hover:bg-gray-700 hover:shadow-sm'
                         } ${
-                          completed && !isActive
+                          completed && !isActive && !isLocked
                             ? 'bg-green-50 dark:bg-green-900/10'
                             : ''
                         }`}
@@ -474,10 +485,12 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                               <span className="w-5 h-5 flex items-center justify-center bg-green-500 rounded-full text-white text-xs">
                                 ✓
                               </span>
+                            ) : isLocked ? (
+                              <Lock className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                             ) : (
                               <span className={`text-sm font-semibold ${
-                                isActive 
-                                  ? 'text-brand-primary' 
+                                isActive
+                                  ? 'text-brand-primary'
                                   : 'text-text-muted dark:text-dark-text-muted'
                               }`}>
                                 {item.itemNumber}
@@ -487,7 +500,9 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <p className={`text-sm font-medium truncate ${
-                                completed
+                                isLocked
+                                  ? 'text-gray-400 dark:text-gray-500'
+                                  : completed
                                   ? 'text-green-700 dark:text-green-400'
                                   : isActive
                                     ? 'text-brand-primary'
@@ -496,13 +511,20 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                                 {item.title}
                               </p>
                               {/* Content item count beside lesson title */}
-                              {item.progressCount && (
+                              {item.progressCount && !isLocked && (
                                 <span className={`text-xs font-medium flex-shrink-0 ${
                                   completed
                                     ? 'text-green-600 dark:text-green-400'
                                     : 'text-text-muted dark:text-dark-text-muted'
                                 }`}>
                                   {item.progressCount.completed}/{item.progressCount.total}
+                                </span>
+                              )}
+                              {/* Locked badge */}
+                              {isLocked && (
+                                <span className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                  <Lock className="w-3 h-3" />
+                                  Locked
                                 </span>
                               )}
                             </div>
@@ -518,7 +540,7 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                                   {item.duration}
                                 </span>
                               </div>
-                              {item.type === 'quiz' && (
+                              {item.type === 'quiz' && !isLocked && (
                                 <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full">
                                   Quiz
                                 </span>
@@ -527,7 +549,7 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                           </div>
                         </div>
                         {/* Optional: Add chevron for active item */}
-                        {isActive && (
+                        {isActive && !isLocked && (
                           <svg
                             className="w-4 h-4 text-brand-primary"
                             fill="none"

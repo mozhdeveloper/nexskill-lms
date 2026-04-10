@@ -938,7 +938,8 @@ const CourseBuilder: React.FC = () => {
     const newQuiz: Quiz = {
       id: quizId, title: quizTitle, description: "", instructions: "",
       passing_score: 70, time_limit_minutes: 30, max_attempts: 3,
-      requires_manual_grading: false, is_published: false,
+      requires_manual_grading: false, requires_coach_approval: true,
+      is_published: false,
       late_submission_allowed: true, late_penalty_percent: 10,
     };
 
@@ -954,7 +955,7 @@ const CourseBuilder: React.FC = () => {
   const handleSaveQuiz = async (updatedQuiz: Quiz) => {
     if (!editingQuiz || !updatedQuiz.id) return;
     try {
-      const { type, requires_coach_approval, ...quizDataToSave } = updatedQuiz as any;
+      const { type, ...quizDataToSave } = updatedQuiz as any;
       
       // Only include fields that definitely exist in the database
       const safeQuizData = {
@@ -966,6 +967,7 @@ const CourseBuilder: React.FC = () => {
         time_limit_minutes: quizDataToSave.time_limit_minutes || null,
         max_attempts: quizDataToSave.max_attempts || null,
         requires_manual_grading: quizDataToSave.requires_manual_grading || false,
+        requires_coach_approval: quizDataToSave.requires_coach_approval || false,
         is_published: quizDataToSave.is_published || false,
         updated_at: new Date().toISOString(),
       };

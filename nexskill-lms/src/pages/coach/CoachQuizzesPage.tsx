@@ -603,6 +603,13 @@ const CoachQuizzesPage: React.FC = () => {
                   ) : quiz.status === 'published' ? (
                     <>
                       <button
+                        onClick={() => navigate(`/coach/courses/${quiz.courseId}/quiz-reviews`)}
+                        className="flex-1 px-3 py-2 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors text-sm font-medium flex items-center justify-center gap-1"
+                      >
+                        <FileText className="w-4 h-4" />
+                        Review Submissions
+                      </button>
+                      <button
                         onClick={() => handleViewAnalytics(quiz)}
                         className="flex-1 px-3 py-2 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors text-sm font-medium flex items-center justify-center gap-1"
                       >

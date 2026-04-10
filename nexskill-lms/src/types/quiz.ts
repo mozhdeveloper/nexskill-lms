@@ -134,6 +134,7 @@ export interface Quiz {
     time_limit_minutes?: number;
     max_attempts?: number;
     requires_manual_grading: boolean;
+    requires_coach_approval?: boolean;
     is_published: boolean;
     available_from?: string;
     due_date?: string;

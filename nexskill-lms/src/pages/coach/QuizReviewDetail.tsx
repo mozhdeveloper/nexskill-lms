@@ -18,6 +18,8 @@ import {
   BookOpen,
   Clock,
   MessageSquare,
+  ExternalLink,
+  Play,
 } from 'lucide-react';
 import type { QuizFeedbackMedia } from '../../types/quiz';
 
@@ -36,25 +38,39 @@ interface SubmissionData {
   quiz_max_score: number | null;
 }
 
+interface UploadedFile {
+  url: string;
+  name?: string;
+  type?: string;
+}
+
+interface UploadedFilesData {
+  type: 'files' | 'video';
+  urls?: string[];
+  url?: string;
+  filename?: string;
+}
+
 interface QuizResponse {
   id: string;
   question_id: string;
   question_text: string;
-  response_data: { answer: string | boolean | null };
+  response_data: { answer: string | boolean | null; uploaded_files?: UploadedFilesData | null };
   points_earned: number;
   points_possible: number;
   is_correct: boolean;
+  requires_grading: boolean;
 }
 
 const QuizReviewDetail: React.FC = () => {
   const navigate = useNavigate();
   const { courseId, submissionId } = useParams<{ courseId: string; submissionId: string }>();
   const { user } = useAuth();
-  
+
   const [submission, setSubmission] = useState<SubmissionData | null>(null);
   const [responses, setResponses] = useState<QuizResponse[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Feedback form state
   const [feedbackComment, setFeedbackComment] = useState('');
   const [mediaFiles, setMediaFiles] = useState<QuizFeedbackMedia[]>([]);
@@ -62,6 +78,19 @@ const QuizReviewDetail: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Helper to extract text from question_content JSON
+  const extractQuestionText = (questionContent: any): string => {
+    if (!questionContent) return 'Untitled Question';
+    const contentBlock = Array.isArray(questionContent)
+      ? (questionContent[0] ?? {})
+      : (questionContent ?? {});
+    return (
+      contentBlock?.text ||
+      contentBlock?.content ||
+      'Untitled Question'
+    );
+  };
 
   useEffect(() => {
     const fetchSubmission = async () => {
@@ -125,7 +154,7 @@ const QuizReviewDetail: React.FC = () => {
           .select(`
             *,
             quiz_questions!inner(
-              question_text
+              question_content
             )
           `)
           .eq('attempt_id', subData.quiz_attempt_id);
@@ -135,11 +164,12 @@ const QuizReviewDetail: React.FC = () => {
         const mappedResponses: QuizResponse[] = (responseData || []).map((r: any) => ({
           id: r.id,
           question_id: r.question_id,
-          question_text: r.quiz_questions.question_text,
+          question_text: extractQuestionText(r.quiz_questions?.question_content),
           response_data: r.response_data,
           points_earned: r.points_earned,
           points_possible: r.points_possible,
           is_correct: r.is_correct,
+          requires_grading: r.requires_grading || false,
         }));
 
         setResponses(mappedResponses);
@@ -297,6 +327,67 @@ const QuizReviewDetail: React.FC = () => {
     );
   };
 
+  const renderStudentUploads = (response: QuizResponse, index: number) => {
+    const uploadedFiles = response.response_data?.uploaded_files;
+    if (!uploadedFiles) return null;
+
+    if (uploadedFiles.type === 'files' && uploadedFiles.urls) {
+      return (
+        <div className="mt-3 p-3 bg-white/50 rounded-lg">
+          <p className="text-xs font-medium text-text-primary mb-2 flex items-center gap-1">
+            <Upload className="w-3 h-3" />
+            Student uploaded {uploadedFiles.urls.length} file(s):
+          </p>
+          <div className="space-y-1.5">
+            {uploadedFiles.urls.map((url: string, i: number) => (
+              <a
+                key={i}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-sm text-brand-primary hover:text-brand-primary-dark transition-colors"
+              >
+                <FileText className="w-3 h-3" />
+                <span className="truncate">File {i + 1}</span>
+                <ExternalLink className="w-3 h-3 flex-shrink-0" />
+              </a>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (uploadedFiles.type === 'video' && uploadedFiles.url) {
+      return (
+        <div className="mt-3 p-3 bg-white/50 rounded-lg">
+          <p className="text-xs font-medium text-text-primary mb-2 flex items-center gap-1">
+            <Video className="w-3 h-3" />
+            Student submitted a video{uploadedFiles.filename ? `: ${uploadedFiles.filename}` : ''}:
+          </p>
+          <div className="relative rounded-lg overflow-hidden bg-black">
+            <video
+              src={uploadedFiles.url}
+              controls
+              className="w-full max-h-64 object-contain"
+            />
+          </div>
+          <a
+            href={uploadedFiles.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-sm text-brand-primary hover:text-brand-primary-dark transition-colors mt-2"
+          >
+            <Play className="w-3 h-3" />
+            <span>Open video in new tab</span>
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   if (loading) {
     return (
       <CoachAppLayout>
@@ -410,7 +501,9 @@ const QuizReviewDetail: React.FC = () => {
                       <div
                         key={response.id}
                         className={`p-4 rounded-lg border-2 ${
-                          response.is_correct
+                          response.requires_grading
+                            ? 'bg-blue-50 border-blue-200'
+                            : response.is_correct
                             ? 'bg-green-50 border-green-200'
                             : 'bg-orange-50 border-orange-200'
                         }`}
@@ -419,7 +512,12 @@ const QuizReviewDetail: React.FC = () => {
                           <h4 className="font-semibold text-text-primary flex-1">
                             Q{index + 1}: {response.question_text}
                           </h4>
-                          {response.is_correct ? (
+                          {response.requires_grading ? (
+                            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full flex items-center gap-1">
+                              <Upload className="w-3 h-3" />
+                              Needs Grading
+                            </span>
+                          ) : response.is_correct ? (
                             <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 ml-2" />
                           ) : (
                             <XCircle className="w-5 h-5 text-orange-600 flex-shrink-0 ml-2" />
@@ -437,6 +535,8 @@ const QuizReviewDetail: React.FC = () => {
                         <p className="text-sm font-medium text-text-primary">
                           Points: {response.points_earned}/{response.points_possible}
                         </p>
+                        {/* Render uploaded files/videos */}
+                        {renderStudentUploads(response, index)}
                       </div>
                     ))}
                   </div>

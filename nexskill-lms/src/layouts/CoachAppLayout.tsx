@@ -68,7 +68,7 @@ const CoachAppLayout: React.FC<CoachAppLayoutProps> = ({ children }) => {
         { path: "/coach/dashboard", label: "Dashboard", icon: LayoutDashboard },
         { path: "/coach/courses", label: "Courses", icon: BookOpen },
         { path: "/coach/ai-tools", label: "AI Tools", icon: Sparkles },
-        { path: "/coach/quizzes", label: "Quizzes & Assessments", icon: ClipboardList },
+        { path: "/coach/quiz-reviews", label: "Quiz Reviews", icon: ClipboardList },
         { path: "/coach/coaching-tools", label: "Coaching Tools", icon: Users },
         { path: "/coach/students", label: "Students", icon: UserPlus },
         { path: "/coach/subcoach-management", label: "Sub-Coaches", comingSoon: true, icon: Users },
