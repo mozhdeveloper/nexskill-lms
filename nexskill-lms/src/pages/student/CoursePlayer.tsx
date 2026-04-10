@@ -255,8 +255,7 @@ const CoursePlayer: React.FC = () => {
     };
 
     refreshCompletedLessons();
-    // Remove completedLessons from deps to prevent race condition overwriting optimistic updates
-  }, [courseId, lessonId]);
+  }, [courseId, lessonId, completedLessons]);
 
   const handleContentItemComplete = useCallback(async (completedContentItemId: string) => {
     console.log('[CoursePlayer] Content item completed:', completedContentItemId);

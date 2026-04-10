@@ -822,6 +822,11 @@ const CourseBuilder: React.FC = () => {
         [lessonId]: [...(prev[lessonId] || []), newItem],
       }));
 
+      // Phase 1.5: Mark course as having pending content if already approved
+      if (isCoursePublished) {
+        await supabase.from('courses').update({ pending_content: true }).eq('id', courseId);
+      }
+
       return newItem;
     } catch (error: any) {
       console.error('Error adding content item:', error);
