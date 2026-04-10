@@ -954,11 +954,40 @@ const CourseBuilder: React.FC = () => {
   const handleSaveQuiz = async (updatedQuiz: Quiz) => {
     if (!editingQuiz || !updatedQuiz.id) return;
     try {
-      const { type, ...quizDataToSave } = updatedQuiz as any;
-      const { error } = await supabase.from("quizzes").upsert(quizDataToSave, { onConflict: "id" });
-      if (error) throw error;
+      const { type, requires_coach_approval, ...quizDataToSave } = updatedQuiz as any;
+      
+      // Only include fields that definitely exist in the database
+      const safeQuizData = {
+        id: quizDataToSave.id,
+        title: quizDataToSave.title,
+        description: quizDataToSave.description || null,
+        instructions: quizDataToSave.instructions || null,
+        passing_score: quizDataToSave.passing_score || 70,
+        time_limit_minutes: quizDataToSave.time_limit_minutes || null,
+        max_attempts: quizDataToSave.max_attempts || null,
+        requires_manual_grading: quizDataToSave.requires_manual_grading || false,
+        is_published: quizDataToSave.is_published || false,
+        updated_at: new Date().toISOString(),
+      };
+      
+      const { error } = await supabase
+        .from("quizzes")
+        .upsert(safeQuizData, { onConflict: "id" });
+      
+      if (error) {
+        console.error("Supabase error details:", error);
+        // If upsert fails, try update
+        const { error: updateError } = await supabase
+          .from("quizzes")
+          .update(safeQuizData)
+          .eq("id", updatedQuiz.id);
+        
+        if (updateError) throw updateError;
+      }
 
-      await supabase.from("module_content_items").update({ is_published: updatedQuiz.is_published })
+      await supabase
+        .from("module_content_items")
+        .update({ is_published: updatedQuiz.is_published })
         .match({ module_id: editingQuiz.moduleId, content_id: updatedQuiz.id, content_type: "quiz" });
 
       setCurriculum(curriculum.map((mod) =>
@@ -967,9 +996,11 @@ const CourseBuilder: React.FC = () => {
           : mod
       ));
       setEditingQuiz({ ...editingQuiz, quiz: updatedQuiz });
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error saving quiz:", err);
-      alert("Error saving quiz");
+      // Show more detailed error
+      const errorMsg = err?.message || err?.code || "Unknown error";
+      alert(`Error saving quiz: ${errorMsg}\n\nCheck browser console for details.`);
     }
   };
 

@@ -3,7 +3,8 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
 import QuestionFeedback from '../../components/quiz/QuestionFeedback';
 import { supabase } from '../../lib/supabaseClient';
-import { Play } from 'lucide-react';
+import { useQuizSubmission } from '../../hooks/useQuizSubmission';
+import { Play, Clock, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 
 interface Question {
   id: string;
@@ -26,6 +27,7 @@ interface LocationState {
   maxAttempts: number | null;
   timeLimitMinutes: number | null;
   lessonId?: string | null;
+  requiresCoachApproval?: boolean;
 }
 
 const QuizResult: React.FC = () => {
@@ -40,11 +42,17 @@ const QuizResult: React.FC = () => {
   const [dbPassing, setDbPassing] = useState<number | null>(null);
   const [lessonId, setLessonId] = useState<string | null>(state?.lessonId ?? null);
   const [loadingDb, setLoadingDb] = useState(!state);
+  const [requiresCoachApproval, setRequiresCoachApproval] = useState(
+    state?.requiresCoachApproval ?? false
+  );
+
+  // Fetch submission status
+  const { submission, loading: submissionLoading } = useQuizSubmission(quizId);
 
   // Fetch data from DB if no state (page refresh) OR if lessonId is missing
   useEffect(() => {
     if (!quizId) return;
-    
+
     const shouldFetch = !state || !lessonId;
     if (!shouldFetch) return;
 
@@ -76,11 +84,12 @@ const QuizResult: React.FC = () => {
         // Always fetch quiz data to get lesson_id if missing
         const { data: quiz } = await supabase
           .from('quizzes')
-          .select('passing_score, lesson_id')
+          .select('passing_score, lesson_id, requires_coach_approval')
           .eq('id', quizId)
           .single();
         if (quiz) {
           setDbPassing(quiz.passing_score || 70);
+          setRequiresCoachApproval(quiz.requires_coach_approval || false);
           if (!lessonId) {
             setLessonId(quiz.lesson_id ?? null);
           }
@@ -108,10 +117,21 @@ const QuizResult: React.FC = () => {
   const incorrectCount = totalQuestions - correctCount;
 
   // Calculate the next attempt number (completed attempts + 1)
-  const completedAttempts = maxAttempts !== null && attemptsRemaining !== null 
-    ? maxAttempts - attemptsRemaining 
+  const completedAttempts = maxAttempts !== null && attemptsRemaining !== null
+    ? maxAttempts - attemptsRemaining
     : null;
   const nextAttemptNumber = completedAttempts !== null ? completedAttempts + 1 : null;
+
+  // Determine display status based on coach approval
+  const displayStatus = requiresCoachApproval && submission
+    ? submission.status
+    : passed
+    ? 'passed'
+    : 'failed';
+
+  const isPendingReview = displayStatus === 'pending_review';
+  const isFailed = displayStatus === 'failed' || displayStatus === 'resubmission_required';
+  const isPassed = displayStatus === 'passed';
 
   const handleRetry = () => {
     navigate(`/student/courses/${courseId}/quizzes/${quizId}/take`);
@@ -122,6 +142,12 @@ const QuizResult: React.FC = () => {
       navigate(`/student/courses/${courseId}/lessons/${lessonId}`);
     } else {
       navigate(`/student/courses/${courseId}`);
+    }
+  };
+
+  const handleViewFeedback = () => {
+    if (submission?.submission_id) {
+      navigate(`/student/courses/${courseId}/quizzes/${quizId}/feedback`);
     }
   };
 
@@ -146,7 +172,7 @@ const QuizResult: React.FC = () => {
     };
   });
 
-  if (loadingDb) {
+  if (loadingDb || submissionLoading) {
     return (
       <StudentAppLayout>
         <div className="flex-1 flex items-center justify-center p-8">
@@ -166,14 +192,22 @@ const QuizResult: React.FC = () => {
           {/* Score summary hero card */}
           <div className="glass-card rounded-3xl p-8 mb-8 text-center">
             <div className="mb-4">
-              <div
-                className={`
-                  inline-flex px-4 py-2 rounded-full text-sm font-semibold mb-4
-                  ${passed ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}
-                `}
-              >
-                {passed ? '✓ Passed' : '⚠ Needs Review'}
-              </div>
+              {isPendingReview ? (
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold mb-4 bg-blue-100 text-blue-700">
+                  <Clock className="w-4 h-4" />
+                  Pending Coach Review
+                </div>
+              ) : isPassed ? (
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold mb-4 bg-green-100 text-green-700">
+                  <CheckCircle className="w-4 h-4" />
+                  ✓ Passed & Approved
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold mb-4 bg-orange-100 text-orange-700">
+                  <XCircle className="w-4 h-4" />
+                  ⚠ Needs Improvement
+                </div>
+              )}
             </div>
 
             <div className="mb-4">
@@ -183,6 +217,29 @@ const QuizResult: React.FC = () => {
                 <span className="font-semibold text-text-primary">{totalQuestions}</span> questions correctly.
               </p>
             </div>
+
+            {/* Pending Review Alert */}
+            {isPendingReview && (
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-6 text-left">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h3 className="font-semibold text-blue-900 mb-1">Quiz Submitted for Review</h3>
+                    <p className="text-sm text-blue-800">
+                      Your quiz has been submitted and is awaiting review by your coach. 
+                      You'll be notified once they review it and provide feedback. 
+                      The next lesson will be unlocked once your coach approves your submission.
+                    </p>
+                    {submission?.review_notes && (
+                      <div className="mt-3 p-3 bg-white rounded-lg">
+                        <p className="text-sm font-medium text-blue-900 mb-1">Coach's Note:</p>
+                        <p className="text-sm text-blue-800">{submission.review_notes}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Breakdown */}
             <div className="flex justify-center gap-8 mb-6 pt-6 border-t border-[color:var(--border-base)]">
@@ -207,27 +264,74 @@ const QuizResult: React.FC = () => {
             </div>
 
             {/* Action buttons */}
-            <div className="flex gap-4 justify-center">
-              {(attemptsRemaining === null || attemptsRemaining > 0) && (
-                <button
-                  onClick={handleRetry}
-                  className="inline-flex items-center gap-2 px-8 py-3 rounded-full font-semibold bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all"
-                >
-                  <Play className="w-5 h-5" />
-                  Start Attempt {attemptsRemaining === null ? '∞' : nextAttemptNumber} of {maxAttempts ?? '∞'}
-                </button>
+            <div className="flex gap-4 justify-center flex-wrap">
+              {isPendingReview ? (
+                <>
+                  {submission?.has_feedback && (
+                    <button
+                      onClick={handleViewFeedback}
+                      className="inline-flex items-center gap-2 px-8 py-3 rounded-full font-semibold bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-all"
+                    >
+                      View Coach Feedback
+                    </button>
+                  )}
+                  <button
+                    onClick={handleBackToCourse}
+                    className="px-8 py-3 rounded-full font-semibold text-brand-primary border-2 border-brand-primary hover:bg-brand-primary/5 transition-all"
+                  >
+                    Back to Course
+                  </button>
+                </>
+              ) : isFailed ? (
+                <>
+                  {(attemptsRemaining === null || attemptsRemaining > 0) && (
+                    <button
+                      onClick={handleRetry}
+                      className="inline-flex items-center gap-2 px-8 py-3 rounded-full font-semibold bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all"
+                    >
+                      <Play className="w-5 h-5" />
+                      Retry Quiz {attemptsRemaining === null ? '' : `(${attemptsRemaining} attempts left)`}
+                    </button>
+                  )}
+                  {submission?.has_feedback && (
+                    <button
+                      onClick={handleViewFeedback}
+                      className="px-8 py-3 rounded-full font-semibold text-blue-600 border-2 border-blue-600 hover:bg-blue-50 transition-all"
+                    >
+                      View Feedback
+                    </button>
+                  )}
+                  <button
+                    onClick={handleBackToCourse}
+                    className="px-8 py-3 rounded-full font-semibold text-brand-primary border-2 border-brand-primary hover:bg-brand-primary/5 transition-all"
+                  >
+                    Back to lesson
+                  </button>
+                </>
+              ) : (
+                <>
+                  {(attemptsRemaining === null || attemptsRemaining > 0) && (
+                    <button
+                      onClick={handleRetry}
+                      className="inline-flex items-center gap-2 px-8 py-3 rounded-full font-semibold bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all"
+                    >
+                      <Play className="w-5 h-5" />
+                      Start Attempt {attemptsRemaining === null ? '∞' : nextAttemptNumber} of {maxAttempts ?? '∞'}
+                    </button>
+                  )}
+                  <button
+                    onClick={handleBackToCourse}
+                    className="px-8 py-3 rounded-full font-semibold text-brand-primary border-2 border-brand-primary hover:bg-brand-primary/5 transition-all"
+                  >
+                    Back to lesson
+                  </button>
+                </>
               )}
-              <button
-                onClick={handleBackToCourse}
-                className="px-8 py-3 rounded-full font-semibold text-brand-primary border-2 border-brand-primary hover:bg-brand-primary/5 transition-all"
-              >
-                Back to lesson
-              </button>
             </div>
           </div>
 
           {/* Detailed feedback section */}
-          {questions.length > 0 && (
+          {!isPendingReview && questions.length > 0 && (
             <div>
               <div className="mb-6">
                 <h2 className="text-2xl font-bold text-text-primary mb-2">Question-by-question feedback</h2>

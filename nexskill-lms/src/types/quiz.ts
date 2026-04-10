@@ -236,5 +236,60 @@ export interface QuizValidationResult {
     warnings?: ValidationError[];
 }
 
+// ============================================
+// Quiz Approval & Feedback Types
+// ============================================
+
+export type QuizSubmissionStatus = 'pending_review' | 'passed' | 'failed' | 'resubmission_required';
+
+export interface QuizSubmission {
+    id: string;
+    user_id: string;
+    quiz_id: string;
+    quiz_attempt_id: string;
+    status: QuizSubmissionStatus;
+    submitted_at: string;
+    reviewed_at?: string;
+    reviewed_by?: string;
+    review_notes?: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface QuizFeedbackMedia {
+    url: string;
+    type: 'image' | 'video' | 'document';
+    filename: string;
+    size?: number;
+}
+
+export interface QuizFeedback {
+    id: string;
+    quiz_submission_id: string;
+    coach_id: string;
+    comment: string;
+    media_urls: QuizFeedbackMedia[];
+    is_resubmission_feedback: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface LessonAccessStatus {
+    lesson_id: string;
+    is_locked: boolean;
+    unlock_reason?: 'coach_approved' | 'first_lesson' | 'no_prerequisite';
+    unlocked_at?: string;
+}
+
+export interface QuizSubmissionStatusResult {
+    submission_id: string;
+    status: QuizSubmissionStatus;
+    latest_attempt_id: string;
+    submitted_at: string;
+    reviewed_at?: string;
+    review_notes?: string;
+    has_feedback: boolean;
+}
+
 // Force the file to be treated as a module
 export {};

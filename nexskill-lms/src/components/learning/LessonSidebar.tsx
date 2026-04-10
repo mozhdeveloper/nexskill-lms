@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
-import { Video, FileQuestion } from 'lucide-react';
+import { Video, FileQuestion, Lock } from 'lucide-react';
+import { useLessonAccessStatus } from '../../hooks/useQuizSubmission';
 
 interface ContentItem {
   id: string;
@@ -12,6 +13,7 @@ interface ContentItem {
   itemNumber: number; // Sequential number across all modules
   // NEW: Per-lesson content item progress
   progressCount?: { completed: number; total: number };
+  isLocked?: boolean; // NEW: Lesson lock status
 }
 
 interface SidebarModule {

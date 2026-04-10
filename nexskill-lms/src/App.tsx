@@ -19,6 +19,7 @@ import CoursePlayer from "./pages/student/CoursePlayer";
 import QuizStart from "./pages/student/QuizStart";
 import QuizSession from "./pages/student/QuizSession";
 import QuizResult from "./pages/student/QuizResult";
+import QuizFeedbackView from "./pages/student/QuizFeedbackView";
 import DiscussionBoard from "./pages/student/DiscussionBoard";
 import ThreadView from "./pages/student/ThreadView";
 import CourseCircle from "./pages/student/CourseCircle";
@@ -444,6 +445,10 @@ function App() {
                 <Route
                   path="/student/courses/:courseId/quizzes/:quizId/result"
                   element={<QuizResult />}
+                />
+                <Route
+                  path="/student/courses/:courseId/quizzes/:quizId/feedback"
+                  element={<QuizFeedbackView />}
                 />
 
                 {/* Community Routes */}

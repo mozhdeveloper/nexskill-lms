@@ -5,6 +5,8 @@ import QuestionProgressBar from '../../components/quiz/QuestionProgressBar';
 import QuestionMultipleChoice from '../../components/quiz/QuestionMultipleChoice';
 import QuestionTrueFalse from '../../components/quiz/QuestionTrueFalse';
 import QuestionImageChoice from '../../components/quiz/QuestionImageChoice';
+import QuestionFileUpload from '../../components/quiz/QuestionFileUpload';
+import QuestionVideoSubmission from '../../components/quiz/QuestionVideoSubmission';
 import QuizAttemptHistory, { type PreviousAttempt } from '../../components/quiz/QuizAttemptHistory';
 import QuizStatusBanner from '../../components/quiz/QuizStatusBanner';
 import { supabase } from '../../lib/supabaseClient';
@@ -17,7 +19,7 @@ import { Trophy, AlertCircle, Play, Calendar, Lock } from 'lucide-react';
 
 interface QuizQuestion {
   id: string;
-  type: 'multiple-choice' | 'true-false' | 'image-choice';
+  type: 'multiple-choice' | 'true-false' | 'image-choice' | 'file-upload' | 'video-submission';
   questionText: string;
   options?: { id: string; label: string; helperText?: string; imageUrl?: string }[];
   correctOptionId?: string;
@@ -25,6 +27,14 @@ interface QuizQuestion {
   explanation: string;
   points: number;
   requires_manual_grading?: boolean;
+  answerConfig?: {
+    accepted_file_types?: string[];
+    max_file_size_mb?: number;
+    max_files?: number;
+    instructions?: string;
+    max_duration_minutes?: number;
+    accepted_formats?: string[];
+  };
 }
 
 interface QuizMeta {
@@ -39,6 +49,7 @@ interface QuizMeta {
   late_penalty_percent: number;
   is_published: boolean;
   requires_manual_grading: boolean;
+  requires_coach_approval?: boolean;
   lesson_id: string | null;
 }
 
@@ -82,10 +93,12 @@ type QuizSessionState =
 // Helper Functions (outside component for perf)
 // ============================================
 
-const mapQuestionType = (dbType: string): 'multiple-choice' | 'true-false' | 'image-choice' => {
+const mapQuestionType = (dbType: string): 'multiple-choice' | 'true-false' | 'image-choice' | 'file-upload' | 'video-submission' => {
   switch (dbType) {
     case 'true_false': return 'true-false';
     case 'image_choice': return 'image-choice';
+    case 'file_upload': return 'file-upload';
+    case 'video_submission': return 'video-submission';
     default: return 'multiple-choice';
   }
 };
@@ -113,34 +126,34 @@ const mapQuizQuestions = (rows: Record<string, unknown>[]): QuizQuestion[] => {
     const contentBlock: Record<string, unknown> = Array.isArray(rawContent)
       ? ((rawContent[0] as Record<string, unknown>) ?? {})
       : ((rawContent as Record<string, unknown>) ?? {});
-    const answer = r.answer_config as Record<string, unknown> | null;
+    const answerConfig = r.answer_config as Record<string, unknown> | null;
     const type = mapQuestionType(r.question_type as string);
 
     const rawQuestionText =
       (contentBlock?.text as string) ||
       (contentBlock?.content as string) ||
-      (answer?.question_text as string) ||
-      (answer?.questionText as string) ||
+      (answerConfig?.question_text as string) ||
+      (answerConfig?.questionText as string) ||
       (r.question_text as string) ||
       '';
 
     let options = (contentBlock?.options as QuizQuestion['options']) || undefined;
-    if (!options && Array.isArray(answer?.options)) {
-      options = (answer!.options as any[]).map((o: any) => ({
+    if (!options && Array.isArray(answerConfig?.options)) {
+      options = (answerConfig!.options as any[]).map((o: any) => ({
         id: o.id as string,
         label: (o.text || o.label || '') as string,
       }));
     }
 
-    let correctOptionId = (answer?.correctOptionId as string) || undefined;
-    if (!correctOptionId && Array.isArray(answer?.options)) {
-      const correctOpt = (answer!.options as any[]).find((o: any) => o.is_correct);
+    let correctOptionId = (answerConfig?.correctOptionId as string) || undefined;
+    if (!correctOptionId && Array.isArray(answerConfig?.options)) {
+      const correctOpt = (answerConfig!.options as any[]).find((o: any) => o.is_correct);
       if (correctOpt) correctOptionId = correctOpt.id as string;
     }
 
     const correctAnswer =
-      (answer?.correctAnswer as boolean | undefined) ??
-      (answer?.correct_answer as boolean | undefined);
+      (answerConfig?.correctAnswer as boolean | undefined) ??
+      (answerConfig?.correct_answer as boolean | undefined);
 
     return {
       id: r.id as string,
@@ -149,9 +162,17 @@ const mapQuizQuestions = (rows: Record<string, unknown>[]): QuizQuestion[] => {
       options,
       correctOptionId,
       correctAnswer,
-      explanation: (answer?.explanation as string) || '',
+      explanation: (answerConfig?.explanation as string) || '',
       points: (r.points as number) || 1,
       requires_manual_grading: (r.requires_manual_grading as boolean) || false,
+      answerConfig: answerConfig ? {
+        accepted_file_types: (answerConfig.accepted_file_types as string[]) || ['pdf', 'docx', 'txt'],
+        max_file_size_mb: (answerConfig.max_file_size_mb as number) || 10,
+        max_files: (answerConfig.max_files as number) || 1,
+        instructions: (answerConfig.instructions as string) || '',
+        max_duration_minutes: (answerConfig.max_duration_minutes as number) || 5,
+        accepted_formats: (answerConfig.accepted_formats as string[]) || ['mp4', 'mov', 'avi', 'webm'],
+      } : undefined,
     };
   });
 };
@@ -185,7 +206,12 @@ const QuizSession: React.FC = () => {
   
   // Resume dialog state
   const [showResumeDialog, setShowResumeDialog] = useState(false);
-  
+
+  // File/Video upload state
+  const [uploadedFiles, setUploadedFiles] = useState<Record<string, File[]>>({});
+  const [uploadedVideos, setUploadedVideos] = useState<Record<string, File | null>>({});
+  const [uploadingFiles, setUploadingFiles] = useState<boolean>(false);
+
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ============================================
@@ -292,6 +318,7 @@ const QuizSession: React.FC = () => {
           late_penalty_percent: quiz.late_penalty_percent,
           is_published: courseIsApproved,
           requires_manual_grading: quiz.requires_manual_grading,
+          requires_coach_approval: quiz.requires_coach_approval || false,
           lesson_id: quiz.lesson_id ?? null,
         });
 
@@ -542,6 +569,7 @@ const QuizSession: React.FC = () => {
           maxAttempts: quizMeta.max_attempts,
           timeLimitMinutes: quizMeta.time_limit_minutes,
           lessonId: quizMeta.lesson_id ?? null,
+          requiresCoachApproval: quizMeta.requires_coach_approval || false,
         },
       });
     } catch (err) {
@@ -600,10 +628,66 @@ const QuizSession: React.FC = () => {
     setSubmitting(true);
 
     try {
+      // Upload files and videos before calculating score
+      setUploadingFiles(true);
+
+      const uploadedFileUrls: Record<string, any> = {};
+
+      // Upload files for file-upload questions
+      for (const question of questions) {
+        if (question.type === 'file-upload' && uploadedFiles[question.id]) {
+          try {
+            const urls = await uploadFilesToStorage(
+              uploadedFiles[question.id],
+              currentAttempt.id,
+              question.id
+            );
+            uploadedFileUrls[question.id] = { type: 'files', urls };
+          } catch (error: any) {
+            console.error(`Failed to upload files for question ${question.id}:`, error);
+            alert(`Failed to upload files: ${error.message}`);
+            setUploadingFiles(false);
+            setSubmitting(false);
+            return;
+          }
+        }
+
+        // Upload video for video-submission questions
+        if (question.type === 'video-submission' && uploadedVideos[question.id]) {
+          try {
+            const url = await uploadVideoToStorage(
+              uploadedVideos[question.id],
+              currentAttempt.id,
+              question.id
+            );
+            uploadedFileUrls[question.id] = {
+              type: 'video',
+              url,
+              filename: uploadedVideos[question.id]!.name
+            };
+          } catch (error: any) {
+            console.error(`Failed to upload video for question ${question.id}:`, error);
+            alert(`Failed to upload video: ${error.message}`);
+            setUploadingFiles(false);
+            setSubmitting(false);
+            return;
+          }
+        }
+      }
+
+      setUploadingFiles(false);
+
       // Calculate score
       let earnedPoints = 0;
       let totalPoints = 0;
       let requiresManualGrading = false;
+
+      // Mark questions with uploads as requiring manual grading
+      questions.forEach((q) => {
+        if ((q.type === 'file-upload' || q.type === 'video-submission') && uploadedFileUrls[q.id]) {
+          requiresManualGrading = true;
+        }
+      });
 
       questions.forEach((q) => {
         const userAnswer = selectedAnswers[q.id];
@@ -662,6 +746,9 @@ const QuizSession: React.FC = () => {
 
         if (q.type === 'true-false') {
           isCorrect = userAnswer === q.correctAnswer;
+        } else if (q.type === 'file-upload' || q.type === 'video-submission') {
+          // File/video uploads always require manual grading
+          isCorrect = false; // Will be graded by coach
         } else {
           isCorrect = userAnswer === q.correctOptionId;
         }
@@ -673,14 +760,20 @@ const QuizSession: React.FC = () => {
           pointsEarned = Math.max(0, q.points - Math.round((q.points * quizMeta.late_penalty_percent) / 100));
         }
 
+        // Include uploaded file/video URLs in response_data
+        const responseData: any = {
+          answer: userAnswer ?? null,
+          uploaded_files: uploadedFileUrls[q.id] || null,
+        };
+
         return {
           attempt_id: currentAttempt.id,
           question_id: q.id,
-          response_data: { answer: userAnswer ?? null },
+          response_data: responseData,
           points_earned: pointsEarned,
           points_possible: q.points,
           is_correct: isCorrect,
-          requires_grading: q.requires_manual_grading || false,
+          requires_grading: q.requires_manual_grading || (q.type === 'file-upload') || (q.type === 'video-submission'),
         };
       });
 
@@ -794,6 +887,84 @@ const QuizSession: React.FC = () => {
   const handleAnswerSelect = (answer: string | boolean) => {
     if (!currentQuestion) return;
     setSelectedAnswers((prev) => ({ ...prev, [currentQuestion.id]: answer }));
+  };
+
+  // File upload handler
+  const handleFilesChange = useCallback((questionId: string, files: File[]) => {
+    setUploadedFiles((prev) => ({ ...prev, [questionId]: files }));
+    // Mark question as answered
+    setSelectedAnswers((prev) => ({ ...prev, [questionId]: `file_upload_${files.length}_files` }));
+  }, []);
+
+  // Video upload handler
+  const handleVideoChange = useCallback((questionId: string, file: File | null) => {
+    setUploadedVideos((prev) => ({ ...prev, [questionId]: file }));
+    // Mark question as answered
+    if (file) {
+      setSelectedAnswers((prev) => ({ ...prev, [questionId]: `video_upload_${file.name}` }));
+    } else {
+      setSelectedAnswers((prev) => {
+        const newState = { ...prev };
+        delete newState[questionId];
+        return newState;
+      });
+    }
+  }, []);
+
+  // Upload files to Supabase storage
+  const uploadFilesToStorage = async (
+    files: File[],
+    attemptId: string,
+    questionId: string
+  ): Promise<string[]> => {
+    const uploadedUrls: string[] = [];
+
+    for (const file of files) {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${attemptId}/${questionId}/${Date.now()}_${file.name}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('quiz-submissions')
+        .upload(fileName, file);
+
+      if (uploadError) {
+        console.error('Error uploading file:', uploadError);
+        throw uploadError;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('quiz-submissions')
+        .getPublicUrl(fileName);
+
+      uploadedUrls.push(urlData.publicUrl);
+    }
+
+    return uploadedUrls;
+  };
+
+  // Upload video to Supabase storage
+  const uploadVideoToStorage = async (
+    video: File,
+    attemptId: string,
+    questionId: string
+  ): Promise<string> => {
+    const videoExt = video.name.split('.').pop() || 'mp4';
+    const fileName = `${attemptId}/${questionId}/video_${Date.now()}.${videoExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('quiz-submissions')
+      .upload(fileName, video);
+
+    if (uploadError) {
+      console.error('Error uploading video:', uploadError);
+      throw uploadError;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('quiz-submissions')
+      .getPublicUrl(fileName);
+
+    return urlData.publicUrl;
   };
 
   // ============================================
@@ -968,6 +1139,26 @@ const QuizSession: React.FC = () => {
                         onSelect={handleAnswerSelect}
                       />
                     )}
+                    {currentQuestion.type === 'file-upload' && (
+                      <QuestionFileUpload
+                        question={{
+                          ...currentQuestion,
+                          answerConfig: currentQuestion.answerConfig,
+                        }}
+                        onFilesChange={handleFilesChange}
+                        existingFiles={uploadedFiles[currentQuestion.id] || []}
+                      />
+                    )}
+                    {currentQuestion.type === 'video-submission' && (
+                      <QuestionVideoSubmission
+                        question={{
+                          ...currentQuestion,
+                          answerConfig: currentQuestion.answerConfig,
+                        }}
+                        onVideoChange={handleVideoChange}
+                        existingVideo={uploadedVideos[currentQuestion.id] || null}
+                      />
+                    )}
                   </div>
 
                   {/* Navigation Controls */}
@@ -994,10 +1185,10 @@ const QuizSession: React.FC = () => {
                       {isLastQuestion ? (
                         <button
                           onClick={handleSubmit}
-                          disabled={submitting}
+                          disabled={submitting || uploadingFiles}
                           className="px-8 py-3 rounded-full font-semibold bg-gradient-to-r from-brand-neon to-brand-electric text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
                         >
-                          {submitting ? 'Submitting...' : 'Submit Quiz'}
+                          {uploadingFiles ? 'Uploading Files...' : submitting ? 'Submitting...' : 'Submit Quiz'}
                         </button>
                       ) : (
                         <button

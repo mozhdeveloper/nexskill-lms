@@ -1,0 +1,567 @@
+import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import CoachAppLayout from '../../layouts/CoachAppLayout';
+import { supabase } from '../../lib/supabaseClient';
+import { useAuth } from '../../context/AuthContext';
+import {
+  ArrowLeft,
+  CheckCircle,
+  XCircle,
+  Send,
+  Upload,
+  Image as ImageIcon,
+  Video,
+  FileText,
+  Trash2,
+  AlertCircle,
+  User,
+  BookOpen,
+  Clock,
+  MessageSquare,
+} from 'lucide-react';
+import type { QuizFeedbackMedia } from '../../types/quiz';
+
+interface SubmissionData {
+  id: string;
+  user_id: string;
+  quiz_id: string;
+  status: 'pending_review' | 'passed' | 'failed' | 'resubmission_required';
+  submitted_at: string;
+  reviewed_at: string | null;
+  review_notes: string | null;
+  student_name: string;
+  student_email: string;
+  quiz_title: string;
+  quiz_score: number | null;
+  quiz_max_score: number | null;
+}
+
+interface QuizResponse {
+  id: string;
+  question_id: string;
+  question_text: string;
+  response_data: { answer: string | boolean | null };
+  points_earned: number;
+  points_possible: number;
+  is_correct: boolean;
+}
+
+const QuizReviewDetail: React.FC = () => {
+  const navigate = useNavigate();
+  const { courseId, submissionId } = useParams<{ courseId: string; submissionId: string }>();
+  const { user } = useAuth();
+  
+  const [submission, setSubmission] = useState<SubmissionData | null>(null);
+  const [responses, setResponses] = useState<QuizResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Feedback form state
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [mediaFiles, setMediaFiles] = useState<QuizFeedbackMedia[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchSubmission = async () => {
+      if (!submissionId) return;
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Fetch submission with student and quiz info
+        const { data: subData, error: subError } = await supabase
+          .from('quiz_submissions')
+          .select(`
+            *,
+            quiz_attempts!inner(
+              score,
+              max_score
+            )
+          `)
+          .eq('id', submissionId)
+          .single();
+
+        if (subError) throw subError;
+
+        // Fetch student profile
+        const { data: studentProfile } = await supabase
+          .from('profiles')
+          .select('first_name, last_name, email')
+          .eq('id', subData.user_id)
+          .single();
+
+        // Fetch quiz title
+        const { data: quizData } = await supabase
+          .from('quizzes')
+          .select('title')
+          .eq('id', subData.quiz_id)
+          .single();
+
+        const studentName = studentProfile
+          ? `${studentProfile.first_name || ''} ${studentProfile.last_name || ''}`.trim()
+          : 'Unknown Student';
+
+        setSubmission({
+          id: subData.id,
+          user_id: subData.user_id,
+          quiz_id: subData.quiz_id,
+          status: subData.status,
+          submitted_at: subData.submitted_at,
+          reviewed_at: subData.reviewed_at,
+          review_notes: subData.review_notes,
+          student_name: studentName,
+          student_email: studentProfile?.email || 'Unknown',
+          quiz_title: quizData?.title || 'Unknown Quiz',
+          quiz_score: subData.quiz_attempts?.score || null,
+          quiz_max_score: subData.quiz_attempts?.max_score || null,
+        });
+
+        // Fetch quiz responses
+        const { data: responseData, error: respError } = await supabase
+          .from('quiz_responses')
+          .select(`
+            *,
+            quiz_questions!inner(
+              question_text
+            )
+          `)
+          .eq('attempt_id', subData.quiz_attempt_id);
+
+        if (respError) throw respError;
+
+        const mappedResponses: QuizResponse[] = (responseData || []).map((r: any) => ({
+          id: r.id,
+          question_id: r.question_id,
+          question_text: r.quiz_questions.question_text,
+          response_data: r.response_data,
+          points_earned: r.points_earned,
+          points_possible: r.points_possible,
+          is_correct: r.is_correct,
+        }));
+
+        setResponses(mappedResponses);
+      } catch (err: any) {
+        console.error('Error fetching submission:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSubmission();
+  }, [submissionId]);
+
+  const handleMediaUpload = async (event: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video' | 'document') => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    setError(null);
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `feedback/${submissionId}/${fileName}`;
+
+        // Upload to Supabase storage
+        const { error: uploadError } = await supabase.storage
+          .from('quiz-feedback')
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from('quiz-feedback')
+          .getPublicUrl(filePath);
+
+        if (urlData?.publicUrl) {
+          setMediaFiles((prev) => [
+            ...prev,
+            {
+              url: urlData.publicUrl,
+              type,
+              filename: file.name,
+              size: file.size,
+            },
+          ]);
+        }
+      }
+    } catch (err: any) {
+      console.error('Error uploading media:', err);
+      setError('Failed to upload media. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeMedia = (index: number) => {
+    setMediaFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleReviewSubmit = useCallback(async (status: 'passed' | 'failed') => {
+    if (!user || !submission) return;
+
+    setSubmitting(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      // Update submission status
+      const { error: updateError } = await supabase
+        .from('quiz_submissions')
+        .update({
+          status,
+          review_notes: feedbackComment || submission.review_notes,
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', submission.id);
+
+      if (updateError) throw updateError;
+
+      // Create feedback record if there's a comment or media
+      if (feedbackComment || mediaFiles.length > 0) {
+        const { error: feedbackError } = await supabase
+          .from('quiz_feedback')
+          .insert({
+            quiz_submission_id: submission.id,
+            coach_id: user.id,
+            comment: feedbackComment,
+            media_urls: mediaFiles,
+            is_resubmission_feedback: submission.status !== 'pending_review',
+          });
+
+        if (feedbackError) throw feedbackError;
+      }
+
+      setSuccess(
+        status === 'passed'
+          ? 'Quiz approved! The next lesson has been unlocked for the student.'
+          : 'Feedback sent. The student can now review and resubmit.'
+      );
+
+      // Navigate back after delay
+      setTimeout(() => {
+        navigate(`/coach/courses/${courseId}/quiz-reviews`);
+      }, 2000);
+    } catch (err: any) {
+      console.error('Error submitting review:', err);
+      setError(err.message || 'Failed to submit review');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [user, submission, feedbackComment, mediaFiles, courseId, navigate]);
+
+  const renderMediaPreview = (media: QuizFeedbackMedia, index: number) => {
+    return (
+      <div key={index} className="relative group">
+        {media.type === 'image' && (
+          <img
+            src={media.url}
+            alt={media.filename}
+            className="w-full h-32 object-cover rounded-lg"
+          />
+        )}
+        {media.type === 'video' && (
+          <div className="relative">
+            <video
+              src={media.url}
+              className="w-full h-32 object-cover rounded-lg"
+              muted
+            />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-lg">
+              <Video className="w-8 h-8 text-white" />
+            </div>
+          </div>
+        )}
+        {media.type === 'document' && (
+          <div className="w-full h-32 flex items-center justify-center bg-gray-100 rounded-lg">
+            <FileText className="w-12 h-12 text-gray-400" />
+          </div>
+        )}
+        <button
+          onClick={() => removeMedia(index)}
+          className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+        <p className="text-xs text-text-secondary mt-1 truncate">{media.filename}</p>
+      </div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <CoachAppLayout>
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-brand-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <h2 className="text-2xl font-bold text-text-primary mb-2">Loading submission...</h2>
+          </div>
+        </div>
+      </CoachAppLayout>
+    );
+  }
+
+  if (!submission) {
+    return (
+      <CoachAppLayout>
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center">
+            <AlertCircle className="w-12 h-12 text-text-secondary mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-text-primary mb-2">Submission Not Found</h2>
+            <button
+              onClick={() => navigate(`/coach/courses/${courseId}/quiz-reviews`)}
+              className="px-6 py-3 rounded-full font-semibold text-brand-primary border-2 border-brand-primary hover:bg-brand-primary/5 transition-all"
+            >
+              Back to Reviews
+            </button>
+          </div>
+        </div>
+      </CoachAppLayout>
+    );
+  }
+
+  const scorePercent = submission.quiz_max_score
+    ? Math.round((submission.quiz_score / submission.quiz_max_score) * 100)
+    : 0;
+
+  return (
+    <CoachAppLayout>
+      <div className="min-h-screen bg-[color:var(--bg-primary)] p-6">
+        <div className="max-w-6xl mx-auto">
+          {/* Header */}
+          <div className="mb-6">
+            <button
+              onClick={() => navigate(`/coach/courses/${courseId}/quiz-reviews`)}
+              className="inline-flex items-center gap-2 text-text-secondary hover:text-brand-primary mb-4 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Reviews
+            </button>
+            <h1 className="text-3xl font-bold text-text-primary mb-2">Review Submission</h1>
+            <p className="text-text-secondary">{submission.quiz_title}</p>
+          </div>
+
+          {/* Error/Success Messages */}
+          {error && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+              <p className="text-red-800">{error}</p>
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
+              <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <p className="text-green-800">{success}</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column - Student Info & Responses */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Student Info Card */}
+              <div className="glass-card rounded-xl p-6">
+                <div className="flex items-start gap-4">
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-r from-brand-neon to-brand-electric flex items-center justify-center text-white font-bold text-2xl">
+                    {submission.student_name.charAt(0)}
+                  </div>
+                  <div className="flex-1">
+                    <h2 className="text-xl font-bold text-text-primary mb-1">{submission.student_name}</h2>
+                    <p className="text-text-secondary mb-3">{submission.student_email}</p>
+                    <div className="flex items-center gap-6 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-text-muted" />
+                        <span className="text-text-secondary">
+                          Submitted {new Date(submission.submitted_at).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <BookOpen className="w-4 h-4 text-text-muted" />
+                        <span className="text-text-primary font-semibold">
+                          Score: {scorePercent}% ({submission.quiz_score}/{submission.quiz_max_score})
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quiz Responses */}
+              <div className="glass-card rounded-xl p-6">
+                <h3 className="text-xl font-bold text-text-primary mb-4">Quiz Responses ({responses.length})</h3>
+                {responses.length > 0 ? (
+                  <div className="space-y-4">
+                    {responses.map((response, index) => (
+                      <div
+                        key={response.id}
+                        className={`p-4 rounded-lg border-2 ${
+                          response.is_correct
+                            ? 'bg-green-50 border-green-200'
+                            : 'bg-orange-50 border-orange-200'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <h4 className="font-semibold text-text-primary flex-1">
+                            Q{index + 1}: {response.question_text}
+                          </h4>
+                          {response.is_correct ? (
+                            <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 ml-2" />
+                          ) : (
+                            <XCircle className="w-5 h-5 text-orange-600 flex-shrink-0 ml-2" />
+                          )}
+                        </div>
+                        <p className="text-sm text-text-secondary mb-2">
+                          Student answer: <span className="font-medium text-text-primary">
+                            {typeof response.response_data.answer === 'boolean'
+                              ? response.response_data.answer
+                                ? 'True'
+                                : 'False'
+                              : response.response_data.answer || 'No answer'}
+                          </span>
+                        </p>
+                        <p className="text-sm font-medium text-text-primary">
+                          Points: {response.points_earned}/{response.points_possible}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-text-secondary text-center py-8">
+                    No responses found for this attempt.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Right Column - Feedback Form */}
+            <div className="space-y-6">
+              {/* Review Actions */}
+              <div className="glass-card rounded-xl p-6">
+                <h3 className="text-lg font-bold text-text-primary mb-4">Review Decision</h3>
+                <div className="space-y-3">
+                  <button
+                    onClick={() => handleReviewSubmit('passed')}
+                    disabled={submitting}
+                    className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-lg font-semibold bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <CheckCircle className="w-5 h-5" />
+                    {submitting ? 'Processing...' : 'Approve & Unlock Next Lesson'}
+                  </button>
+                  <button
+                    onClick={() => handleReviewSubmit('failed')}
+                    disabled={submitting}
+                    className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-lg font-semibold bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <XCircle className="w-5 h-5" />
+                    {submitting ? 'Processing...' : 'Request Resubmission'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Feedback Form */}
+              <div className="glass-card rounded-xl p-6">
+                <h3 className="text-lg font-bold text-text-primary mb-4 flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5" />
+                  Feedback for Student
+                </h3>
+
+                {/* Comment */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
+                    Comments & Suggestions
+                  </label>
+                  <textarea
+                    value={feedbackComment}
+                    onChange={(e) => setFeedbackComment(e.target.value)}
+                    placeholder="Provide constructive feedback, highlight areas for improvement, or congratulate the student..."
+                    rows={6}
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent resize-none"
+                  />
+                </div>
+
+                {/* Media Upload */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
+                    Attachments (Optional)
+                  </label>
+                  <div className="flex gap-2 mb-3">
+                    <label className="flex-1 cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={(e) => handleMediaUpload(e, 'image')}
+                        disabled={uploading}
+                        className="hidden"
+                      />
+                      <div className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed border-gray-300 hover:border-brand-primary transition-colors disabled:opacity-50">
+                        <ImageIcon className="w-4 h-4" />
+                        <span className="text-sm">Image</span>
+                      </div>
+                    </label>
+                    <label className="flex-1 cursor-pointer">
+                      <input
+                        type="file"
+                        accept="video/*"
+                        multiple
+                        onChange={(e) => handleMediaUpload(e, 'video')}
+                        disabled={uploading}
+                        className="hidden"
+                      />
+                      <div className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed border-gray-300 hover:border-brand-primary transition-colors disabled:opacity-50">
+                        <Video className="w-4 h-4" />
+                        <span className="text-sm">Video</span>
+                      </div>
+                    </label>
+                    <label className="flex-1 cursor-pointer">
+                      <input
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        multiple
+                        onChange={(e) => handleMediaUpload(e, 'document')}
+                        disabled={uploading}
+                        className="hidden"
+                      />
+                      <div className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed border-gray-300 hover:border-brand-primary transition-colors disabled:opacity-50">
+                        <FileText className="w-4 h-4" />
+                        <span className="text-sm">Doc</span>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Uploaded Media Preview */}
+                  {mediaFiles.length > 0 && (
+                    <div className="grid grid-cols-2 gap-3 mt-3">
+                      {mediaFiles.map((media, index) => renderMediaPreview(media, index))}
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-xs text-text-secondary">
+                  Your feedback will be visible to the student and help them improve their understanding.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </CoachAppLayout>
+  );
+};
+
+export default QuizReviewDetail;
