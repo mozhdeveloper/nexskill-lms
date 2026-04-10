@@ -23,6 +23,8 @@ interface CourseBuilderSidebarProps {
   onChangeSection: (sectionKey: string) => void;
   courseTitle: string;
   courseStatus: 'draft' | 'published';
+  verificationStatus?: string;
+  pendingContent?: boolean;
 }
 
 const sections: Section[] = [
@@ -42,12 +44,21 @@ const CourseBuilderSidebar: React.FC<CourseBuilderSidebarProps> = ({
   onChangeSection,
   courseTitle,
   courseStatus,
+  verificationStatus = 'draft',
+  pendingContent = false,
 }) => {
-  const getStatusColor = (status: string) => {
-    return status === 'published'
-      ? 'bg-green-100 text-green-700 border-green-200'
-      : 'bg-slate-100 dark:bg-gray-800 text-slate-700 dark:text-dark-text-primary border-slate-200';
+  const getStatusDisplay = () => {
+    // Phase 1.5: Show "Pending Changes" when course is approved but has unpublished content
+    if (verificationStatus === 'approved' && pendingContent) {
+      return { text: 'Pending Changes', className: 'bg-purple-100 text-purple-700 border-purple-200' };
+    }
+    if (courseStatus === 'published') {
+      return { text: 'Published', className: 'bg-green-100 text-green-700 border-green-200' };
+    }
+    return { text: 'Draft', className: 'bg-slate-100 dark:bg-gray-800 text-slate-700 dark:text-dark-text-primary border-slate-200' };
   };
+
+  const statusInfo = getStatusDisplay();
 
   return (
     <div className="w-[280px] flex-shrink-0 bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 dark:border-gray-700 h-fit sticky top-8 flex flex-col overflow-hidden">
@@ -56,8 +67,8 @@ const CourseBuilderSidebar: React.FC<CourseBuilderSidebarProps> = ({
         <h3 className="font-bold text-slate-900 dark:text-dark-text-primary mb-3 line-clamp-2 leading-tight">
           {courseTitle || 'Untitled Course'}
         </h3>
-        <span className={`inline-flex items-center px-2.5 py-0.5 text-xs font-semibold rounded-full border ${getStatusColor(courseStatus)}`}>
-          {courseStatus.charAt(0).toUpperCase() + courseStatus.slice(1)}
+        <span className={`inline-flex items-center px-2.5 py-0.5 text-xs font-semibold rounded-full border ${statusInfo.className}`}>
+          {statusInfo.text}
         </span>
       </div>
 

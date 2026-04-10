@@ -501,6 +501,8 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
   useEffect(() => {
     if (!lastCompletedContentItemId) return;
 
+    console.log('[LessonSidebar] lastCompletedContentItemId changed:', lastCompletedContentItemId);
+    
     setSidebarModules((prev) => {
       const targetLessonId = activeLessonId;
       if (!targetLessonId) return prev;
@@ -512,10 +514,26 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
           if (item.id !== targetLessonId) return item;
 
           const pc = item.progressCount;
-          if (!pc) return item;
+          
+          // If no progressCount (text/notes-only lesson), mark as complete directly
+          if (!pc) {
+            console.log('[LessonSidebar] No progressCount for lesson, marking as complete directly');
+            return {
+              ...item,
+              isCompleted: true,
+            };
+          }
 
           const newCompleted = Math.min(pc.completed + 1, pc.total);
           const lessonComplete = newCompleted >= pc.total;
+
+          console.log('[LessonSidebar] Updating lesson progress:', {
+            lessonId: item.id,
+            oldCompleted: pc.completed,
+            newCompleted,
+            total: pc.total,
+            lessonComplete
+          });
 
           return {
             ...item,

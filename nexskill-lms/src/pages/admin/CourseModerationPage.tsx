@@ -27,6 +27,8 @@ interface Course {
   reportsCount: number;
   description?: string;
   is_published?: boolean;
+  pending_content?: boolean;
+  hasPendingContent?: boolean;
 }
 
 interface Report {
@@ -168,11 +170,20 @@ const CourseModerationPage: React.FC = () => {
         const mappedCourses: Course[] = (coursesData || []).map((c: any) => {
           let uiStatus: 'pending' | 'approved' | 'rejected' | 'changes_requested' = 'pending';
 
-          if (c.verification_status === 'approved') uiStatus = 'approved';
-          else if (c.verification_status === 'rejected') uiStatus = 'rejected';
-          else if (c.verification_status === 'changes_requested') uiStatus = 'changes_requested';
-          else if (c.verification_status === 'pending_review') uiStatus = 'pending';
-          else if (c.verification_status === 'draft') uiStatus = 'pending';
+          // Phase 1.5: Approved courses with pending_content=true should show in Pending tab
+          if (c.pending_content === true && c.verification_status === 'approved') {
+            uiStatus = 'pending';
+          } else if (c.verification_status === 'approved') {
+            uiStatus = 'approved';
+          } else if (c.verification_status === 'rejected') {
+            uiStatus = 'rejected';
+          } else if (c.verification_status === 'changes_requested') {
+            uiStatus = 'changes_requested';
+          } else if (c.verification_status === 'pending_review') {
+            uiStatus = 'pending';
+          } else if (c.verification_status === 'draft') {
+            uiStatus = 'pending';
+          }
 
           const qualityScore = calculateQualityScore({
             ...c,
@@ -201,6 +212,7 @@ const CourseModerationPage: React.FC = () => {
             instructorId: c.coach_id || 'unknown',
             category: c.category?.name || 'General',
             status: uiStatus,
+            hasPendingContent: c.pending_content === true,
             submittedAt: c.created_at,
             qualityScore,
             qualityMetrics: {
@@ -272,113 +284,84 @@ const CourseModerationPage: React.FC = () => {
     }
 
     try {
-      console.log('[Admin] Approving course:', courseId);
-
       // Step 1: Get all modules for this course
       const { data: modulesData, error: modulesError } = await supabase
         .from('modules')
         .select('id')
         .eq('course_id', courseId);
 
-      console.log('[Admin] Modules found:', { modulesData, modulesError });
-
       if (modulesError) throw modulesError;
 
-      if (modulesData && modulesData.length > 0) {
-        const moduleIds = modulesData.map(m => m.id);
+      const moduleIds = modulesData?.map(m => m.id) || [];
+      console.log('[Admin Approval] Module IDs:', moduleIds);
 
-        // Step 2: Publish all MODULES
-        console.log('[Admin] Publishing modules...');
-        const { error: modulesUpdateError } = await supabase
-          .from('modules')
-          .update({ is_published: true })
-          .in('id', moduleIds);
+      if (moduleIds.length > 0) {
+        // Step 2: Publish all modules
+        const { error: modErr } = await supabase.from('modules').update({ is_published: true }).in('id', moduleIds);
+        if (modErr) console.error('[Admin] Modules publish error:', modErr);
 
-        if (modulesUpdateError) {
-          console.error('[Admin] Modules update error:', modulesUpdateError);
-        } else {
-          console.log('[Admin] ✅ Modules published successfully');
-        }
+        // Step 3: Publish all module_content_items
+        const { error: mciErr } = await supabase.from('module_content_items').update({ is_published: true }).in('module_id', moduleIds);
+        if (mciErr) console.error('[Admin] MCI publish error:', mciErr);
 
-        // Step 3: Publish all MODULE_CONTENT_ITEMS
-        console.log('[Admin] Publishing module_content_items...');
-        const { error: contentItemsError } = await supabase
-          .from('module_content_items')
-          .update({ is_published: true })
-          .in('module_id', moduleIds);
-
-        if (contentItemsError) {
-          console.error('[Admin] Module content items error:', contentItemsError);
-        } else {
-          console.log('[Admin] ✅ Module content items published successfully');
-        }
-
-        // Step 4: Publish all LESSONS
-        console.log('[Admin] Publishing lessons...');
-        const { data: lessonContentItems } = await supabase
+        // Step 4: Publish all lessons
+        const { data: lessonItems, error: lessonErr } = await supabase
           .from('module_content_items')
           .select('content_id')
           .in('module_id', moduleIds)
           .eq('content_type', 'lesson');
-
-        if (lessonContentItems && lessonContentItems.length > 0) {
-          const lessonIds = lessonContentItems.map(l => l.content_id);
-          
-          const { error: lessonsError } = await supabase
-            .from('lessons')
-            .update({ is_published: true })
-            .in('id', lessonIds);
-
-          if (lessonsError) {
-            console.error('[Admin] Lessons error:', lessonsError);
-          } else {
-            console.log('[Admin] ✅ Lessons published successfully');
-          }
+        
+        if (lessonErr) console.error('[Admin] Lesson items fetch error:', lessonErr);
+        else if (lessonItems && lessonItems.length > 0) {
+          const { error: lessonsPubErr } = await supabase.from('lessons').update({ is_published: true }).in('id', lessonItems.map(l => l.content_id));
+          if (lessonsPubErr) console.error('[Admin] Lessons publish error:', lessonsPubErr);
         }
 
-        // Step 5: Publish all QUIZZES
-        console.log('[Admin] Publishing quizzes...');
-        const { data: quizContentItems } = await supabase
+        // Step 5: Publish all lesson_content_items
+        const { data: lciBefore } = await supabase.from('lesson_content_items').select('id, is_published').in('module_id', moduleIds);
+        console.log('[Admin] LCI before publish:', lciBefore);
+        
+        const { error: lciErr } = await supabase.from('lesson_content_items').update({ is_published: true }).in('module_id', moduleIds);
+        if (lciErr) console.error('[Admin] LCI publish error:', lciErr);
+        
+        const { data: lciAfter } = await supabase.from('lesson_content_items').select('id, is_published').in('module_id', moduleIds);
+        console.log('[Admin] LCI after publish:', lciAfter);
+
+        // Step 6: Publish all quizzes
+        const { data: quizItems } = await supabase
           .from('module_content_items')
           .select('content_id')
           .in('module_id', moduleIds)
           .eq('content_type', 'quiz');
 
-        if (quizContentItems && quizContentItems.length > 0) {
-          const quizIds = quizContentItems.map(q => q.content_id);
-          
-          const { error: quizzesError } = await supabase
-            .from('quizzes')
-            .update({ is_published: true })
-            .in('id', quizIds);
+        if (quizItems && quizItems.length > 0) {
+          await supabase.from('quizzes').update({ is_published: true }).in('id', quizItems.map(q => q.content_id));
+        }
 
-          if (quizzesError) {
-            console.error('[Admin] Quizzes error:', quizzesError);
-          } else {
-            console.log('[Admin] ✅ Quizzes published successfully');
-          }
+        // Step 7: Publish quizzes from lesson_content_items
+        const { data: lessonQuizItems } = await supabase
+          .from('lesson_content_items')
+          .select('content_id')
+          .in('module_id', moduleIds)
+          .eq('content_type', 'quiz');
+
+        if (lessonQuizItems && lessonQuizItems.length > 0) {
+          await supabase.from('quizzes').update({ is_published: true }).in('id', lessonQuizItems.map(q => q.content_id));
         }
       }
 
-      // Step 6: Approve the course
-      console.log('[Admin] Approving course...');
-      const { data: courseData, error: courseError } = await supabase
+      // Step 8: Approve the course and clear pending_content
+      const { error: courseError } = await supabase
         .from('courses')
         .update({
           verification_status: 'approved',
+          pending_content: false,
           visibility: 'public',
           updated_at: new Date().toISOString()
         })
-        .eq('id', courseId)
-        .select();
+        .eq('id', courseId);
 
-      if (courseError) {
-        console.error('[Admin] Course update error:', courseError);
-        throw courseError;
-      }
-      if (!courseData || courseData.length === 0) throw new Error('Course not found');
-
-      console.log('[Admin] ✅ Course approved successfully!');
+      if (courseError) throw courseError;
 
       // Update local state
       setCourses(prev => prev.map(c =>
@@ -387,7 +370,14 @@ const CourseModerationPage: React.FC = () => {
           : c
       ));
 
-      alert(`✅ Course Approved!\n\nCourse: ${courseData[0].title}\n\nAll modules, lessons, and quizzes are now published and visible to students.`);
+      // Fetch course title for the success message
+      const { data: courseData } = await supabase
+        .from('courses')
+        .select('title')
+        .eq('id', courseId)
+        .single();
+
+      alert(`✅ Course Approved!\n\nCourse: ${courseData?.title || courseId}\n\nAll modules, lessons, and quizzes are now published and visible to students.`);
 
     } catch (error: any) {
       console.error('Approval error:', error);

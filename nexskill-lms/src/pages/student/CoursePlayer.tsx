@@ -87,9 +87,12 @@ const CoursePlayer: React.FC = () => {
 
         try {
           const contentItems = await fetchLessonContentItems(lessonId);
+          console.log('[CoursePlayer] Fetched lessonContentItems for lesson', lessonId, ':', contentItems);
+          console.log('[CoursePlayer] lessonContentItems.length:', contentItems.length);
+          console.log('[CoursePlayer] lessonContentItems types:', contentItems.map(item => item.content_type));
           setLessonContentItems(contentItems);
         } catch (contentError) {
-          console.error('Error fetching lesson content items:', contentError);
+          console.error('[CoursePlayer] Error fetching lesson content items:', contentError);
           setLessonContentItems([]);
         }
 
@@ -252,7 +255,8 @@ const CoursePlayer: React.FC = () => {
     };
 
     refreshCompletedLessons();
-  }, [courseId, lessonId, completedLessons]);
+    // Remove completedLessons from deps to prevent race condition overwriting optimistic updates
+  }, [courseId, lessonId]);
 
   const handleContentItemComplete = useCallback(async (completedContentItemId: string) => {
     console.log('[CoursePlayer] Content item completed:', completedContentItemId);

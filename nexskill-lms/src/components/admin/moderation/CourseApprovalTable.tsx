@@ -8,6 +8,7 @@ interface Course {
   instructorEmail: string;
   category: string;
   status: 'pending' | 'approved' | 'rejected' | 'changes_requested';
+  hasPendingContent?: boolean; // Phase 1.5: true if approved course has new unpublished content
   submittedAt: string;
   qualityScore: number;
   qualityFlags: string[];
@@ -60,11 +61,20 @@ const CourseApprovalTable: React.FC<CourseApprovalTableProps> = ({
     }
   };
 
-  const getStatusConfig = (status: Course['status']) => {
+  const getStatusConfig = (status: Course['status'], hasPendingContent: boolean = false) => {
+    // Phase 1.5: Distinguish between new course approval and content updates
+    if (status === 'pending' && hasPendingContent) {
+      return {
+        label: 'Pending Changes',
+        bg: 'bg-purple-50',
+        text: 'text-purple-700',
+        border: 'border-purple-200',
+      };
+    }
     switch (status) {
       case 'pending':
         return {
-          label: 'Pending',
+          label: 'Pending Review',
           bg: 'bg-[#DBEAFE]',
           text: 'text-[#1E40AF]',
           border: 'border-[#93C5FD]',
@@ -176,7 +186,7 @@ const CourseApprovalTable: React.FC<CourseApprovalTableProps> = ({
             <tbody className="divide-y divide-[#EDF0FB]">
               {courses.map((course) => {
                 const qualityConfig = getQualityConfig(course.qualityScore);
-                const statusConfig = getStatusConfig(course.status);
+                const statusConfig = getStatusConfig(course.status, course.hasPendingContent);
                 return (
                   <tr
                     key={course.id}
@@ -288,7 +298,7 @@ const CourseApprovalTable: React.FC<CourseApprovalTableProps> = ({
         <div className="lg:hidden divide-y divide-[#EDF0FB]">
           {courses.map((course) => {
             const qualityConfig = getQualityConfig(course.qualityScore);
-            const statusConfig = getStatusConfig(course.status);
+            const statusConfig = getStatusConfig(course.status, course.hasPendingContent);
             return (
               <div
                 key={course.id}

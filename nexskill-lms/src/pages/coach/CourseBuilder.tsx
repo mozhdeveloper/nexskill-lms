@@ -81,6 +81,7 @@ const CourseBuilder: React.FC = () => {
   const [activeSection, setActiveSection] = useState<SectionKey>("settings");
   const [courseStatus, setCourseStatus] = useState<"draft" | "published">("draft");
   const [verificationStatus, setVerificationStatus] = useState<string>("draft");
+  const [pendingContent, setPendingContent] = useState<boolean>(false);
   const [adminFeedback, setAdminFeedback] = useState<string>("");
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [instructorName, setInstructorName] = useState<string>("Instructor");
@@ -92,15 +93,16 @@ const CourseBuilder: React.FC = () => {
       if (!courseId) return;
       const { data } = await supabase
         .from('courses')
-        .select('verification_status')
+        .select('verification_status, pending_content')
         .eq('id', courseId)
         .single();
-      
+
       const isPublished = data?.verification_status === 'approved';
       setIsCoursePublished(isPublished);
-      console.log('[CourseBuilder] Course is published:', isPublished);
+      setPendingContent(data?.pending_content || false);
+      console.log('[CourseBuilder] Course is published:', isPublished, 'pending_content:', data?.pending_content);
     };
-    
+
     checkCoursePublished();
   }, [courseId]);
 
@@ -160,6 +162,7 @@ const CourseBuilder: React.FC = () => {
         const isPublished = courseData.verification_status === 'approved';
         setCourseStatus(isPublished ? "published" : "draft");
         setVerificationStatus(courseData.verification_status || "draft");
+        setPendingContent(courseData.pending_content || false);
 
         const dbPrice = courseData.price ?? 0;
         const pricingMode: 'free' | 'one-time' | 'subscription' = dbPrice === 0 ? 'free' : 'one-time';
@@ -519,8 +522,10 @@ const CourseBuilder: React.FC = () => {
       setCurriculum(curriculum.map((m) =>
         m.id === moduleId ? { ...m, lessons: [...m.lessons, updatedNewLesson] } : m
       ));
-      
+
+      // Phase 1.5: Mark course as having pending content
       if (shouldSaveAsUnpublished) {
+        await supabase.from('courses').update({ pending_content: true }).eq('id', courseId);
         alert('✅ Lesson added! Since this course is already published, your changes will be visible to students after admin approval.');
       }
     } catch (err) {
@@ -678,6 +683,11 @@ const CourseBuilder: React.FC = () => {
         alert(`Failed to save video: ${error.message}`);
       } else {
         handleRefreshLesson(moduleId, lessonId);
+        
+        // Phase 1.5: Mark course as having pending content if already approved
+        if (isCoursePublished) {
+          await supabase.from('courses').update({ pending_content: true }).eq('id', courseId);
+        }
       }
     } catch (err) {
       console.error("[CourseBuilder] Error saving video block:", err);
@@ -1222,6 +1232,7 @@ const CourseBuilder: React.FC = () => {
           <CoursePublishWorkflow
             courseStatus={courseStatus}
             verificationStatus={verificationStatus}
+            pendingContent={pendingContent}
             adminFeedback={adminFeedback}
             onPublish={handlePublish}
             onUnpublish={handleUnpublish}
@@ -1270,6 +1281,8 @@ const CourseBuilder: React.FC = () => {
             onChangeSection={(section) => setActiveSection(section as SectionKey)}
             courseTitle={settings.title || "Untitled course"}
             courseStatus={courseStatus}
+            verificationStatus={verificationStatus}
+            pendingContent={pendingContent}
           />
           <div className="flex-1">
             <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-lg p-8">

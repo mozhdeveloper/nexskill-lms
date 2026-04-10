@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { Video, FileQuestion, FileText, File, Play, BookOpen } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import type { LessonContentItem } from '../../types/lesson-content-item';
@@ -94,6 +94,8 @@ export const StudentContentRenderer: React.FC<StudentContentRendererProps> = ({
                 key={item.id}
                 item={item}
                 index={index}
+                lessonId={lessonId}
+                onComplete={() => onContentItemComplete?.(item.id)}
               />
             );
           }
@@ -194,19 +196,105 @@ const QuizItem: React.FC<{
   );
 };
 
-// Notes Item - NO completion checkmark
+// Notes Item - WITH scroll-based completion tracking
 const NotesItem: React.FC<{
   item: LessonContentItem;
   index: number;
-}> = ({ item, index }) => {
+  lessonId: string;
+  onComplete?: () => void;
+}> = ({ item, index, lessonId, onComplete }) => {
+  const { isCompleted, markAsViewed } = useContentItemProgress({
+    lessonId,
+    contentItemId: item.id,
+    contentType: 'notes',
+    onComplete,
+  });
+  
+  const containerRef = useRef<HTMLDivElement>(null);
+  const hasMarkedCompleteRef = useRef(false);
+
+  // Mark notes as complete - only once
+  const markComplete = useCallback(() => {
+    if (hasMarkedCompleteRef.current || isCompleted) {
+      console.log('[NotesItem] Already marked complete or isCompleted:', { hasMarked: hasMarkedCompleteRef.current, isCompleted });
+      return;
+    }
+
+    console.log('[NotesItem] Marking notes as complete');
+    hasMarkedCompleteRef.current = true;
+    markAsViewed();
+  }, [isCompleted, markAsViewed]);
+
+  // Check if content is short (no scrolling needed) and auto-complete
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) {
+      console.log('[NotesItem] Container ref is null');
+      return;
+    }
+
+    // Use requestAnimationFrame to ensure DOM is fully rendered
+    const timer = requestAnimationFrame(() => {
+      const scrollHeight = container.scrollHeight;
+      const clientHeight = container.clientHeight;
+      
+      console.log('[NotesItem] Checking if scrollable:', {
+        scrollHeight,
+        clientHeight,
+        isScrollable: scrollHeight > clientHeight,
+        isAlreadyCompleted: isCompleted || hasMarkedCompleteRef.current
+      });
+
+      // Check if content is scrollable
+      if (scrollHeight <= clientHeight) {
+        console.log('[NotesItem] Notes are short (no scrolling needed), auto-completing immediately');
+        markComplete();
+      }
+    });
+
+    return () => cancelAnimationFrame(timer);
+  }, [isCompleted, markComplete]);
+
+  // Track scroll for longer content
+  const handleScroll = useCallback(() => {
+    if (hasMarkedCompleteRef.current || isCompleted) return;
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Check if user has scrolled to bottom (within 50px threshold)
+    const scrollTop = container.scrollTop;
+    const scrollHeight = container.scrollHeight;
+    const clientHeight = container.clientHeight;
+    const isAtBottom = scrollTop + clientHeight >= scrollHeight - 50;
+
+    if (isAtBottom) {
+      console.log('[NotesItem] User reached bottom of notes, marking as complete', {
+        scrollTop,
+        scrollHeight,
+        clientHeight,
+        isAtBottom
+      });
+      markComplete();
+    }
+  }, [isCompleted, markComplete]);
+
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
         <BookOpen className="w-4 h-4 text-green-600" />
         <span>{item.metadata?.title || 'Notes'}</span>
-        {/* NO checkmark for notes */}
+        {isCompleted && (
+          <span className="w-5 h-5 flex items-center justify-center bg-green-500 rounded-full text-white text-xs flex-shrink-0">
+            ✓
+          </span>
+        )}
       </div>
-      <div className="p-5 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
+      <div 
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="p-5 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800 max-h-[60vh] overflow-y-auto"
+      >
         <div
           className="notes-content prose prose-slate dark:prose-invert max-w-none text-gray-700 dark:text-gray-300"
           dangerouslySetInnerHTML={{ __html: item.metadata?.content || '' }}
@@ -226,29 +314,89 @@ const NotesItem: React.FC<{
   );
 };
 
-// Text Content Component - NO auto completion tracking
-// Text blocks are considered "consumed" when viewed, but don't block lesson completion
+// Text Content Component - WITH auto completion tracking
+// Text blocks should auto-complete when viewed (short text) or scrolled to bottom (long text)
 const TextContent: React.FC<{
   contentItemId: string;
   content?: string;
   onComplete?: () => void;
 }> = ({ contentItemId, content, onComplete }) => {
-  // Only track completion if this is the ONLY content in the lesson
-  // Parent will handle the "only content" logic
-  useEffect(() => {
-    // Just notify parent that this text was viewed (for analytics/logging if needed)
-    // But DON'T mark as completed in database
-    const timer = setTimeout(() => {
-      console.log('[TextContent] Text viewed (not marking complete):', contentItemId);
-      // Optionally call onComplete for tracking, but it won't affect lesson completion
-      // onComplete?.(); 
-    }, 2000);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const hasMarkedCompleteRef = useRef(false);
 
-    return () => clearTimeout(timer);
+  // Mark text as complete - only once
+  const markComplete = useCallback(() => {
+    if (hasMarkedCompleteRef.current) {
+      console.log('[TextContent] Already marked complete');
+      return;
+    }
+
+    console.log('[TextContent] Marking text as complete:', contentItemId);
+    hasMarkedCompleteRef.current = true;
+    onComplete?.();
   }, [contentItemId, onComplete]);
 
+  // Check if content is short (no scrolling needed) and auto-complete
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) {
+      console.log('[TextContent] Container ref is null');
+      return;
+    }
+
+    // Use requestAnimationFrame to ensure DOM is fully rendered
+    const timer = requestAnimationFrame(() => {
+      const scrollHeight = container.scrollHeight;
+      const clientHeight = container.clientHeight;
+      
+      console.log('[TextContent] Checking if scrollable:', {
+        contentItemId,
+        scrollHeight,
+        clientHeight,
+        isScrollable: scrollHeight > clientHeight
+      });
+
+      // Check if content is scrollable
+      if (scrollHeight <= clientHeight) {
+        console.log('[TextContent] Text is short (no scrolling needed), auto-completing immediately');
+        markComplete();
+      }
+    });
+
+    return () => cancelAnimationFrame(timer);
+  }, [contentItemId, markComplete]);
+
+  // Track scroll for longer content
+  const handleScroll = useCallback(() => {
+    if (hasMarkedCompleteRef.current) return;
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Check if user has scrolled to bottom (within 50px threshold)
+    const scrollTop = container.scrollTop;
+    const scrollHeight = container.scrollHeight;
+    const clientHeight = container.clientHeight;
+    const isAtBottom = scrollTop + clientHeight >= scrollHeight - 50;
+
+    if (isAtBottom) {
+      console.log('[TextContent] User reached bottom of text, marking as complete', {
+        contentItemId,
+        scrollTop,
+        scrollHeight,
+        clientHeight,
+        isAtBottom
+      });
+      markComplete();
+    }
+  }, [contentItemId, markComplete]);
+
   return (
-    <div className="prose prose-slate dark:prose-invert max-w-none p-4 bg-gray-50 dark:bg-slate-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+    <div 
+      ref={containerRef}
+      onScroll={handleScroll}
+      className="prose prose-slate dark:prose-invert max-w-none p-4 bg-gray-50 dark:bg-slate-700/50 rounded-lg border border-gray-200 dark:border-gray-600 max-h-[60vh] overflow-y-auto"
+    >
       <div
         className="text-content [&>h1]:text-2xl [&>h1]:font-bold [&>h1]:mb-4 [&>h1]:mt-6 [&>h2]:text-xl [&>h2]:font-bold [&>h2]:mb-3 [&>h2]:mt-5 [&>h3]:text-lg [&>h3]:font-semibold [&>h3]:mb-2 [&>h3]:mt-4 [&>h4]:text-base [&>h4]:font-semibold [&>h4]:mb-2 [&>h4]:mt-3 [&>ol]:list-decimal [&>ol]:ml-6 [&>ol]:my-3 [&>ul]:list-disc [&>ul]:ml-6 [&>ul]:my-3 [&>li]:mb-1 [&>p]:mb-3 [&>p]:leading-relaxed"
         dangerouslySetInnerHTML={{
