@@ -285,7 +285,7 @@ const CoursePlayer: React.FC = () => {
 
     if (requiredItems.length === 0) {
       console.log('[CoursePlayer] Lesson has only supplementary content (text/notes/docs) - auto-completing');
-      
+
       const { error } = await supabase
         .from('user_lesson_progress')
         .upsert({
@@ -300,6 +300,8 @@ const CoursePlayer: React.FC = () => {
       } else {
         console.log('[CoursePlayer] Lesson auto-completed (supplementary-only content)!');
         setCompletedLessons(prev => prev.includes(lessonId) ? prev : [...prev, lessonId]);
+        // Set lastCompletedContentItemId so LessonSidebar updates immediately
+        setLastCompletedContentItemId(completedContentItemId);
       }
       return;
     }

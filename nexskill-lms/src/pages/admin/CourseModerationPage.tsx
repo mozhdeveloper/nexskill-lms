@@ -296,12 +296,12 @@ const CourseModerationPage: React.FC = () => {
       console.log('[Admin Approval] Module IDs:', moduleIds);
 
       if (moduleIds.length > 0) {
-        // Step 2: Publish all modules
-        const { error: modErr } = await supabase.from('modules').update({ is_published: true }).in('id', moduleIds);
+        // Step 2: Publish all modules (only unpublished ones)
+        const { error: modErr } = await supabase.from('modules').update({ is_published: true }).in('id', moduleIds).eq('is_published', false);
         if (modErr) console.error('[Admin] Modules publish error:', modErr);
 
-        // Step 3: Publish all module_content_items
-        const { error: mciErr } = await supabase.from('module_content_items').update({ is_published: true }).in('module_id', moduleIds);
+        // Step 3: Publish all module_content_items (only unpublished ones)
+        const { error: mciErr } = await supabase.from('module_content_items').update({ is_published: true }).in('module_id', moduleIds).eq('is_published', false);
         if (mciErr) console.error('[Admin] MCI publish error:', mciErr);
 
         // Step 4: Publish all lessons
@@ -310,24 +310,24 @@ const CourseModerationPage: React.FC = () => {
           .select('content_id')
           .in('module_id', moduleIds)
           .eq('content_type', 'lesson');
-        
+
         if (lessonErr) console.error('[Admin] Lesson items fetch error:', lessonErr);
         else if (lessonItems && lessonItems.length > 0) {
-          const { error: lessonsPubErr } = await supabase.from('lessons').update({ is_published: true }).in('id', lessonItems.map(l => l.content_id));
+          const { error: lessonsPubErr } = await supabase.from('lessons').update({ is_published: true }).in('id', lessonItems.map(l => l.content_id)).eq('is_published', false);
           if (lessonsPubErr) console.error('[Admin] Lessons publish error:', lessonsPubErr);
         }
 
-        // Step 5: Publish all lesson_content_items
-        const { data: lciBefore } = await supabase.from('lesson_content_items').select('id, is_published').in('module_id', moduleIds);
-        console.log('[Admin] LCI before publish:', lciBefore);
-        
-        const { error: lciErr } = await supabase.from('lesson_content_items').update({ is_published: true }).in('module_id', moduleIds);
-        if (lciErr) console.error('[Admin] LCI publish error:', lciErr);
-        
-        const { data: lciAfter } = await supabase.from('lesson_content_items').select('id, is_published').in('module_id', moduleIds);
-        console.log('[Admin] LCI after publish:', lciAfter);
+        // Step 5: Publish all lesson_content_items (only unpublished ones — avoids triggering reset on already-published rows)
+        const { data: lciBefore } = await supabase.from('lesson_content_items').select('id, is_published').in('module_id', moduleIds).eq('is_published', false);
+        console.log('[Admin] LCI to publish:', lciBefore);
 
-        // Step 6: Publish all quizzes
+        const { error: lciErr } = await supabase.from('lesson_content_items').update({ is_published: true }).in('module_id', moduleIds).eq('is_published', false);
+        if (lciErr) console.error('[Admin] LCI publish error:', lciErr);
+
+        const { data: lciAfter } = await supabase.from('lesson_content_items').select('id, is_published').in('module_id', moduleIds).eq('is_published', false);
+        console.log('[Admin] LCI remaining unpublished:', lciAfter);
+
+        // Step 6: Publish all quizzes (only unpublished ones)
         const { data: quizItems } = await supabase
           .from('module_content_items')
           .select('content_id')
@@ -335,10 +335,10 @@ const CourseModerationPage: React.FC = () => {
           .eq('content_type', 'quiz');
 
         if (quizItems && quizItems.length > 0) {
-          await supabase.from('quizzes').update({ is_published: true }).in('id', quizItems.map(q => q.content_id));
+          await supabase.from('quizzes').update({ is_published: true }).in('id', quizItems.map(q => q.content_id)).eq('is_published', false);
         }
 
-        // Step 7: Publish quizzes from lesson_content_items
+        // Step 7: Publish quizzes from lesson_content_items (only unpublished ones)
         const { data: lessonQuizItems } = await supabase
           .from('lesson_content_items')
           .select('content_id')
@@ -346,7 +346,7 @@ const CourseModerationPage: React.FC = () => {
           .eq('content_type', 'quiz');
 
         if (lessonQuizItems && lessonQuizItems.length > 0) {
-          await supabase.from('quizzes').update({ is_published: true }).in('id', lessonQuizItems.map(q => q.content_id));
+          await supabase.from('quizzes').update({ is_published: true }).in('id', lessonQuizItems.map(q => q.content_id)).eq('is_published', false);
         }
       }
 

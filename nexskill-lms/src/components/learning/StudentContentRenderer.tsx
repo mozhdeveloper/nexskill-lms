@@ -344,26 +344,53 @@ const TextContent: React.FC<{
       return;
     }
 
-    // Use requestAnimationFrame to ensure DOM is fully rendered
-    const timer = requestAnimationFrame(() => {
+    // Use ResizeObserver to wait for content to fully render, then check
+    const observer = new ResizeObserver(() => {
       const scrollHeight = container.scrollHeight;
       const clientHeight = container.clientHeight;
       
-      console.log('[TextContent] Checking if scrollable:', {
+      console.log('[TextContent] ResizeObserver fired:', {
         contentItemId,
         scrollHeight,
         clientHeight,
         isScrollable: scrollHeight > clientHeight
       });
 
-      // Check if content is scrollable
+      // If not scrollable, auto-complete immediately
       if (scrollHeight <= clientHeight) {
         console.log('[TextContent] Text is short (no scrolling needed), auto-completing immediately');
         markComplete();
       }
+      
+      // Disconnect after first check to avoid repeated triggers
+      observer.disconnect();
     });
 
-    return () => cancelAnimationFrame(timer);
+    observer.observe(container);
+
+    // Fallback: if ResizeObserver doesn't fire within 2 seconds, check manually
+    const fallbackTimer = setTimeout(() => {
+      observer.disconnect();
+      const scrollHeight = container.scrollHeight;
+      const clientHeight = container.clientHeight;
+      
+      console.log('[TextContent] Fallback check:', {
+        contentItemId,
+        scrollHeight,
+        clientHeight,
+        isScrollable: scrollHeight > clientHeight
+      });
+
+      if (scrollHeight <= clientHeight) {
+        console.log('[TextContent] Text is short (fallback), auto-completing immediately');
+        markComplete();
+      }
+    }, 2000);
+
+    return () => {
+      observer.disconnect();
+      clearTimeout(fallbackTimer);
+    };
   }, [contentItemId, markComplete]);
 
   // Track scroll for longer content
