@@ -133,6 +133,9 @@ export interface Quiz {
     passing_score?: number;
     time_limit_minutes?: number;
     max_attempts?: number;
+    attempt_control_enabled?: boolean; // OFF = default 1 attempt, ON = custom max_attempts
+    quiz_type?: 'standard' | 'coach_reviewed'; // Explicit quiz type
+    allow_skipped_questions?: boolean; // Whether students can skip questions
     requires_manual_grading: boolean;
     requires_coach_approval?: boolean;
     is_published: boolean;

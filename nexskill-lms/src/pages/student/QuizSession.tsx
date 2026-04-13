@@ -10,7 +10,7 @@ import QuestionVideoSubmission from '../../components/quiz/QuestionVideoSubmissi
 import QuizAttemptHistory, { type PreviousAttempt } from '../../components/quiz/QuizAttemptHistory';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
-import { useQuizSubmission } from '../../hooks/useQuizSubmission';
+import { useQuizSubmission, checkQuizAttemptPermission } from '../../hooks/useQuizSubmission';
 import {
   Trophy,
   AlertCircle,

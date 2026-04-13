@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Settings, ChevronDown, ChevronUp, Shield, FileQuestion } from "lucide-react";
+import { Settings, ChevronDown, ChevronUp, Shield, FileQuestion, ToggleLeft, ToggleRight, Lock } from "lucide-react";
 import type { Quiz } from "../../types/quiz";
 
 interface QuizSettingsProps {
@@ -10,23 +10,50 @@ interface QuizSettingsProps {
 const QuizSettings: React.FC<QuizSettingsProps> = ({ quiz, onChange }) => {
     const [isExpanded, setIsExpanded] = useState(false);
 
-    // Determine quiz type based on requires_coach_approval
-    const quizType = quiz.requires_coach_approval ? "approval" : "basic";
+    // Determine quiz type based on quiz_type field or fallback to requires_coach_approval
+    const quizType = quiz.quiz_type || (quiz.requires_coach_approval ? "coach_reviewed" : "standard");
 
-    const handleQuizTypeChange = (type: "approval" | "basic") => {
-        if (type === "approval") {
-            // Type 1: Coach Approval Required
+    const handleQuizTypeChange = (type: "standard" | "coach_reviewed") => {
+        if (type === "coach_reviewed") {
+            // Coach-Reviewed Quiz: Requires manual review, unlimited attempts
             onChange({
+                quiz_type: "coach_reviewed",
                 requires_coach_approval: true,
-                max_attempts: undefined, // No attempts for approval quizzes
+                attempt_control_enabled: false,
+                max_attempts: undefined,
             });
         } else {
-            // Type 2: Basic Quiz
+            // Standard Quiz: Auto-graded, with attempt control
             onChange({
+                quiz_type: "standard",
                 requires_coach_approval: false,
-                max_attempts: 3, // Default attempts for basic quizzes
+                attempt_control_enabled: false, // Default to OFF (1 attempt)
+                max_attempts: 1, // Default to 1 attempt
             });
         }
+    };
+
+    const handleAttemptControlToggle = () => {
+        const newValue = !quiz.attempt_control_enabled;
+        
+        if (newValue) {
+            // Turn ON custom attempt control
+            onChange({
+                attempt_control_enabled: true,
+                max_attempts: quiz.max_attempts || 3, // Default to 3 when enabling
+            });
+        } else {
+            // Turn OFF custom attempt control (default to 1 attempt)
+            onChange({
+                attempt_control_enabled: false,
+                max_attempts: 1,
+            });
+        }
+    };
+
+    const handleSkippedQuestionsToggle = () => {
+        const newValue = !quiz.allow_skipped_questions;
+        onChange({ allow_skipped_questions: newValue });
     };
 
     return (
@@ -56,34 +83,34 @@ const QuizSettings: React.FC<QuizSettingsProps> = ({ quiz, onChange }) => {
                             Quiz Type
                         </label>
                         <div className="grid grid-cols-2 gap-3">
-                            {/* Type 1: Coach Approval Required */}
+                            {/* Type 1: Coach-Reviewed Quiz */}
                             <button
                                 type="button"
-                                onClick={() => handleQuizTypeChange("approval")}
+                                onClick={() => handleQuizTypeChange("coach_reviewed")}
                                 className={`relative p-4 rounded-lg border-2 text-left transition-all ${
-                                    quizType === "approval"
+                                    quizType === "coach_reviewed"
                                         ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400"
                                         : "border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500"
                                 }`}
                             >
                                 <div className="flex items-center gap-2 mb-2">
                                     <Shield className={`w-5 h-5 ${
-                                        quizType === "approval"
+                                        quizType === "coach_reviewed"
                                             ? "text-blue-600 dark:text-blue-400"
                                             : "text-gray-400"
                                     }`} />
                                     <span className={`font-semibold text-sm ${
-                                        quizType === "approval"
+                                        quizType === "coach_reviewed"
                                             ? "text-blue-900 dark:text-blue-300"
                                             : "text-gray-700 dark:text-gray-300"
                                     }`}>
-                                        Coach Approval Required
+                                        Coach-Reviewed
                                     </span>
                                 </div>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                                    Student must wait for coach approval before proceeding. No attempt limits.
+                                    Requires manual review. Students retake until passing.
                                 </p>
-                                {quizType === "approval" && (
+                                {quizType === "coach_reviewed" && (
                                     <div className="absolute top-2 right-2 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
                                         <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -92,34 +119,34 @@ const QuizSettings: React.FC<QuizSettingsProps> = ({ quiz, onChange }) => {
                                 )}
                             </button>
 
-                            {/* Type 2: Basic Quiz */}
+                            {/* Type 2: Standard Quiz */}
                             <button
                                 type="button"
-                                onClick={() => handleQuizTypeChange("basic")}
+                                onClick={() => handleQuizTypeChange("standard")}
                                 className={`relative p-4 rounded-lg border-2 text-left transition-all ${
-                                    quizType === "basic"
+                                    quizType === "standard"
                                         ? "border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-400"
                                         : "border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500"
                                 }`}
                             >
                                 <div className="flex items-center gap-2 mb-2">
                                     <FileQuestion className={`w-5 h-5 ${
-                                        quizType === "basic"
+                                        quizType === "standard"
                                             ? "text-green-600 dark:text-green-400"
                                             : "text-gray-400"
                                     }`} />
                                     <span className={`font-semibold text-sm ${
-                                        quizType === "basic"
+                                        quizType === "standard"
                                             ? "text-green-900 dark:text-green-300"
                                             : "text-gray-700 dark:text-gray-300"
                                     }`}>
-                                        Basic Quiz
+                                        Standard
                                     </span>
                                 </div>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                                    Auto-passes on score. Configurable attempt limits.
+                                    Auto-graded. Configurable attempt limits.
                                 </p>
-                                {quizType === "basic" && (
+                                {quizType === "standard" && (
                                     <div className="absolute top-2 right-2 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
                                         <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -130,6 +157,110 @@ const QuizSettings: React.FC<QuizSettingsProps> = ({ quiz, onChange }) => {
                         </div>
                     </div>
 
+                    {/* Attempt Control Toggle - Only for Standard Quiz */}
+                    {quizType === "standard" && (
+                        <div className="p-4 bg-gray-50 dark:bg-slate-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-3">
+                                    <Lock className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                                    <div>
+                                        <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                                            Attempt Control
+                                        </p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                            {quiz.attempt_control_enabled 
+                                                ? `Custom attempt limit: ${quiz.max_attempts || 3}` 
+                                                : "Default: 1 attempt only"}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleAttemptControlToggle}
+                                    className="flex items-center gap-2 transition-colors"
+                                >
+                                    {quiz.attempt_control_enabled ? (
+                                        <ToggleRight className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                                    ) : (
+                                        <ToggleLeft className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+                                    )}
+                                    <span className={`text-sm font-medium ${
+                                        quiz.attempt_control_enabled 
+                                            ? "text-blue-600 dark:text-blue-400" 
+                                            : "text-gray-500 dark:text-gray-400"
+                                    }`}>
+                                        {quiz.attempt_control_enabled ? "ON" : "OFF"}
+                                    </span>
+                                </button>
+                            </div>
+                            
+                            {/* Custom Attempts Input - Only visible when enabled */}
+                            {quiz.attempt_control_enabled && (
+                                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Maximum Attempts
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={quiz.max_attempts || ""}
+                                        onChange={(e) =>
+                                            onChange({
+                                                max_attempts: e.target.value
+                                                    ? parseInt(e.target.value)
+                                                    : undefined,
+                                            })
+                                        }
+                                        min={1}
+                                        max={100}
+                                        placeholder="Enter custom limit (e.g., 3, 5)"
+                                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                                    />
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        Set custom number of attempts allowed
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Skipped Questions Toggle */}
+                    <div className="p-4 bg-gray-50 dark:bg-slate-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                                <Shield className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                                <div>
+                                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                                        Allow Skipped Questions
+                                    </p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        {quiz.allow_skipped_questions 
+                                            ? "Students can skip and return to questions" 
+                                            : "All questions must be answered before submission"}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={handleSkippedQuestionsToggle}
+                                className="flex items-center gap-2 transition-colors"
+                            >
+                                {quiz.allow_skipped_questions !== false ? (
+                                    <ToggleRight className="w-8 h-8 text-green-600 dark:text-green-400" />
+                                ) : (
+                                    <ToggleLeft className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+                                )}
+                                <span className={`text-sm font-medium ${
+                                    quiz.allow_skipped_questions !== false
+                                        ? "text-green-600 dark:text-green-400" 
+                                        : "text-gray-500 dark:text-gray-400"
+                                }`}>
+                                    {quiz.allow_skipped_questions !== false ? "ALLOW" : "BLOCK"}
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Quiz Configuration Grid */}
                     <div className="grid grid-cols-2 gap-6">
                         {/* Passing Score */}
                         <div>
@@ -173,29 +304,6 @@ const QuizSettings: React.FC<QuizSettingsProps> = ({ quiz, onChange }) => {
                                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
                             />
                         </div>
-
-                        {/* Max Attempts - Only show for Basic Quiz */}
-                        {quizType === "basic" && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Maximum Attempts
-                                </label>
-                                <input
-                                    type="number"
-                                    value={quiz.max_attempts || ""}
-                                    onChange={(e) =>
-                                        onChange({
-                                            max_attempts: e.target.value
-                                                ? parseInt(e.target.value)
-                                                : undefined,
-                                        })
-                                    }
-                                    min={1}
-                                    placeholder="Unlimited"
-                                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
-                                />
-                            </div>
-                        )}
 
                         {/* Late Penalty */}
                         <div>
@@ -337,38 +445,44 @@ const QuizSettings: React.FC<QuizSettingsProps> = ({ quiz, onChange }) => {
                         </label>
                     </div>
 
-                    {/* Type 1 Info Banner */}
-                    {quizType === "approval" && (
+                    {/* Coach-Reviewed Info Banner */}
+                    {quizType === "coach_reviewed" && (
                         <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                             <div className="flex items-start gap-3">
                                 <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
                                 <div>
                                     <p className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-1">
-                                        Coach Approval Mode
+                                        Coach-Reviewed Quiz Mode
                                     </p>
                                     <ul className="text-xs text-blue-800 dark:text-blue-400 space-y-1">
-                                        <li>• Students must wait for your approval before proceeding</li>
-                                        <li>• No attempt limits - students can resubmit until approved</li>
+                                        <li>• Students must wait for your review after submission</li>
+                                        <li>• Unlimited attempts - students retake until they pass</li>
+                                        <li>• You can provide detailed feedback on each attempt</li>
                                         <li>• Next lesson unlocks automatically when you approve</li>
+                                        <li>• Students see status: Pending Review / Passed / Needs Retake</li>
                                     </ul>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* Type 2 Info Banner */}
-                    {quizType === "basic" && (
+                    {/* Standard Quiz Info Banner */}
+                    {quizType === "standard" && (
                         <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                             <div className="flex items-start gap-3">
                                 <FileQuestion className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
                                 <div>
                                     <p className="text-sm font-medium text-green-900 dark:text-green-300 mb-1">
-                                        Basic Quiz Mode
+                                        Standard Quiz Mode
                                     </p>
                                     <ul className="text-xs text-green-800 dark:text-green-400 space-y-1">
-                                        <li>• Auto-passes when student meets passing score</li>
-                                        <li>• Configurable attempt limits</li>
+                                        <li>• Auto-graded immediately upon submission</li>
+                                        <li>• {quiz.attempt_control_enabled ? `Custom attempt limit: ${quiz.max_attempts || 3}` : "Default: 1 attempt only"}</li>
+                                        <li>• Students pass/fail based on passing score threshold</li>
                                         <li>• Next lesson unlocks automatically on pass</li>
+                                        {quiz.allow_skipped_questions === false && (
+                                            <li>• All questions must be answered before submission</li>
+                                        )}
                                     </ul>
                                 </div>
                             </div>

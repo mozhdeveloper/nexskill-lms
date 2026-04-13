@@ -378,3 +378,169 @@ export async function checkLessonLocked(
     return true; // Default to locked on error
   }
 }
+
+// ============================================
+// NEW: Attempt Control & Validation Functions
+// ============================================
+
+export interface QuizAttemptValidation {
+  can_attempt: boolean;
+  reason: string;
+  attempts_used: number;
+  max_attempts: number | null;
+  has_pending_submission: boolean;
+}
+
+/**
+ * Check if a student can attempt a quiz based on configuration and previous attempts
+ */
+export async function checkQuizAttemptPermission(
+  userId: string,
+  quizId: string
+): Promise<QuizAttemptValidation> {
+  try {
+    const { data, error } = await supabase
+      .rpc('can_attempt_quiz', {
+        p_user_id: userId,
+        p_quiz_id: quizId,
+      });
+
+    if (error) {
+      console.error('Error checking quiz attempt permission:', error);
+      return {
+        can_attempt: false,
+        reason: 'Error checking attempt permission',
+        attempts_used: 0,
+        max_attempts: null,
+        has_pending_submission: false,
+      };
+    }
+
+    if (data && data.length > 0) {
+      return data[0];
+    }
+
+    return {
+      can_attempt: false,
+      reason: 'No data returned',
+      attempts_used: 0,
+      max_attempts: null,
+      has_pending_submission: false,
+    };
+  } catch (err) {
+    console.error('Error checking quiz attempt permission:', err);
+    return {
+      can_attempt: false,
+      reason: 'Error checking attempt permission',
+      attempts_used: 0,
+      max_attempts: null,
+      has_pending_submission: false,
+    };
+  }
+}
+
+export interface QuizSubmissionValidation {
+  is_valid: boolean;
+  validation_errors: string[];
+  answered_count: number;
+  total_questions: number;
+  skipped_questions: string[];
+}
+
+/**
+ * Validate quiz submission completeness (check for skipped questions)
+ */
+export async function validateQuizSubmissionComplete(
+  attemptId: string
+): Promise<QuizSubmissionValidation> {
+  try {
+    const { data, error } = await supabase
+      .rpc('validate_quiz_submission', {
+        p_attempt_id: attemptId,
+      });
+
+    if (error) {
+      console.error('Error validating quiz submission:', error);
+      return {
+        is_valid: false,
+        validation_errors: ['Error validating submission'],
+        answered_count: 0,
+        total_questions: 0,
+        skipped_questions: [],
+      };
+    }
+
+    if (data && data.length > 0) {
+      return data[0];
+    }
+
+    return {
+      is_valid: false,
+      validation_errors: ['No data returned'],
+      answered_count: 0,
+      total_questions: 0,
+      skipped_questions: [],
+    };
+  } catch (err) {
+    console.error('Error validating quiz submission:', err);
+    return {
+      is_valid: false,
+      validation_errors: ['Error validating submission'],
+      answered_count: 0,
+      total_questions: 0,
+      skipped_questions: [],
+    };
+  }
+}
+
+export interface LessonAccessValidation {
+  can_access: boolean;
+  is_locked: boolean;
+  lock_reason: string | null;
+  previous_lesson_id: string | null;
+}
+
+/**
+ * Check if a student can access a lesson based on sequential progression
+ */
+export async function checkLessonAccess(
+  userId: string,
+  lessonId: string
+): Promise<LessonAccessValidation> {
+  try {
+    const { data, error } = await supabase
+      .rpc('can_access_lesson', {
+        p_user_id: userId,
+        p_lesson_id: lessonId,
+      });
+
+    if (error) {
+      console.error('Error checking lesson access:', error);
+      return {
+        can_access: false,
+        is_locked: true,
+        lock_reason: 'Error checking lesson access',
+        previous_lesson_id: null,
+      };
+    }
+
+    if (data && data.length > 0) {
+      return data[0];
+    }
+
+    return {
+      can_access: true,
+      is_locked: false,
+      lock_reason: null,
+      previous_lesson_id: null,
+    };
+  } catch (err) {
+    console.error('Error checking lesson access:', err);
+    return {
+      can_access: false,
+      is_locked: true,
+      lock_reason: 'Error checking lesson access',
+      previous_lesson_id: null,
+    };
+  }
+}
