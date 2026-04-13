@@ -267,9 +267,19 @@ const QuizSession: React.FC = () => {
           .from('quizzes')
           .select('*')
           .eq('id', quizId)
-          .single();
+          .maybeSingle();
 
-        if (quizError) throw quizError;
+        if (quizError) {
+          console.error('Error fetching quiz:', quizError);
+          setSessionState('not_published');
+          return;
+        }
+
+        if (!quiz) {
+          console.warn('Quiz not found:', quizId);
+          setSessionState('not_published');
+          return;
+        }
 
         // Fetch course approval status via lesson_id or module_content_items
         let courseIsApproved = true;
@@ -945,6 +955,9 @@ const QuizSession: React.FC = () => {
   const handlePrevious = () => {
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex((prev) => prev - 1);
+    } else {
+      // If on first question, go back to course
+      navigate(`/student/courses/${courseId}`);
     }
   };
 
@@ -1442,12 +1455,7 @@ const QuizSession: React.FC = () => {
             <div className="flex items-center justify-between">
               <button
                 onClick={handlePrevious}
-                disabled={isFirstQuestion}
-                className={`px-6 py-3 rounded-full font-semibold transition-all ${
-                  isFirstQuestion
-                    ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-                    : 'glass-card text-text-primary border-2 border-[color:var(--border-base)] hover:shadow'
-                }`}
+                className="px-6 py-3 rounded-full font-semibold glass-card text-text-primary border-2 border-[color:var(--border-base)] hover:shadow transition-all"
               >
                 ← Previous
               </button>

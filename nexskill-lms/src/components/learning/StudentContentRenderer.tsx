@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Video, FileQuestion, FileText, File, Play, BookOpen } from 'lucide-react';
+import { Video, FileQuestion, FileText, File, Play, BookOpen, Lock } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import type { LessonContentItem } from '../../types/lesson-content-item';
 import { VideoProgressTracker } from './VideoProgressTracker';
@@ -11,12 +11,15 @@ interface StudentContentRendererProps {
   contentItems: LessonContentItem[];
   lessonId: string;
   onQuizClick: (quizId: string) => void;
-  onContentItemComplete?: (contentItemId: string) => void; // NEW: Callback when ANY content item completes
-  onVideoComplete?: () => void; // DEPRECATED: Kept for backward compatibility
-  // Navigation props
+  onContentItemComplete?: (contentItemId: string) => void;
+  onVideoComplete?: () => void;
+  // Navigation props - separated for Previous and Next
   prevItem?: { id: string; type: 'lesson' | 'quiz' } | null;
   nextItem?: { id: string; type: 'lesson' | 'quiz' } | null;
-  onNavigate?: (item: { id: string; type: 'lesson' | 'quiz' }) => void;
+  onNavigatePrevious?: (item: { id: string; type: 'lesson' | 'quiz' }) => void;
+  onNavigateNext?: (item: { id: string; type: 'lesson' | 'quiz' }) => void;
+  // Lock status props
+  isNextItemLocked?: boolean;
 }
 
 export const StudentContentRenderer: React.FC<StudentContentRendererProps> = ({
@@ -27,7 +30,9 @@ export const StudentContentRenderer: React.FC<StudentContentRendererProps> = ({
   onVideoComplete,
   prevItem,
   nextItem,
-  onNavigate,
+  onNavigatePrevious,
+  onNavigateNext,
+  isNextItemLocked = false,
 }) => {
   if (!contentItems || contentItems.length === 0) {
     return (
@@ -102,23 +107,33 @@ export const StudentContentRenderer: React.FC<StudentContentRendererProps> = ({
         })}
       </div>
 
-      {/* Next / Previous Navigation — positioned underneath last content item */}
+      {/* Next / Previous Navigation */}
       <div className="flex items-center justify-between pt-6">
         {prevItem ? (
           <button
-            onClick={() => onNavigate?.(prevItem)}
+            onClick={() => onNavigatePrevious?.(prevItem)}
             className="px-5 py-2.5 text-sm font-medium text-text-secondary dark:text-dark-text-secondary border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
           >
             ← Previous {prevItem.type === 'quiz' ? 'Quiz' : 'Lesson'}
           </button>
         ) : <div />}
         {nextItem ? (
-          <button
-            onClick={() => onNavigate?.(nextItem)}
-            className="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-brand-primary to-brand-primary-light rounded-full shadow-button-primary hover:shadow-lg hover:scale-[1.02] transition-all"
-          >
-            Next {nextItem.type === 'quiz' ? 'Quiz' : 'Lesson'} →
-          </button>
+          isNextItemLocked ? (
+            <button
+              disabled
+              className="px-5 py-2.5 text-sm font-medium text-gray-400 dark:text-gray-500 bg-gray-200 dark:bg-gray-700 rounded-full cursor-not-allowed flex items-center gap-2"
+            >
+              <Lock className="w-4 h-4" />
+              Complete Current Lesson to Unlock Next
+            </button>
+          ) : (
+            <button
+              onClick={() => onNavigateNext?.(nextItem)}
+              className="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-brand-primary to-brand-primary-light rounded-full shadow-button-primary hover:shadow-lg hover:scale-[1.02] transition-all"
+            >
+              Next {nextItem.type === 'quiz' ? 'Quiz' : 'Lesson'} →
+            </button>
+          )
         ) : <div />}
       </div>
     </>

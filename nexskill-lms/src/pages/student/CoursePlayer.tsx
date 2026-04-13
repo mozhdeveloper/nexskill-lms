@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
@@ -202,13 +202,44 @@ const CoursePlayer: React.FC = () => {
   const prevItem = currentIndex > 0 ? flatItemList[currentIndex - 1] : null;
   const nextItem = currentIndex >= 0 && currentIndex < flatItemList.length - 1 ? flatItemList[currentIndex + 1] : null;
 
-  const navigateToItem = (item: FlatItem) => {
+  // Check if current lesson is complete (for Next button)
+  const isCurrentLessonComplete = completedLessons.includes(lessonId || '');
+  
+  // FIXED: Next button ONLY depends on whether current lesson is complete
+  // Do NOT check lesson_access_status table - it's separate from user_lesson_progress
+  // Source of truth: completedLessons state (backed by user_lesson_progress database)
+  const isNextItemLocked = useMemo(() => {
+    // If there's no next item, nothing to lock
+    if (!nextItem) return false;
+    
+    // If current lesson IS complete → Next button enabled
+    if (isCurrentLessonComplete) return false;
+    
+    // Current lesson NOT complete → Next button locked
+    return true;
+  }, [nextItem, isCurrentLessonComplete]);
+
+  // Previous navigation - ALWAYS allowed, no validation
+  const handleNavigatePrevious = useCallback((item: { id: string; type: 'lesson' | 'quiz' }) => {
     if (item.type === 'quiz') {
       navigate(`/student/courses/${courseId}/quizzes/${item.id}/take`);
     } else {
       navigate(`/student/courses/${courseId}/lessons/${item.id}`);
     }
-  };
+  }, [courseId, navigate]);
+
+  // Next navigation - requires current lesson to be complete
+  const handleNavigateNext = useCallback((item: { id: string; type: 'lesson' | 'quiz' }) => {
+    if (!isCurrentLessonComplete) {
+      alert('🔒 Please complete all videos and quizzes in the current lesson before proceeding.');
+      return;
+    }
+    if (item.type === 'quiz') {
+      navigate(`/student/courses/${courseId}/quizzes/${item.id}/take`);
+    } else {
+      navigate(`/student/courses/${courseId}/lessons/${item.id}`);
+    }
+  }, [courseId, navigate, isCurrentLessonComplete]);
 
   const handleMarkComplete = useCallback(async () => {
     if (!lessonId || !courseId) return;
@@ -238,18 +269,271 @@ const CoursePlayer: React.FC = () => {
     }
   }, [lessonId, courseId]);
 
+  // Helper function to check and mark lesson complete
+  // This is the CORE backend validation function that determines lesson completion
+  const checkAndMarkLessonComplete = useCallback(async (userId: string, currentLessonId: string, justCompletedItemId?: string) => {
+    console.log('[CoursePlayer] ========== Checking lesson completion ==========');
+    console.log('[CoursePlayer] Lesson ID:', currentLessonId);
+    console.log('[CoursePlayer] User ID:', userId);
+    console.log('[CoursePlayer] Just completed item:', justCompletedItemId);
+    
+    // WAIT 500ms to ensure database saves are complete (race condition fix)
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // STEP 1: Check if lesson uses new lesson_content_items system
+    const { data: allContentItems } = await supabase
+      .from('lesson_content_items')
+      .select('id, content_type, content_id')
+      .eq('lesson_id', currentLessonId);
+
+    console.log('[CoursePlayer] Content items found:', allContentItems?.length || 0);
+
+    // If lesson has content items (new system)
+    if (allContentItems && allContentItems.length > 0) {
+      console.log('[CoursePlayer] ✅ Using NEW lesson_content_items system');
+      
+      // Filter to only "required" content types (videos and quizzes)
+      const requiredItems = allContentItems.filter(
+        (item: any) => item.content_type === 'video' || item.content_type === 'quiz'
+      );
+
+      console.log('[CoursePlayer] Required items:', requiredItems.length);
+      console.log('[CoursePlayer] Required item IDs:', requiredItems.map((i: any) => i.id));
+
+      // SPECIAL CASE: If no required items (only text/notes/documents), auto-complete lesson
+      if (requiredItems.length === 0) {
+        console.log('[CoursePlayer] ⚡ No required items - auto-completing lesson');
+        const { error } = await supabase
+          .from('user_lesson_progress')
+          .upsert({
+            user_id: userId,
+            lesson_id: currentLessonId,
+            is_completed: true,
+            completed_at: new Date().toISOString(),
+          }, { onConflict: 'user_id,lesson_id' });
+
+        if (!error) {
+          console.log('[CoursePlayer] ✅ Lesson auto-completed!');
+          setCompletedLessons(prev => prev.includes(currentLessonId) ? prev : [...prev, currentLessonId]);
+        } else {
+          console.error('[CoursePlayer] ❌ Error:', error);
+        }
+        return;
+      }
+
+      // Get completed REQUIRED content items
+      const { data: completedItems } = await supabase
+        .from('lesson_content_item_progress')
+        .select('content_item_id')
+        .eq('user_id', userId)
+        .eq('lesson_id', currentLessonId)
+        .eq('is_completed', true);
+
+      console.log('[CoursePlayer] Completed items from DB:', completedItems?.length || 0);
+      console.log('[CoursePlayer] Completed item IDs:', completedItems?.map((i: any) => i.content_item_id));
+
+      // Build completed set - INCLUDE the just-completed item if provided
+      const completedIds = new Set((completedItems || []).map((item: any) => item.content_item_id));
+      if (justCompletedItemId) {
+        completedIds.add(justCompletedItemId);
+        console.log('[CoursePlayer] ➕ Added just-completed item to set:', justCompletedItemId);
+      }
+      
+      console.log('[CoursePlayer] Total completed IDs (including pending):', completedIds.size);
+      
+      // Check if ALL REQUIRED content items are completed
+      const allContentCompleted = requiredItems.every((item: any) => completedIds.has(item.id));
+      
+      console.log('[CoursePlayer] All content completed?', allContentCompleted);
+      console.log('[CoursePlayer] Progress:', completedIds.size, '/', requiredItems.length);
+
+      // STEP 2: Check quiz completion status (if lesson has quizzes)
+      const quizItems = requiredItems.filter((item: any) => item.content_type === 'quiz');
+      let allQuizzesPassed = true;
+
+      if (quizItems.length > 0) {
+        console.log('[CoursePlayer] 🔍 Checking quiz completion status...');
+        
+        for (const quizItem of quizItems) {
+          const quizId = quizItem.content_id;
+          console.log('[CoursePlayer] Checking quiz:', quizId);
+          
+          // Check if quiz is completed and passed
+          const { data: quizAttempts } = await supabase
+            .from('quiz_attempts')
+            .select('passed, status')
+            .eq('user_id', userId)
+            .eq('quiz_id', quizId)
+            .eq('status', 'graded')
+            .order('attempt_number', { ascending: false })
+            .limit(1);
+
+          const latestAttempt = quizAttempts?.[0];
+          const quizPassed = latestAttempt?.passed === true;
+          
+          console.log('[CoursePlayer] Quiz', quizId, '- Passed:', quizPassed, '- Attempt:', latestAttempt);
+          
+          if (!quizPassed) {
+            allQuizzesPassed = false;
+            console.log('[CoursePlayer] ❌ Quiz not passed - blocking lesson completion');
+            break;
+          }
+        }
+      }
+
+      console.log('[CoursePlayer] All quizzes passed?', allQuizzesPassed);
+
+      // LESSON IS COMPLETE ONLY IF: All content completed AND all quizzes passed
+      if (allContentCompleted && allQuizzesPassed) {
+        console.log('[CoursePlayer] 🎉 LESSON FULLY COMPLETE! Marking in database...');
+
+        const { error } = await supabase
+          .from('user_lesson_progress')
+          .upsert({
+            user_id: userId,
+            lesson_id: currentLessonId,
+            is_completed: true,
+            completed_at: new Date().toISOString(),
+          }, { onConflict: 'user_id,lesson_id' });
+
+        if (error) {
+          console.error('[CoursePlayer] ❌ Error marking lesson complete:', error);
+        } else {
+          console.log('[CoursePlayer] ✅ SUCCESS! Lesson marked as complete in database!');
+          setCompletedLessons(prev => {
+            const updated = prev.includes(currentLessonId) ? prev : [...prev, currentLessonId];
+            console.log('[CoursePlayer] Updated completedLessons:', updated);
+            return updated;
+          });
+        }
+      } else {
+        console.log('[CoursePlayer] ⚠️ Lesson NOT complete yet:');
+        if (!allContentCompleted) {
+          const remaining = requiredItems.filter((item: any) => !completedIds.has(item.id));
+          console.log('[CoursePlayer]   - Content items remaining:', remaining.length, remaining.map((i: any) => i.id));
+        }
+        if (!allQuizzesPassed) {
+          console.log('[CoursePlayer]   - Not all quizzes passed');
+        }
+      }
+      return;
+    }
+
+    // STEP 3: Fallback to legacy content_blocks system
+    console.log('[CoursePlayer] 🔄 Falling back to LEGACY content_blocks system');
+    
+    // Get lesson data to check content_blocks
+    const { data: lessonData } = await supabase
+      .from('lessons')
+      .select('content_blocks')
+      .eq('id', currentLessonId)
+      .single();
+
+    console.log('[CoursePlayer] Lesson data:', lessonData ? 'Found' : 'Not found');
+    console.log('[CoursePlayer] Content blocks:', lessonData?.content_blocks ? JSON.stringify(lessonData.content_blocks).substring(0, 100) : 'None');
+
+    if (!lessonData?.content_blocks || lessonData.content_blocks.length === 0) {
+      console.log('[CoursePlayer] ⚡ No content blocks - auto-completing');
+      const { error } = await supabase
+        .from('user_lesson_progress')
+        .upsert({
+          user_id: userId,
+          lesson_id: currentLessonId,
+          is_completed: true,
+          completed_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,lesson_id' });
+
+      if (!error) {
+        setCompletedLessons(prev => prev.includes(currentLessonId) ? prev : [...prev, currentLessonId]);
+      }
+      return;
+    }
+
+    // Check if lesson has video blocks
+    const videoBlocks = lessonData.content_blocks.filter((block: any) => 
+      block.type === 'video' || block.block_type === 'video'
+    );
+
+    console.log('[CoursePlayer] Video blocks found:', videoBlocks.length);
+
+    if (videoBlocks.length === 0) {
+      // No videos, mark as complete
+      console.log('[CoursePlayer] ⚡ No video blocks - auto-completing');
+      const { error } = await supabase
+        .from('user_lesson_progress')
+        .upsert({
+          user_id: userId,
+          lesson_id: currentLessonId,
+          is_completed: true,
+          completed_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,lesson_id' });
+
+      if (!error) {
+        setCompletedLessons(prev => prev.includes(currentLessonId) ? prev : [...prev, currentLessonId]);
+      }
+      return;
+    }
+
+    // Check video completion from lesson_video_progress table
+    console.log('[CoursePlayer] Querying lesson_video_progress...');
+    const { data: videoProgress } = await supabase
+      .from('lesson_video_progress')
+      .select('video_url, is_completed')
+      .eq('user_id', userId)
+      .eq('lesson_id', currentLessonId)
+      .eq('is_completed', true);
+
+    console.log('[CoursePlayer] Completed videos from DB:', videoProgress?.length || 0);
+    console.log('[CoursePlayer] Completed video URLs:', videoProgress?.map((vp: any) => vp.video_url));
+
+    const completedVideoUrls = new Set((videoProgress || []).map((vp: any) => vp.video_url));
+    
+    // Check if all videos are completed
+    const allVideosCompleted = videoBlocks.every((block: any) => {
+      const videoUrl = block.content || block.url || block.attributes?.external_url || block.attributes?.media_url;
+      const isCompleted = completedVideoUrls.has(videoUrl);
+      console.log('[CoursePlayer] Video block URL:', videoUrl, '- Completed:', isCompleted);
+      return isCompleted;
+    });
+
+    console.log('[CoursePlayer] Legacy system - All videos completed?', allVideosCompleted);
+
+    if (allVideosCompleted) {
+      console.log('[CoursePlayer] 🎉 LESSON COMPLETE (legacy system)! Marking in database...');
+      const { error } = await supabase
+        .from('user_lesson_progress')
+        .upsert({
+          user_id: userId,
+          lesson_id: currentLessonId,
+          is_completed: true,
+          completed_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,lesson_id' });
+
+      if (!error) {
+        console.log('[CoursePlayer] ✅ SUCCESS! Lesson marked complete!');
+        setCompletedLessons(prev => prev.includes(currentLessonId) ? prev : [...prev, currentLessonId]);
+      } else {
+        console.error('[CoursePlayer] ❌ Error:', error);
+      }
+    } else {
+      console.log('[CoursePlayer] ⚠️ Not all videos completed in legacy system');
+    }
+  }, []);
+
   // Callback for video completion - refreshes the completed lessons list
   const handleVideoComplete = useCallback(() => {
-    console.log('[CoursePlayer] Video complete - refreshing completion status');
+    console.log('[CoursePlayer] Video complete - checking lesson completion');
 
-    // Re-fetch completed lessons to update UI (background refresh)
-    const refreshCompletedLessons = async () => {
-      if (!courseId) return;
+    // Check and mark lesson complete if all content is done
+    const checkLessonCompletion = async () => {
+      if (!courseId || !lessonId) return;
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Get all modules for this course
+      await checkAndMarkLessonComplete(user.id, lessonId);
+      
+      // Also refresh completed lessons list
       const { data: mods } = await supabase
         .from('modules')
         .select('id')
@@ -276,18 +560,14 @@ const CoursePlayer: React.FC = () => {
             .in('lesson_id', lessonIds);
 
           setCompletedLessons((progressRows || []).map((r: any) => r.lesson_id));
-          console.log('[CoursePlayer] Completed lessons updated:', progressRows);
         }
       }
     };
 
-    refreshCompletedLessons();
-  }, [courseId, lessonId, completedLessons]);
+    checkLessonCompletion();
+  }, [courseId, lessonId, checkAndMarkLessonComplete]);
 
-  // NEW: Handle individual content item completion
-  // Only videos and quizzes count toward lesson completion
-  // Text/notes/documents are "supplementary" and don't block completion
-  // EXCEPTION: If lesson has ONLY text/notes (no videos/quizzes), viewing it auto-completes the lesson
+  // Handle individual content item completion
   const handleContentItemComplete = useCallback(async (completedContentItemId: string) => {
     console.log('[CoursePlayer] Content item completed:', completedContentItemId);
 
@@ -296,98 +576,127 @@ const CoursePlayer: React.FC = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Get ALL content items for this lesson
-    const { data: allContentItems } = await supabase
-      .from('lesson_content_items')
-      .select('id, content_type')
-      .eq('lesson_id', lessonId);
+    // Check and mark lesson complete
+    await checkAndMarkLessonComplete(user.id, lessonId);
 
-    if (!allContentItems || allContentItems.length === 0) {
-      console.log('[CoursePlayer] No content items found for this lesson');
-      return;
-    }
-
-    console.log('[CoursePlayer] All content items:', allContentItems);
-
-    // Filter to only "required" content types (videos and quizzes)
-    const requiredItems = allContentItems.filter(
-      (item: any) => item.content_type === 'video' || item.content_type === 'quiz'
-    );
-
-    console.log('[CoursePlayer] Required content items (videos/quizzes):', requiredItems);
-
-    // SPECIAL CASE: If no required items (only text/notes/documents), auto-complete lesson
-    if (requiredItems.length === 0) {
-      console.log('[CoursePlayer] Lesson has only supplementary content (text/notes/docs) - auto-completing');
-      
-      const { error } = await supabase
-        .from('user_lesson_progress')
-        .upsert({
-          user_id: user.id,
-          lesson_id: lessonId,
-          is_completed: true,
-          completed_at: new Date().toISOString(),
-        }, { onConflict: 'user_id,lesson_id' });
-
-      if (error) {
-        console.error('[CoursePlayer] Error auto-completing lesson:', error);
-      } else {
-        console.log('[CoursePlayer] Lesson auto-completed (supplementary-only content)!');
-        setCompletedLessons(prev => prev.includes(lessonId) ? prev : [...prev, lessonId]);
-      }
-      return;
-    }
-
-    // Get completed REQUIRED content items for this lesson
-    const { data: completedItems } = await supabase
-      .from('lesson_content_item_progress')
-      .select('content_item_id')
-      .eq('user_id', user.id)
-      .eq('lesson_id', lessonId)
-      .eq('is_completed', true);
-
-    const completedIds = new Set((completedItems || []).map((item: any) => item.content_item_id));
-    console.log('[CoursePlayer] Completed content items:', completedIds.size);
-
-    // Check if ALL REQUIRED content items are completed
-    const allRequiredCompleted = requiredItems.every((item: any) => completedIds.has(item.id));
-
-    console.log('[CoursePlayer] All required items completed?', allRequiredCompleted);
-
-    if (allRequiredCompleted) {
-      console.log('[CoursePlayer] All required content items completed! Marking lesson as complete...');
-
-      // Mark lesson as complete in user_lesson_progress
-      const { error } = await supabase
-        .from('user_lesson_progress')
-        .upsert({
-          user_id: user.id,
-          lesson_id: lessonId,
-          is_completed: true,
-          completed_at: new Date().toISOString(),
-        }, { onConflict: 'user_id,lesson_id' });
-
-      if (error) {
-        console.error('[CoursePlayer] Error marking lesson complete:', error);
-      } else {
-        console.log('[CoursePlayer] Lesson marked as complete!');
-        // Update UI
-        setCompletedLessons(prev => prev.includes(lessonId) ? prev : [...prev, lessonId]);
-      }
-    } else {
-      const remaining = requiredItems.filter((item: any) => !completedIds.has(item.id));
-      console.log('[CoursePlayer] Required items remaining:', remaining.length);
-    }
-
-    // Trigger sidebar progress count refresh (without full page reload)
+    // Trigger sidebar progress count refresh
     setSidebarRefreshKey(k => k + 1);
-  }, [courseId, lessonId]);
+  }, [courseId, lessonId, checkAndMarkLessonComplete]);
+
   // Show graduation banner when all lessons are complete
   useEffect(() => {
     if (totalLessonsInCourse > 0 && completedLessons.length >= totalLessonsInCourse) {
       setShowGraduation(true);
     }
   }, [completedLessons, totalLessonsInCourse]);
+
+  // NEW: Check lesson completion on mount (fixes issue where lesson was already complete but not marked)
+  useEffect(() => {
+    if (!lessonId || !courseId) return;
+    
+    console.log('[CoursePlayer] 📋 Checking lesson completion on mount from database...');
+    
+    const checkOnMount = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Wait a bit for any pending saves
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Check if lesson is already complete in database
+      const { data: existingCompletion, error } = await supabase
+        .from('user_lesson_progress')
+        .select('is_completed')
+        .eq('user_id', user.id)
+        .eq('lesson_id', lessonId)
+        .eq('is_completed', true)
+        .single();
+
+      console.log('[CoursePlayer] Database query result:', existingCompletion);
+      console.log('[CoursePlayer] Database error:', error);
+
+      if (existingCompletion && existingCompletion.is_completed === true) {
+        console.log('[CoursePlayer] ✅ Lesson is COMPLETE in database - unlocking Next button');
+        // Update the component state so the Next button unlocks
+        setCompletedLessons(prev => {
+          const alreadyThere = prev.includes(lessonId);
+          console.log('[CoursePlayer] Current completedLessons:', prev);
+          console.log('[CoursePlayer] LessonId already in state?', alreadyThere);
+          if (alreadyThere) return prev;
+          const updated = [...prev, lessonId];
+          console.log('[CoursePlayer] ➕ Updated completedLessons to:', updated);
+          return updated;
+        });
+        return;
+      }
+
+      // If not complete, run the full check
+      console.log('[CoursePlayer] ⏳ Lesson not complete yet in database - running full check...');
+      await checkAndMarkLessonComplete(user.id, lessonId);
+    };
+
+    checkOnMount();
+  }, [lessonId, courseId, checkAndMarkLessonComplete]);
+
+  // Debug function to manually check completion status
+  const handleDebugCheck = useCallback(async () => {
+    console.log('[CoursePlayer] 🔧 Manual debug check triggered');
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !lessonId) return;
+
+    console.log('[CoursePlayer] User:', user.id);
+    console.log('[CoursePlayer] Lesson:', lessonId);
+
+    // Check content items
+    const { data: contentItems } = await supabase
+      .from('lesson_content_items')
+      .select('id, content_type, content_id')
+      .eq('lesson_id', lessonId);
+
+    console.log('[CoursePlayer] Content items:', contentItems);
+
+    // Check completed items
+    const { data: completedItems } = await supabase
+      .from('lesson_content_item_progress')
+      .select('content_item_id, is_completed')
+      .eq('user_id', user.id)
+      .eq('lesson_id', lessonId);
+
+    console.log('[CoursePlayer] Completed items:', completedItems);
+
+    // Check lesson progress
+    const { data: lessonProgress } = await supabase
+      .from('user_lesson_progress')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('lesson_id', lessonId);
+
+    console.log('[CoursePlayer] Lesson progress:', lessonProgress);
+
+    // Check lesson data
+    const { data: lessonData } = await supabase
+      .from('lessons')
+      .select('content_blocks')
+      .eq('id', lessonId)
+      .single();
+
+    console.log('[CoursePlayer] Lesson content_blocks:', lessonData?.content_blocks ? JSON.stringify(lessonData.content_blocks).substring(0, 200) : 'None');
+
+    // Check video progress
+    const { data: videoProgress } = await supabase
+      .from('lesson_video_progress')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('lesson_id', lessonId);
+
+    console.log('[CoursePlayer] Video progress:', videoProgress);
+
+    // Now run the actual check
+    await checkAndMarkLessonComplete(user.id, lessonId);
+    
+    alert('Debug check complete! Check browser console for details.');
+  }, [lessonId, checkAndMarkLessonComplete]);
 
   // Handle AI Summary tab — opens drawer instead of inline panel
   const handleTabClick = (tab: BottomTab) => {
@@ -403,6 +712,7 @@ const CoursePlayer: React.FC = () => {
     { id: 'notes', label: 'Notes', icon: '📝' },
     { id: 'ask-ai', label: 'Ask AI', icon: '🤖' },
     { id: 'ai-summary', label: 'AI Summary', icon: '✨' },
+    { id: 'debug', label: 'Debug', icon: '🔧' },
   ];
 
   if (loading) {
@@ -496,7 +806,9 @@ const CoursePlayer: React.FC = () => {
                   onVideoComplete={handleVideoComplete}
                   prevItem={prevItem}
                   nextItem={nextItem}
-                  onNavigate={navigateToItem}
+                  onNavigatePrevious={handleNavigatePrevious}
+                  onNavigateNext={handleNavigateNext}
+                  isNextItemLocked={isNextItemLocked}
                 />
               ) : (
                 <ContentBlockRenderer
