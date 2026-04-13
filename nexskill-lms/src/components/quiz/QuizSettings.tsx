@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Settings, ChevronDown, ChevronUp } from "lucide-react";
+import { Settings, ChevronDown, ChevronUp, Shield, FileQuestion } from "lucide-react";
 import type { Quiz } from "../../types/quiz";
 
 interface QuizSettingsProps {
@@ -9,6 +9,25 @@ interface QuizSettingsProps {
 
 const QuizSettings: React.FC<QuizSettingsProps> = ({ quiz, onChange }) => {
     const [isExpanded, setIsExpanded] = useState(false);
+
+    // Determine quiz type based on requires_coach_approval
+    const quizType = quiz.requires_coach_approval ? "approval" : "basic";
+
+    const handleQuizTypeChange = (type: "approval" | "basic") => {
+        if (type === "approval") {
+            // Type 1: Coach Approval Required
+            onChange({
+                requires_coach_approval: true,
+                max_attempts: undefined, // No attempts for approval quizzes
+            });
+        } else {
+            // Type 2: Basic Quiz
+            onChange({
+                requires_coach_approval: false,
+                max_attempts: 3, // Default attempts for basic quizzes
+            });
+        }
+    };
 
     return (
         <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
@@ -31,6 +50,86 @@ const QuizSettings: React.FC<QuizSettingsProps> = ({ quiz, onChange }) => {
 
             {isExpanded && (
                 <div className="px-6 pb-6 space-y-6 border-t border-gray-200 dark:border-gray-700 pt-6">
+                    {/* Quiz Type Selector */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                            Quiz Type
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                            {/* Type 1: Coach Approval Required */}
+                            <button
+                                type="button"
+                                onClick={() => handleQuizTypeChange("approval")}
+                                className={`relative p-4 rounded-lg border-2 text-left transition-all ${
+                                    quizType === "approval"
+                                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400"
+                                        : "border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500"
+                                }`}
+                            >
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Shield className={`w-5 h-5 ${
+                                        quizType === "approval"
+                                            ? "text-blue-600 dark:text-blue-400"
+                                            : "text-gray-400"
+                                    }`} />
+                                    <span className={`font-semibold text-sm ${
+                                        quizType === "approval"
+                                            ? "text-blue-900 dark:text-blue-300"
+                                            : "text-gray-700 dark:text-gray-300"
+                                    }`}>
+                                        Coach Approval Required
+                                    </span>
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    Student must wait for coach approval before proceeding. No attempt limits.
+                                </p>
+                                {quizType === "approval" && (
+                                    <div className="absolute top-2 right-2 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </div>
+                                )}
+                            </button>
+
+                            {/* Type 2: Basic Quiz */}
+                            <button
+                                type="button"
+                                onClick={() => handleQuizTypeChange("basic")}
+                                className={`relative p-4 rounded-lg border-2 text-left transition-all ${
+                                    quizType === "basic"
+                                        ? "border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-400"
+                                        : "border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500"
+                                }`}
+                            >
+                                <div className="flex items-center gap-2 mb-2">
+                                    <FileQuestion className={`w-5 h-5 ${
+                                        quizType === "basic"
+                                            ? "text-green-600 dark:text-green-400"
+                                            : "text-gray-400"
+                                    }`} />
+                                    <span className={`font-semibold text-sm ${
+                                        quizType === "basic"
+                                            ? "text-green-900 dark:text-green-300"
+                                            : "text-gray-700 dark:text-gray-300"
+                                    }`}>
+                                        Basic Quiz
+                                    </span>
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    Auto-passes on score. Configurable attempt limits.
+                                </p>
+                                {quizType === "basic" && (
+                                    <div className="absolute top-2 right-2 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </div>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-6">
                         {/* Passing Score */}
                         <div>
@@ -75,26 +174,28 @@ const QuizSettings: React.FC<QuizSettingsProps> = ({ quiz, onChange }) => {
                             />
                         </div>
 
-                        {/* Max Attempts */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Maximum Attempts
-                            </label>
-                            <input
-                                type="number"
-                                value={quiz.max_attempts || ""}
-                                onChange={(e) =>
-                                    onChange({
-                                        max_attempts: e.target.value
-                                            ? parseInt(e.target.value)
-                                            : undefined,
-                                    })
-                                }
-                                min={1}
-                                placeholder="Unlimited"
-                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
-                            />
-                        </div>
+                        {/* Max Attempts - Only show for Basic Quiz */}
+                        {quizType === "basic" && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Maximum Attempts
+                                </label>
+                                <input
+                                    type="number"
+                                    value={quiz.max_attempts || ""}
+                                    onChange={(e) =>
+                                        onChange({
+                                            max_attempts: e.target.value
+                                                ? parseInt(e.target.value)
+                                                : undefined,
+                                        })
+                                    }
+                                    min={1}
+                                    placeholder="Unlimited"
+                                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                                />
+                            </div>
+                        )}
 
                         {/* Late Penalty */}
                         <div>
@@ -235,6 +336,44 @@ const QuizSettings: React.FC<QuizSettingsProps> = ({ quiz, onChange }) => {
                             </span>
                         </label>
                     </div>
+
+                    {/* Type 1 Info Banner */}
+                    {quizType === "approval" && (
+                        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                            <div className="flex items-start gap-3">
+                                <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-1">
+                                        Coach Approval Mode
+                                    </p>
+                                    <ul className="text-xs text-blue-800 dark:text-blue-400 space-y-1">
+                                        <li>• Students must wait for your approval before proceeding</li>
+                                        <li>• No attempt limits - students can resubmit until approved</li>
+                                        <li>• Next lesson unlocks automatically when you approve</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Type 2 Info Banner */}
+                    {quizType === "basic" && (
+                        <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                            <div className="flex items-start gap-3">
+                                <FileQuestion className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="text-sm font-medium text-green-900 dark:text-green-300 mb-1">
+                                        Basic Quiz Mode
+                                    </p>
+                                    <ul className="text-xs text-green-800 dark:text-green-400 space-y-1">
+                                        <li>• Auto-passes when student meets passing score</li>
+                                        <li>• Configurable attempt limits</li>
+                                        <li>• Next lesson unlocks automatically on pass</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

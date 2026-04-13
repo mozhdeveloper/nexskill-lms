@@ -935,10 +935,12 @@ const CourseBuilder: React.FC = () => {
     try { resolvedModuleId = await resolveModuleId(moduleId); } catch (e) { throw new Error("Failed to resolve module"); }
 
     const quizId = uuidv4();
+    // Default to Type 2: Basic Quiz (no coach approval, has attempts)
+    // Coach can change to Type 1 in Quiz Settings
     const newQuiz: Quiz = {
       id: quizId, title: quizTitle, description: "", instructions: "",
       passing_score: 70, time_limit_minutes: 30, max_attempts: 3,
-      requires_manual_grading: false, requires_coach_approval: true,
+      requires_manual_grading: false, requires_coach_approval: false,
       is_published: false,
       late_submission_allowed: true, late_penalty_percent: 10,
     };
