@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
@@ -13,6 +13,7 @@ import MarkLessonCompleteModal from '../../components/learning/MarkLessonComplet
 import type { Lesson } from '../../types/lesson';
 import type { LessonContentItem } from '../../types/lesson-content-item';
 import { fetchLessonContentItems } from '../../lib/supabase/lesson-content.queries';
+import { usePageScrollCompletion } from '../../hooks/usePageScrollCompletion';
 
 type LessonWithModule = Lesson & { moduleTitle?: string };
 
@@ -40,6 +41,50 @@ const CoursePlayer: React.FC = () => {
   const [flatItemList, setFlatItemList] = useState<FlatItem[]>([]);
   const [lessonContentItems, setLessonContentItems] = useState<LessonContentItem[]>([]);
   const [activeTab, setActiveTab] = useState<BottomTab | null>(null);
+
+  // Ref to track completed content items locally to avoid DB fetch race conditions
+  const completedContentItemsRef = useRef<Set<string>>(new Set());
+
+  // Track if lesson has been marked complete to prevent duplicate calls
+  const lessonMarkedCompleteRef = useRef(false);
+
+  // Hook to detect when user scrolls to bottom of page (near Next Lesson button)
+  const handlePageScrollComplete = useCallback(() => {
+    if (lessonMarkedCompleteRef.current || !lessonId || !courseId) return;
+
+    console.log('[CoursePlayer] User scrolled to bottom of page, marking lesson complete');
+    lessonMarkedCompleteRef.current = true;
+
+    // Update UI immediately (optimistic update)
+    setCompletedLessons(prev => prev.includes(lessonId) ? prev : [...prev, lessonId]);
+
+    // Mark lesson as complete in DB
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+
+      supabase
+        .from('user_lesson_progress')
+        .upsert({
+          user_id: user.id,
+          lesson_id: lessonId,
+          is_completed: true,
+          completed_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,lesson_id' })
+        .then(({ error }) => {
+          if (error) {
+            console.error('[CoursePlayer] Error marking lesson complete:', error);
+          } else {
+            console.log('[CoursePlayer] Lesson marked complete in DB');
+          }
+        });
+    });
+  }, [lessonId, courseId]);
+
+  const { triggerRef: bottomTriggerRef } = usePageScrollCompletion({
+    onComplete: handlePageScrollComplete,
+    enabled: !!lessonId && !!courseId && !lessonMarkedCompleteRef.current,
+    threshold: 0.3,
+  });
 
   useEffect(() => {
     const fetchLessonData = async () => {
@@ -255,96 +300,22 @@ const CoursePlayer: React.FC = () => {
     };
 
     refreshCompletedLessons();
-  }, [courseId, lessonId, completedLessons]);
+    // Removed completedLessons from deps to prevent race condition where stale DB fetch overwrites optimistic update
+  }, [courseId, lessonId]);
 
+  // DISABLED: Content item completion no longer triggers lesson completion.
+  // Lesson completion is now handled by page-scroll detection (usePageScrollCompletion hook).
+  // This function only updates the sidebar optimistically for visual feedback.
   const handleContentItemComplete = useCallback(async (completedContentItemId: string) => {
     console.log('[CoursePlayer] Content item completed:', completedContentItemId);
-
-    if (!courseId || !lessonId) return;
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data: allContentItems } = await supabase
-      .from('lesson_content_items')
-      .select('id, content_type')
-      .eq('lesson_id', lessonId);
-
-    if (!allContentItems || allContentItems.length === 0) {
-      console.log('[CoursePlayer] No content items found for this lesson');
-      return;
-    }
-
-    console.log('[CoursePlayer] All content items:', allContentItems);
-
-    const requiredItems = allContentItems.filter(
-      (item: any) => item.content_type === 'video' || item.content_type === 'quiz'
-    );
-
-    console.log('[CoursePlayer] Required content items (videos/quizzes):', requiredItems);
-
-    if (requiredItems.length === 0) {
-      console.log('[CoursePlayer] Lesson has only supplementary content (text/notes/docs) - auto-completing');
-
-      const { error } = await supabase
-        .from('user_lesson_progress')
-        .upsert({
-          user_id: user.id,
-          lesson_id: lessonId,
-          is_completed: true,
-          completed_at: new Date().toISOString(),
-        }, { onConflict: 'user_id,lesson_id' });
-
-      if (error) {
-        console.error('[CoursePlayer] Error auto-completing lesson:', error);
-      } else {
-        console.log('[CoursePlayer] Lesson auto-completed (supplementary-only content)!');
-        setCompletedLessons(prev => prev.includes(lessonId) ? prev : [...prev, lessonId]);
-        // Set lastCompletedContentItemId so LessonSidebar updates immediately
-        setLastCompletedContentItemId(completedContentItemId);
-      }
-      return;
-    }
-
-    const { data: completedItems } = await supabase
-      .from('lesson_content_item_progress')
-      .select('content_item_id')
-      .eq('user_id', user.id)
-      .eq('lesson_id', lessonId)
-      .eq('is_completed', true);
-
-    const completedIds = new Set((completedItems || []).map((item: any) => item.content_item_id));
-    console.log('[CoursePlayer] Completed content items:', completedIds.size);
-
-    const allRequiredCompleted = requiredItems.every((item: any) => completedIds.has(item.id));
-
-    console.log('[CoursePlayer] All required items completed?', allRequiredCompleted);
-
-    if (allRequiredCompleted) {
-      console.log('[CoursePlayer] All required content items completed! Marking lesson as complete...');
-
-      const { error } = await supabase
-        .from('user_lesson_progress')
-        .upsert({
-          user_id: user.id,
-          lesson_id: lessonId,
-          is_completed: true,
-          completed_at: new Date().toISOString(),
-        }, { onConflict: 'user_id,lesson_id' });
-
-      if (error) {
-        console.error('[CoursePlayer] Error marking lesson complete:', error);
-      } else {
-        console.log('[CoursePlayer] Lesson marked as complete!');
-        setCompletedLessons(prev => prev.includes(lessonId) ? prev : [...prev, lessonId]);
-      }
-    } else {
-      const remaining = requiredItems.filter((item: any) => !completedIds.has(item.id));
-      console.log('[CoursePlayer] Required items remaining:', remaining.length);
-    }
-
+    // Only update sidebar optimistically - don't check for lesson completion
     setLastCompletedContentItemId(completedContentItemId);
-  }, [courseId, lessonId]);
+  }, []);
+
+  // Reset the completion tracking ref when the lesson changes
+  useEffect(() => {
+    completedContentItemsRef.current = new Set();
+  }, [lessonId]);
 
   useEffect(() => {
     if (totalLessonsInCourse > 0 && completedLessons.length >= totalLessonsInCourse) {
@@ -452,6 +423,7 @@ const CoursePlayer: React.FC = () => {
                   prevItem={prevItem}
                   nextItem={nextItem}
                   onNavigate={navigateToItem}
+                  bottomTriggerRef={bottomTriggerRef}
                 />
               ) : (
                 <ContentBlockRenderer

@@ -6,21 +6,16 @@ interface UseContentItemProgressOptions {
   lessonId: string;
   contentItemId: string;
   contentType: 'video' | 'quiz' | 'text' | 'document' | 'notes';
-  onComplete?: () => void; // Callback when content item is completed
+  onComplete?: () => void;
 }
 
 interface ContentItemProgressState {
   isCompleted: boolean;
-  progressData: any | null;
   isLoading: boolean;
+  progressData: any | null;
   error: string | null;
 }
 
-/**
- * Hook to track individual lesson content item progress
- * Used for videos, quizzes, text blocks, documents, and notes
- * Lesson is only marked complete when ALL content items are consumed
- */
 export const useContentItemProgress = ({
   lessonId,
   contentItemId,
@@ -36,8 +31,12 @@ export const useContentItemProgress = ({
   });
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks whether we have ever fired onComplete in this session
   const hasCompletedRef = useRef<boolean>(false);
   const isSavingRef = useRef<boolean>(false);
+  // Stable ref so saveProgress closure always sees the latest callback
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
 
   // Load existing progress on mount
   useEffect(() => {
@@ -61,52 +60,38 @@ export const useContentItemProgress = ({
         if (error) throw error;
 
         if (isMounted) {
-          if (data) {
-            setState((prev) => ({
-              ...prev,
-              isCompleted: data.is_completed || false,
-              progressData: data.progress_data || null,
-              isLoading: false,
-            }));
-            hasCompletedRef.current = data.is_completed || false;
-          } else {
-            setState((prev) => ({
-              ...prev,
-              isLoading: false,
-            }));
-          }
+          const alreadyDone = data?.is_completed ?? false;
+          // If the DB already shows complete, mark the session ref so we
+          // never fire onComplete again for a completion that already happened.
+          if (alreadyDone) hasCompletedRef.current = true;
+
+          setState({
+            isCompleted: alreadyDone,
+            progressData: data?.progress_data ?? null,
+            isLoading: false,
+            error: null,
+          });
         }
       } catch (err) {
         console.error('Error loading content item progress:', err);
         if (isMounted) {
-          setState((prev) => ({
-            ...prev,
-            isLoading: false,
-            error: 'Failed to load progress',
-          }));
+          setState(prev => ({ ...prev, isLoading: false, error: 'Failed to load progress' }));
         }
       }
     };
 
     loadProgress();
-
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [user, lessonId, contentItemId]);
 
-  // Save progress to database
+  // Core save — single source of truth for calling onComplete
   const saveProgress = useCallback(
     async (progressData?: any, markComplete = false) => {
       if (isSavingRef.current) return;
+      if (!user || !lessonId || !contentItemId) return;
+
       isSavingRef.current = true;
-
       try {
-        if (!user || !lessonId || !contentItemId) {
-          isSavingRef.current = false;
-          return;
-        }
-
         const updateData: any = {
           user_id: user.id,
           lesson_id: lessonId,
@@ -116,32 +101,28 @@ export const useContentItemProgress = ({
           completed_at: markComplete ? new Date().toISOString() : null,
           updated_at: new Date().toISOString(),
         };
+        if (progressData) updateData.progress_data = progressData;
 
-        if (progressData) {
-          updateData.progress_data = progressData;
-        }
-
-        const { error } = await supabase.from('lesson_content_item_progress').upsert(
-          updateData,
-          { onConflict: 'user_id,lesson_id,content_item_id' }
-        );
+        const { error } = await supabase
+          .from('lesson_content_item_progress')
+          .upsert(updateData, { onConflict: 'user_id,lesson_id,content_item_id' });
 
         if (error) {
           console.error('[ContentItemProgress] Error saving progress:', error);
-        } else {
-          console.log('[ContentItemProgress] Progress saved successfully', { markComplete });
+          return;
+        }
 
-          // Trigger completion callback if newly completed
-          if (markComplete && !hasCompletedRef.current && onComplete) {
+        console.log('[ContentItemProgress] Progress saved', { markComplete, contentItemId });
+
+        if (markComplete) {
+          setState(prev => ({ ...prev, isCompleted: true }));
+
+          // Fire onComplete exactly once per session — only for a *new* completion
+          if (!hasCompletedRef.current) {
             hasCompletedRef.current = true;
-            console.log('[ContentItemProgress] Content item completed!');
-            onComplete();
+            console.log('[ContentItemProgress] Firing onComplete for', contentItemId);
+            onCompleteRef.current?.();
           }
-
-          setState((prev) => ({
-            ...prev,
-            isCompleted: markComplete,
-          }));
         }
       } catch (err) {
         console.error('[ContentItemProgress] Error saving progress:', err);
@@ -149,75 +130,45 @@ export const useContentItemProgress = ({
         isSavingRef.current = false;
       }
     },
-    [user, lessonId, contentItemId, contentType, onComplete]
+    [user, lessonId, contentItemId, contentType]
+    // intentionally omit onComplete — we use the ref
   );
 
-  // Debounced save for progress updates (e.g., video watch time)
   const debouncedSave = useCallback(
     (progressData: any) => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-
-      saveTimeoutRef.current = setTimeout(() => {
-        saveProgress(progressData, false);
-      }, 5000); // Save every 5 seconds
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = setTimeout(() => saveProgress(progressData, false), 5000);
     },
     [saveProgress]
   );
 
-  // Update progress data (for videos: current time, duration, watch time)
   const updateProgress = useCallback(
     (progressData: any) => {
       debouncedSave(progressData);
-      setState((prev) => ({
-        ...prev,
-        progressData,
-      }));
+      setState(prev => ({ ...prev, progressData }));
     },
     [debouncedSave]
   );
 
-  // Mark content item as complete
+  // For videos — explicit complete call
   const markAsComplete = useCallback(async () => {
-    if (!user || !lessonId || !contentItemId) {
-      console.log('[ContentItemProgress] markAsComplete: Missing required params');
-      return;
-    }
-
-    console.log('[ContentItemProgress] Marking content item as complete:', contentItemId);
+    if (!user || !lessonId || !contentItemId) return;
+    console.log('[ContentItemProgress] markAsComplete:', contentItemId);
     await saveProgress({}, true);
-    setState((prev) => ({ ...prev, isCompleted: true }));
-    hasCompletedRef.current = true;
+  }, [user, lessonId, contentItemId, saveProgress]);
 
-    if (onComplete) {
-      onComplete();
-    }
-  }, [user, lessonId, contentItemId, saveProgress, onComplete]);
-
-  // Mark as viewed (for text/document/notes - instant completion)
+  // For text / notes — instant "viewed = complete"
   const markAsViewed = useCallback(async () => {
     if (!user || !lessonId || !contentItemId) return;
-
-    console.log('[ContentItemProgress] Marking content item as viewed:', contentItemId);
+    console.log('[ContentItemProgress] markAsViewed:', contentItemId);
     await saveProgress({ viewed: true }, true);
   }, [user, lessonId, contentItemId, saveProgress]);
 
-  // Cleanup on unmount
   useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
+    return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
   }, []);
 
-  return {
-    ...state,
-    updateProgress,
-    markAsComplete,
-    markAsViewed,
-  };
+  return { ...state, updateProgress, markAsComplete, markAsViewed };
 };
 
 export default useContentItemProgress;
