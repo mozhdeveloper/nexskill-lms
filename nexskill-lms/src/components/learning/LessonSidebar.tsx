@@ -397,6 +397,24 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
   const totalCount     = allItems.length;
   const progress       = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
+  // ── Determine locked items based on sequential completion ─────────────────
+  const lockedItemIds = React.useMemo(() => {
+    const locked = new Set<string>();
+    let foundUncompleted = false;
+
+    for (const mod of sidebarModules) {
+      for (const item of mod.items) {
+        if (foundUncompleted && !item.isCompleted) {
+          locked.add(item.id);
+        }
+        if (!item.isCompleted) {
+          foundUncompleted = true;
+        }
+      }
+    }
+    return locked;
+  }, [sidebarModules]);
+
   if (loading) {
     return (
       <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-card p-5 h-full">
@@ -455,14 +473,14 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                   {module.items.map((item) => {
                     const isActive = item.id === activeLessonId;
                     const completed = item.isCompleted;
-                    // Check if lesson is locked (only for lessons, not quizzes)
-                    const isLocked = item.type === 'lesson' ? checkLessonLocked(item.id) : false;
+                    // Use sequential lock logic instead of RLS-based check
+                    const isLocked = lockedItemIds.has(item.id) && !completed;
 
                     return (
                       <button
                         key={item.id}
                         onClick={() => {
-                          if (isLocked) return; // Don't navigate if locked
+                          if (isLocked) return;
                           onSelectLesson(item.id);
                         }}
                         disabled={isLocked}
