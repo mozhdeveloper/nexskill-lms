@@ -85,6 +85,28 @@ export const useEnrollment = (courseId: string | undefined) => {
     try {
       setLoading(true);
 
+      // CRITICAL: Delete all student progress for this course first
+      // This includes: quiz attempts, responses, submissions, feedback,
+      // lesson progress, module progress, and lesson access status
+      const { data: cleanupResult, error: cleanupError } = await supabase
+        .rpc('delete_student_course_progress', {
+          p_user_id: user.id,
+          p_course_id: courseId,
+        });
+
+      if (cleanupError) {
+        console.error("[useEnrollment] Progress cleanup error:", cleanupError);
+        return { success: false, error: cleanupError.message };
+      }
+
+      if (!cleanupResult?.success) {
+        console.error("[useEnrollment] Cleanup failed:", cleanupResult?.error);
+        return { success: false, error: cleanupResult?.error || "Failed to clean up progress" };
+      }
+
+      console.log("[useEnrollment] Progress cleanup complete:", cleanupResult);
+
+      // Now delete the enrollment
       const { error } = await supabase
         .from("enrollments")
         .delete()

@@ -104,16 +104,29 @@ const QuizReviewDetail: React.FC = () => {
         const { data: subData, error: subError } = await supabase
           .from('quiz_submissions')
           .select(`
-            *,
-            quiz_attempts!inner(
-              score,
-              max_score
-            )
+            *
           `)
           .eq('id', submissionId)
           .single();
 
         if (subError) throw subError;
+
+        // Fetch quiz attempt scores separately (avoid inner join failure)
+        let quizScore = null;
+        let quizMaxScore = null;
+        
+        if (subData.quiz_attempt_id) {
+          const { data: attemptData } = await supabase
+            .from('quiz_attempts')
+            .select('score, max_score')
+            .eq('id', subData.quiz_attempt_id)
+            .single();
+          
+          if (attemptData) {
+            quizScore = attemptData.score;
+            quizMaxScore = attemptData.max_score;
+          }
+        }
 
         // Fetch student profile
         const { data: studentProfile } = await supabase
@@ -144,16 +157,16 @@ const QuizReviewDetail: React.FC = () => {
           student_name: studentName,
           student_email: studentProfile?.email || 'Unknown',
           quiz_title: quizData?.title || 'Unknown Quiz',
-          quiz_score: subData.quiz_attempts?.score || null,
-          quiz_max_score: subData.quiz_attempts?.max_score || null,
+          quiz_score: quizScore,
+          quiz_max_score: quizMaxScore,
         });
 
-        // Fetch quiz responses
+        // Fetch quiz responses (use left join to handle missing questions)
         const { data: responseData, error: respError } = await supabase
           .from('quiz_responses')
           .select(`
             *,
-            quiz_questions!inner(
+            quiz_questions(
               question_content
             )
           `)
@@ -164,7 +177,9 @@ const QuizReviewDetail: React.FC = () => {
         const mappedResponses: QuizResponse[] = (responseData || []).map((r: any) => ({
           id: r.id,
           question_id: r.question_id,
-          question_text: extractQuestionText(r.quiz_questions?.question_content),
+          question_text: r.quiz_questions?.question_content 
+            ? extractQuestionText(r.quiz_questions.question_content)
+            : 'Question not found',
           response_data: r.response_data,
           points_earned: r.points_earned,
           points_possible: r.points_possible,
@@ -175,7 +190,7 @@ const QuizReviewDetail: React.FC = () => {
         setResponses(mappedResponses);
       } catch (err: any) {
         console.error('Error fetching submission:', err);
-        setError(err.message);
+        setError(err.message || 'Failed to fetch submission data');
       } finally {
         setLoading(false);
       }
@@ -255,6 +270,23 @@ const QuizReviewDetail: React.FC = () => {
         .eq('id', submission.id);
 
       if (updateError) throw updateError;
+
+      // If approved (passed), unlock the next lesson for the student
+      if (status === 'passed') {
+        console.log('🔓 Coach approved quiz — unlocking next lesson for student');
+        const { error: unlockErr } = await supabase
+          .rpc('unlock_next_lesson', {
+            p_user_id: submission.user_id,
+            p_quiz_id: submission.quiz_id,
+          });
+
+        if (unlockErr) {
+          console.error('⚠️ Failed to unlock next lesson:', unlockErr);
+          // Don't throw error - the review was still successful
+        } else {
+          console.log('✅ Next lesson unlocked successfully for student');
+        }
+      }
 
       // Create feedback record if there's a comment or media
       if (feedbackComment || mediaFiles.length > 0) {
@@ -420,7 +452,7 @@ const QuizReviewDetail: React.FC = () => {
     );
   }
 
-  const scorePercent = submission.quiz_max_score
+  const scorePercent = submission.quiz_max_score && submission.quiz_score !== null
     ? Math.round((submission.quiz_score / submission.quiz_max_score) * 100)
     : 0;
 

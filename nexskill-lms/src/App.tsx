@@ -53,7 +53,6 @@ import EarningsDashboard from "./pages/coach/EarningsDashboard";
 import CoachProfilePage from "./pages/coach/CoachProfilePage";
 import CoachMessagesPage from "./pages/coach/CoachMessagesPage";
 import CoachStudentsPage from "./pages/coach/CoachStudentsPage";
-import CoachQuizzesPage from "./pages/coach/CoachQuizzesPage";
 import QuizReviewDashboard from "./pages/coach/QuizReviewDashboard";
 import QuizReviewDetail from "./pages/coach/QuizReviewDetail";
 import SubCoachManagement from "./pages/coach/SubCoachManagement";
@@ -264,7 +263,6 @@ function App() {
                 <Route path="/coach/profile" element={<CoachProfilePage />} />
                 <Route path="/coach/messages" element={<CoachMessagesPage />} />
                 <Route path="/coach/students" element={<CoachStudentsPage />} />
-                <Route path="/coach/quizzes" element={<CoachQuizzesPage />} />
                 <Route path="/coach/quiz-reviews" element={<QuizReviewDashboard />} />
                 <Route path="/coach/courses/:courseId/quiz-reviews" element={<QuizReviewDashboard />} />
                 <Route path="/coach/courses/:courseId/quiz-reviews/:submissionId" element={<QuizReviewDetail />} />

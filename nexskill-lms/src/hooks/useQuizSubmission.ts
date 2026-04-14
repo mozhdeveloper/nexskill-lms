@@ -186,6 +186,7 @@ export function useCoachQuizSubmissions(courseId: string | undefined) {
 
   const fetchSubmissions = useCallback(async () => {
     if (!courseId || !user) {
+      console.log('🔍 useCoachQuizSubmissions: No courseId or user', { courseId, hasUser: !!user });
       setSubmissions([]);
       setLoading(false);
       return;
@@ -195,6 +196,8 @@ export function useCoachQuizSubmissions(courseId: string | undefined) {
       setLoading(true);
       setError(null);
 
+      console.log('🔍 useCoachQuizSubmissions: Fetching for course:', courseId);
+
       // Step 1: Get all quiz IDs for this course
       const { data: modules, error: modErr } = await supabase
         .from('modules')
@@ -203,23 +206,79 @@ export function useCoachQuizSubmissions(courseId: string | undefined) {
 
       if (modErr) throw modErr;
 
+      console.log('  Step 1 - Modules found:', modules?.length || 0, modules);
+
       const moduleIds = modules?.map(m => m.id) || [];
       if (moduleIds.length === 0) {
+        console.log('  ❌ No modules found for this course');
         setSubmissions([]);
         setLoading(false);
         return;
       }
 
+      // Get ALL content items (both lesson and module content)
+      const quizIds = new Set<string>();
+
+      // 1. Check module_content_items for quizzes
       const { data: contentItems, error: ciErr } = await supabase
         .from('module_content_items')
         .select('content_id')
         .in('module_id', moduleIds)
         .eq('content_type', 'quiz');
 
-      if (ciErr) throw ciErr;
+      if (ciErr) {
+        console.error('  ❌ Error fetching module_content_items:', ciErr);
+        throw ciErr;
+      }
 
-      const quizIds = contentItems?.map(ci => ci.content_id) || [];
-      if (quizIds.length === 0) {
+      console.log('  Step 2a - Module content items (quiz type):', contentItems?.length || 0, contentItems);
+      contentItems?.forEach(ci => quizIds.add(ci.content_id));
+
+      // 2. Get lessons from module_content_items (content_type = 'lesson')
+      const { data: lessonContentRefs, error: lcrErr } = await supabase
+        .from('module_content_items')
+        .select('content_id')
+        .in('module_id', moduleIds)
+        .eq('content_type', 'lesson');
+
+      if (lcrErr) {
+        console.error('  ❌ Error fetching lesson refs:', lcrErr);
+      } else {
+        const lessonIds = lessonContentRefs?.map(l => l.content_id) || [];
+        console.log('  Step 2b - Lessons found in modules:', lessonIds.length, lessonIds);
+
+        if (lessonIds.length > 0) {
+          // Get quizzes from lesson_content_items
+          const { data: lessonContentItems, error: lciErr } = await supabase
+            .from('lesson_content_items')
+            .select('content_id')
+            .eq('content_type', 'quiz')
+            .in('lesson_id', lessonIds);
+
+          if (lciErr) {
+            console.warn('  ⚠️ Error fetching lesson_content_items:', lciErr);
+          } else {
+            console.log('  Step 2c - Lesson content items (quiz type):', lessonContentItems?.length || 0, lessonContentItems);
+            lessonContentItems?.forEach(lci => quizIds.add(lci.content_id));
+          }
+        }
+      }
+
+      const uniqueQuizIds = Array.from(quizIds);
+      console.log('  Unique quiz IDs found:', uniqueQuizIds);
+
+      if (uniqueQuizIds.length === 0) {
+        console.log('  ❌ No quizzes found in this course');
+        console.log('  Debug: Checking ALL content types in modules...');
+        
+        // Debug: Check what content items actually exist
+        const { data: allModuleContent } = await supabase
+          .from('module_content_items')
+          .select('content_type, content_id')
+          .in('module_id', moduleIds);
+        
+        console.log('  All module content items:', allModuleContent);
+        
         setSubmissions([]);
         setLoading(false);
         return;
@@ -229,22 +288,30 @@ export function useCoachQuizSubmissions(courseId: string | undefined) {
       const { data: quizzes, error: qErr } = await supabase
         .from('quizzes')
         .select('id, title')
-        .in('id', quizIds);
+        .in('id', uniqueQuizIds);
 
       if (qErr) throw qErr;
+
+      console.log('  Step 3 - Quizzes found:', quizzes?.length || 0, quizzes);
 
       const quizTitles: Record<string, string> = {};
       quizzes?.forEach(q => { quizTitles[q.id] = q.title; });
 
       // Step 3: Fetch submissions (without join to avoid timeout)
+      console.log('  Step 4 - Fetching submissions for quiz IDs:', uniqueQuizIds);
       const { data, error: subErr } = await supabase
         .from('quiz_submissions')
         .select('*')
-        .in('quiz_id', quizIds)
-        .in('status', ['pending_review', 'failed', 'resubmission_required'])
+        .in('quiz_id', uniqueQuizIds)
+        .in('status', ['pending_review'])
         .order('submitted_at', { ascending: false });
 
-      if (subErr) throw subErr;
+      if (subErr) {
+        console.error('  ❌ Error fetching submissions:', subErr);
+        throw subErr;
+      }
+
+      console.log('  ✅ Submissions found:', data?.length || 0, data);
 
       // Step 4: Fetch attempt scores separately (batched)
       if (data && data.length > 0) {

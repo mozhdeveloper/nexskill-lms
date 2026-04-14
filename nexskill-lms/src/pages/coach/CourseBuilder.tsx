@@ -941,6 +941,7 @@ const CourseBuilder: React.FC = () => {
       id: quizId, title: quizTitle, description: "", instructions: "",
       passing_score: 70, time_limit_minutes: 30, max_attempts: 3,
       requires_manual_grading: false, requires_coach_approval: false,
+      quiz_type: 'standard',
       is_published: false,
       late_submission_allowed: true, late_penalty_percent: 10,
     };
@@ -958,7 +959,7 @@ const CourseBuilder: React.FC = () => {
     if (!editingQuiz || !updatedQuiz.id) return;
     try {
       const { type, ...quizDataToSave } = updatedQuiz as any;
-      
+
       // Only include fields that definitely exist in the database
       const safeQuizData = {
         id: quizDataToSave.id,
@@ -970,23 +971,49 @@ const CourseBuilder: React.FC = () => {
         max_attempts: quizDataToSave.max_attempts || null,
         requires_manual_grading: quizDataToSave.requires_manual_grading || false,
         requires_coach_approval: quizDataToSave.requires_coach_approval || false,
+        quiz_type: quizDataToSave.quiz_type || (quizDataToSave.requires_coach_approval ? 'coach_reviewed' : 'standard'),
+        attempt_control_enabled: quizDataToSave.attempt_control_enabled || false,
+        allow_skipped_questions: quizDataToSave.allow_skipped_questions || false,
         is_published: quizDataToSave.is_published || false,
         updated_at: new Date().toISOString(),
       };
-      
+
+      console.log('💾 QUIZ SAVE DEBUG:');
+      console.log('  Input quiz_type:', quizDataToSave.quiz_type);
+      console.log('  Input requires_coach_approval:', quizDataToSave.requires_coach_approval);
+      console.log('  Input allow_skipped_questions:', quizDataToSave.allow_skipped_questions);
+      console.log('  Computed safeQuizData.quiz_type:', safeQuizData.quiz_type);
+      console.log('  Computed safeQuizData.allow_skipped_questions:', safeQuizData.allow_skipped_questions);
+      console.log('  Full safeQuizData:', safeQuizData);
+
       const { error } = await supabase
         .from("quizzes")
         .upsert(safeQuizData, { onConflict: "id" });
-      
+
       if (error) {
+        console.error("❌ Quiz save failed:", error);
         console.error("Supabase error details:", error);
         // If upsert fails, try update
         const { error: updateError } = await supabase
           .from("quizzes")
           .update(safeQuizData)
           .eq("id", updatedQuiz.id);
-        
+
         if (updateError) throw updateError;
+      } else {
+        console.log('✅ Quiz saved successfully');
+        
+        // Verify what was actually saved in the database
+        const { data: verifyData } = await supabase
+          .from('quizzes')
+          .select('quiz_type, requires_coach_approval, allow_skipped_questions, attempt_control_enabled')
+          .eq('id', updatedQuiz.id)
+          .single();
+        
+        console.log('🔍 Database verification:');
+        console.log('  Saved quiz_type:', verifyData?.quiz_type);
+        console.log('  Saved requires_coach_approval:', verifyData?.requires_coach_approval);
+        console.log('  Saved allow_skipped_questions:', verifyData?.allow_skipped_questions);
       }
 
       await supabase

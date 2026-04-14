@@ -346,19 +346,21 @@ const CourseDetailRefactored: React.FC = () => {
 
   const handleUnenroll = async () => {
     const confirmed = window.confirm(
-      `Are you sure you want to leave ${course?.title}?\n\n` +
-        "You will lose access to:\n" +
-        "• Course circle discussions\n" +
-        "• Progress tracking\n" +
-        "• Community features\n\n" +
-        "You can re-enroll at any time."
+      `⚠️ WARNING: Leave ${course?.title}?\n\n` +
+        "By leaving this course, you will:\n" +
+        "• Lose ALL your progress (lessons completed, quiz attempts, scores)\n" +
+        "• Lose all your quiz answers and submissions\n" +
+        "• Lose access to Course Circle discussions\n" +
+        "• Lose all feedback and coach review history\n\n" +
+        "This action CANNOT be undone. If you re-enroll later, you'll start from scratch.\n\n" +
+        "Are you sure you want to continue?"
     );
     if (!confirmed) return;
     const result = await unenroll();
     if (result.success) {
-      showFeedback("success", `You have been unenrolled from ${course?.title}.`);
+      showFeedback("success", `You have left ${course?.title}. All your progress has been removed.`);
     } else {
-      showFeedback("error", `Failed to unenroll: ${result.error}`);
+      showFeedback("error", `Failed to leave course: ${result.error}`);
     }
   };
 

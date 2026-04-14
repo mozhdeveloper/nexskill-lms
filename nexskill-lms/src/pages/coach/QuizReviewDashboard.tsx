@@ -76,15 +76,41 @@ const QuizReviewDashboard: React.FC = () => {
               return { id: course.id, title: course.title, totalPending: 0, totalSubmissions: 0 };
             }
 
+            // Collect quiz IDs from both module_content_items and lesson_content_items
+            const quizIds = new Set<string>();
+
+            // 1. Check module_content_items for direct quizzes
             const { data: contentItems } = await supabase
               .from('module_content_items')
               .select('content_id')
               .in('module_id', moduleIds)
               .eq('content_type', 'quiz');
 
-            const quizIds = contentItems?.map(ci => ci.content_id) || [];
+            contentItems?.forEach(ci => quizIds.add(ci.content_id));
 
-            if (quizIds.length === 0) {
+            // 2. Get lessons from module_content_items (content_type = 'lesson')
+            const { data: lessonContentRefs } = await supabase
+              .from('module_content_items')
+              .select('content_id')
+              .in('module_id', moduleIds)
+              .eq('content_type', 'lesson');
+
+            if (lessonContentRefs && lessonContentRefs.length > 0) {
+              const lessonIds = lessonContentRefs.map(l => l.content_id);
+
+              // Get quizzes from lesson_content_items
+              const { data: lessonContentItems } = await supabase
+                .from('lesson_content_items')
+                .select('content_id')
+                .eq('content_type', 'quiz')
+                .in('lesson_id', lessonIds);
+
+              lessonContentItems?.forEach(lci => quizIds.add(lci.content_id));
+            }
+
+            const uniqueQuizIds = Array.from(quizIds);
+
+            if (uniqueQuizIds.length === 0) {
               return { id: course.id, title: course.title, totalPending: 0, totalSubmissions: 0 };
             }
 
@@ -92,7 +118,7 @@ const QuizReviewDashboard: React.FC = () => {
             const { data: submissions } = await supabase
               .from('quiz_submissions')
               .select('status')
-              .in('quiz_id', quizIds);
+              .in('quiz_id', uniqueQuizIds);
 
             const totalSubmissions = submissions?.length || 0;
             const totalPending = submissions?.filter(s => s.status === 'pending_review').length || 0;
@@ -141,20 +167,6 @@ const QuizReviewDashboard: React.FC = () => {
             Passed
           </span>
         );
-      case 'failed':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">
-            <XCircle className="w-3 h-3" />
-            Failed
-          </span>
-        );
-      case 'resubmission_required':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">
-            <XCircle className="w-3 h-3" />
-            Resubmission
-          </span>
-        );
     }
   };
 
@@ -176,7 +188,6 @@ const QuizReviewDashboard: React.FC = () => {
     total: submissions.length,
     pending: submissions.filter((s) => s.status === 'pending_review').length,
     passed: submissions.filter((s) => s.status === 'passed').length,
-    failed: submissions.filter((s) => s.status === 'failed' || s.status === 'resubmission_required').length,
   };
 
   // ===================== VIEW: Course Submissions List =====================
@@ -190,7 +201,7 @@ const QuizReviewDashboard: React.FC = () => {
             {/* Back Button & Header */}
             <div className="mb-6">
               <button
-                onClick={() => navigate('/coach/quizzes')}
+                onClick={() => navigate('/coach/quiz-reviews')}
                 className="inline-flex items-center gap-2 text-text-secondary hover:text-brand-primary mb-4 transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -225,13 +236,6 @@ const QuizReviewDashboard: React.FC = () => {
                 <p className="text-2xl font-bold text-green-900">{stats.passed}</p>
                 <p className="text-sm text-green-700">Approved</p>
               </div>
-              <div className="glass-card rounded-xl p-4 bg-orange-50 border border-orange-200">
-                <div className="flex items-center justify-between mb-2">
-                  <XCircle className="w-5 h-5 text-orange-600" />
-                </div>
-                <p className="text-2xl font-bold text-orange-900">{stats.failed}</p>
-                <p className="text-sm text-orange-700">Needs Work</p>
-              </div>
             </div>
 
             {/* Filters */}
@@ -252,8 +256,6 @@ const QuizReviewDashboard: React.FC = () => {
                       <option value="all">All Statuses</option>
                       <option value="pending_review">Pending Review</option>
                       <option value="passed">Passed</option>
-                      <option value="failed">Failed</option>
-                      <option value="resubmission_required">Resubmission Required</option>
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted pointer-events-none" />
                   </div>

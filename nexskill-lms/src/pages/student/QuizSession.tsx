@@ -258,10 +258,17 @@ const QuizSession: React.FC = () => {
   // ============================================
 
   useEffect(() => {
+    let cancelled = false; // Prevent race conditions
+
     const fetchQuiz = async () => {
-      if (!quizId || !user) return;
+      if (!quizId || !user) {
+        console.warn('QuizSession: Missing quizId or user', { quizId, hasUser: !!user });
+        return;
+      }
 
       try {
+        console.log('QuizSession: Fetching quiz with ID:', quizId, 'for user:', user.id);
+
         // Fetch quiz first
         const { data: quiz, error: quizError } = await supabase
           .from('quizzes')
@@ -270,16 +277,47 @@ const QuizSession: React.FC = () => {
           .maybeSingle();
 
         if (quizError) {
-          console.error('Error fetching quiz:', quizError);
+          console.error('QuizSession: Error fetching quiz:', quizError);
+          console.error('QuizSession: Quiz error details:', {
+            code: quizError.code,
+            message: quizError.message,
+            details: quizError.details,
+            hint: quizError.hint
+          });
           setSessionState('not_published');
           return;
         }
 
         if (!quiz) {
-          console.warn('Quiz not found:', quizId);
+          console.warn('QuizSession: Quiz not found in database:', quizId);
+          console.warn('QuizSession: This could be due to:');
+          console.warn('  1. Quiz does not exist in the quizzes table');
+          console.warn('  2. RLS policy blocking access');
+          console.warn('  3. Quiz is not published');
+          
+          // Try to check if there's a content item referencing this quiz
+          const { data: contentItem } = await supabase
+            .from('lesson_content_items')
+            .select('*, lessons(title), courses(title)')
+            .eq('content_id', quizId)
+            .eq('content_type', 'quiz')
+            .maybeSingle();
+          
+          if (contentItem) {
+            console.error('QuizSession: Found orphaned content item referencing this quiz:');
+            console.error('  Content Item ID:', contentItem.id);
+            console.error('  Lesson:', contentItem.lessons?.title);
+            console.error('  Course:', contentItem.courses?.title);
+            console.error('  Metadata:', contentItem.metadata);
+            console.error('');
+            console.error('QuizSession: The quiz row is missing! Run FIX_MISSING_QUIZ.sql in Supabase to fix this.');
+          }
+          
           setSessionState('not_published');
           return;
         }
+
+        console.log('QuizSession: Successfully fetched quiz:', quiz.title, quiz.id);
 
         // Fetch course approval status via lesson_id or module_content_items
         let courseIsApproved = true;
@@ -413,13 +451,13 @@ const QuizSession: React.FC = () => {
 
         // Check if there's a pending submission that blocks new attempts
         if (quiz.requires_coach_approval && submission && submission.status === 'pending_review') {
-          // Fetch previous responses for view-only mode
+          // Fetch previous responses for view-only mode (use left join)
           if (submission.latest_attempt_id) {
             const { data: prevResponses } = await supabase
               .from('quiz_responses')
               .select(`
                 *,
-                quiz_questions!inner(
+                quiz_questions(
                   question_content,
                   question_type
                 )
@@ -430,8 +468,10 @@ const QuizSession: React.FC = () => {
               const mapped = prevResponses.map((r: any) => ({
                 id: r.id,
                 question_id: r.question_id,
-                question_text: extractQuestionText(r.quiz_questions?.question_content),
-                question_type: r.quiz_questions?.question_type,
+                question_text: r.quiz_questions?.question_content 
+                  ? extractQuestionText(r.quiz_questions.question_content)
+                  : 'Question not found',
+                question_type: r.quiz_questions?.question_type || 'unknown',
                 response_data: r.response_data,
                 points_earned: r.points_earned,
                 points_possible: r.points_possible,
@@ -511,6 +551,11 @@ const QuizSession: React.FC = () => {
     };
 
     fetchQuiz();
+    
+    // Cleanup function to prevent race conditions
+    return () => {
+      cancelled = true;
+    };
   }, [quizId, user, submission]);
 
   // ============================================
@@ -675,7 +720,47 @@ const QuizSession: React.FC = () => {
     }
 
     try {
-      const nextAttemptNumber = (previousAttempts.length || 0) + 1;
+      // First, check if there's already an in_progress attempt for this user and quiz
+      const { data: existingInProgress } = await supabase
+        .from('quiz_attempts')
+        .select('id, attempt_number')
+        .eq('user_id', user.id)
+        .eq('quiz_id', quizMeta.id)
+        .eq('status', 'in_progress')
+        .maybeSingle();
+
+      // If there's an in-progress attempt, use that instead of creating a new one
+      if (existingInProgress) {
+        console.log('QuizSession: Found existing in-progress attempt, resuming:', existingInProgress.attempt_number);
+        const { data: attempt } = await supabase
+          .from('quiz_attempts')
+          .select('*')
+          .eq('id', existingInProgress.id)
+          .single();
+        
+        if (attempt) {
+          setCurrentAttempt(attempt);
+          setTimeRemaining(quizMeta.time_limit_minutes ? quizMeta.time_limit_minutes * 60 : null);
+          setCurrentQuestionIndex(0);
+          setSessionState('in_progress');
+        }
+        return;
+      }
+
+      // Calculate the next attempt number by finding the max attempt number in the database
+      const { data: maxAttemptData } = await supabase
+        .from('quiz_attempts')
+        .select('attempt_number')
+        .eq('user_id', user.id)
+        .eq('quiz_id', quizMeta.id)
+        .order('attempt_number', { ascending: false })
+        .limit(1);
+
+      const nextAttemptNumber = (maxAttemptData && maxAttemptData.length > 0) 
+        ? (maxAttemptData[0].attempt_number || 0) + 1 
+        : 1;
+
+      console.log('QuizSession: Creating new attempt with number:', nextAttemptNumber);
 
       const { data: newAttempt, error: aErr } = await supabase
         .from('quiz_attempts')
@@ -689,7 +774,34 @@ const QuizSession: React.FC = () => {
         .select()
         .single();
 
-      if (aErr) throw aErr;
+      if (aErr) {
+        console.error('QuizSession: Error creating attempt:', aErr);
+        // If it's still a duplicate key error, try one more time with a higher attempt number
+        if (aErr.code === '23505') {
+          console.warn('QuizSession: Duplicate key detected, retrying with next attempt number...');
+          const { data: retryAttempt } = await supabase
+            .from('quiz_attempts')
+            .insert({
+              user_id: user.id,
+              quiz_id: quizMeta.id,
+              attempt_number: nextAttemptNumber + 1,
+              status: 'in_progress',
+              started_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+          
+          if (retryAttempt) {
+            setCurrentAttempt(retryAttempt);
+            setTimeRemaining(quizMeta.time_limit_minutes ? quizMeta.time_limit_minutes * 60 : null);
+            setSelectedAnswers({});
+            setCurrentQuestionIndex(0);
+            setSessionState('in_progress');
+            return;
+          }
+        }
+        throw aErr;
+      }
 
       setCurrentAttempt(newAttempt);
       setTimeRemaining(quizMeta.time_limit_minutes ? quizMeta.time_limit_minutes * 60 : null);
@@ -697,7 +809,8 @@ const QuizSession: React.FC = () => {
       setCurrentQuestionIndex(0);
       setSessionState('in_progress');
     } catch (err) {
-      console.error('Error creating attempt:', err);
+      console.error('QuizSession: Error creating attempt:', err);
+      alert('Failed to start quiz attempt. Please refresh and try again.');
     }
   };
 
@@ -797,7 +910,20 @@ const QuizSession: React.FC = () => {
       const scorePercent = totalPoints > 0 ? Math.round((finalScore / totalPoints) * 100) : 0;
       const passed = scorePercent >= quizMeta.passing_score;
 
-      let finalStatus: 'submitted' | 'graded' = requiresManualGrading ? 'submitted' : 'graded';
+      // CRITICAL: For coach-reviewed quizzes, ALWAYS use 'submitted' status
+      // so the database trigger creates a quiz_submissions record for coach review.
+      // Standard quizzes without coach approval use 'graded' for auto-grading.
+      const isCoachReviewed = quizMeta.requires_coach_approval;
+      let finalStatus: 'submitted' | 'graded' = requiresManualGrading || isCoachReviewed ? 'submitted' : 'graded';
+
+      console.log('🔍 QUIZ SUBMISSION DEBUG:');
+      console.log('  Quiz ID:', quizMeta.id);
+      console.log('  Quiz Title:', quizMeta.title);
+      console.log('  requires_coach_approval:', quizMeta.requires_coach_approval);
+      console.log('  requires_manual_grading:', requiresManualGrading);
+      console.log('  isCoachReviewed:', isCoachReviewed);
+      console.log('  finalStatus:', finalStatus, '(should be "submitted" for coach review)');
+      console.log('  Attempt ID:', currentAttempt.id);
 
       const { error: updateErr } = await supabase
         .from('quiz_attempts')
@@ -810,7 +936,15 @@ const QuizSession: React.FC = () => {
         })
         .eq('id', currentAttempt.id);
 
-      if (updateErr) throw updateErr;
+      if (updateErr) {
+        console.error('❌ FAILED to update quiz_attempts:', updateErr);
+        throw updateErr;
+      }
+
+      console.log('✅ quiz_attempts updated successfully');
+      console.log('  Status set to:', finalStatus);
+      console.log('  If this is "submitted", the database trigger should fire');
+      console.log('  and create a quiz_submissions record for coach review');
 
       const responses = questions.map((q) => {
         const userAnswer = selectedAnswers[q.id];
@@ -907,6 +1041,31 @@ const QuizSession: React.FC = () => {
           }
         } catch (err) {
           console.error('Error marking quiz completion:', err);
+        }
+      }
+
+      // VERIFY: Check if quiz_submissions was created (for coach-reviewed quizzes)
+      if (isCoachReviewed) {
+        console.log('🔎 Checking if quiz_submissions was created...');
+        const { data: checkSubmission, error: checkError } = await supabase
+          .from('quiz_submissions')
+          .select('*')
+          .eq('quiz_attempt_id', currentAttempt.id)
+          .single();
+
+        if (checkError) {
+          console.error('❌ quiz_submissions NOT found!');
+          console.error('  Error:', checkError);
+          console.log('  This means the database trigger did not fire');
+          console.log('  Possible causes:');
+          console.log('    1. Trigger does not exist');
+          console.log('    2. Status was not "submitted"');
+          console.log('    3. Quiz does not have requires_coach_approval=true');
+        } else {
+          console.log('✅ quiz_submissions created successfully!');
+          console.log('  Submission ID:', checkSubmission.id);
+          console.log('  Status:', checkSubmission.status);
+          console.log('  Coach should now see this in Quiz Reviews');
         }
       }
 
@@ -1081,6 +1240,23 @@ const QuizSession: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Previous Coach Feedback Button (when retrying) */}
+          {submission?.review_notes && (
+            <button
+              onClick={() => navigate(`/student/courses/${courseId}/quizzes/${quizId}/feedback`)}
+              className="w-full mb-6 p-4 bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 rounded-xl transition-all text-left group"
+            >
+              <div className="flex items-center gap-3">
+                <MessageSquare className="w-5 h-5 text-blue-600" />
+                <div className="flex-1">
+                  <h3 className="text-sm font-bold text-blue-900">Coach's Previous Feedback</h3>
+                  <p className="text-xs text-blue-700 mt-0.5 line-clamp-1">{submission.review_notes}</p>
+                </div>
+                <span className="text-blue-600 text-sm font-medium group-hover:translate-x-1 transition-transform">View →</span>
+              </div>
+            </button>
+          )}
 
           {quizMeta.description && (
             <div className="mb-6">
@@ -1288,10 +1464,48 @@ const QuizSession: React.FC = () => {
     return (
       <StudentAppLayout>
         <div className="min-h-screen bg-[color:var(--bg-primary)] flex items-center justify-center">
-          <div className="text-center">
+          <div className="text-center max-w-md">
             <Lock className="w-12 h-12 text-gray-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-text-primary mb-2">Quiz Not Available</h2>
-            <p className="text-text-secondary">This quiz has not been published yet.</p>
+            <p className="text-text-secondary mb-4">
+              This quiz could not be found. This might be because:
+            </p>
+            <ul className="text-sm text-text-secondary text-left mb-6 space-y-2">
+              <li className="flex items-start gap-2">
+                <span className="text-brand-primary mt-0.5">•</span>
+                <span>The quiz hasn't been created in the database yet</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-brand-primary mt-0.5">•</span>
+                <span>You don't have permission to access this quiz</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-brand-primary mt-0.5">•</span>
+                <span>The quiz ID is incorrect or the link is outdated</span>
+              </li>
+            </ul>
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 mb-4">
+              <p className="text-xs text-amber-800 dark:text-amber-200 text-left">
+                <strong>For Admins/Coaches:</strong> Check browser console for details. 
+                If the quiz content item exists but the quiz row is missing, run{' '}
+                <code className="bg-amber-100 dark:bg-amber-900/40 px-1 rounded">FIX_MISSING_QUIZ.sql</code>{' '}
+                in Supabase SQL Editor.
+              </p>
+            </div>
+            <div className="space-y-3">
+              <button
+                onClick={() => navigate(`/student/courses/${courseId}`)}
+                className="w-full px-6 py-3 rounded-full font-semibold text-brand-primary border-2 border-brand-primary hover:bg-brand-primary/5 transition-all"
+              >
+                Back to Course
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="w-full px-6 py-3 rounded-full font-semibold text-text-secondary border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
+              >
+                Retry
+              </button>
+            </div>
           </div>
         </div>
       </StudentAppLayout>

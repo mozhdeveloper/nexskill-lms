@@ -380,13 +380,42 @@ const CourseDetail: React.FC = () => {
   };
 
   const handleUnenroll = async () => {
+    const confirmed = window.confirm(
+      `⚠️ WARNING: Leave ${course?.title}?\n\n` +
+        "By leaving this course, you will:\n" +
+        "• Lose ALL your progress (lessons completed, quiz attempts, scores)\n" +
+        "• Lose all your quiz answers and submissions\n" +
+        "• Lose access to Course Circle discussions\n" +
+        "• Lose all feedback and coach review history\n\n" +
+        "This action CANNOT be undone. If you re-enroll later, you'll start from scratch.\n\n" +
+        "Are you sure you want to continue?"
+    );
+    if (!confirmed) return;
+
     try {
       if (!user || !course) return;
+
+      // Delete all student progress first
+      const { error: cleanupError } = await supabase
+        .rpc('delete_student_course_progress', {
+          p_user_id: user.id,
+          p_course_id: course.id,
+        });
+
+      if (cleanupError) {
+        console.error('Error cleaning up progress:', cleanupError);
+        alert('Failed to clean up progress. Please try again.');
+        return;
+      }
+
+      // Then delete the enrollment
       const { error } = await supabase.from('enrollments').delete().match({ profile_id: user.id, course_id: course.id });
       if (error) throw error;
       setIsEnrolled(false);
+      alert(`You have left ${course.title}. All your progress has been removed.`);
     } catch (error) {
       console.error('Error unenrolling:', error);
+      alert('Failed to leave course. Please try again.');
     }
   };
 
