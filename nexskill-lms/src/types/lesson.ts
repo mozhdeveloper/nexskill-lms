@@ -80,7 +80,7 @@ export interface Lesson {
     // New field - multiple content items per lesson
     content_items?: LessonContentItem[];
     estimated_duration_minutes?: number;
-    is_published: boolean;
+    content_status: 'draft' | 'published' | 'pending_addition' | 'pending_deletion';
     created_at?: string;
     updated_at?: string;
     type?: "video" | "pdf" | "quiz" | "live" | "text" | "lesson";
@@ -97,7 +97,7 @@ export interface Module {
     title: string;
     description?: string;
     position?: number;
-    is_published?: boolean;
+    content_status: 'draft' | 'published' | 'pending_addition' | 'pending_deletion';
     is_sequential?: boolean;
     drip_mode?: "immediate" | "days-after-enrollment" | "specific-date" | "after-previous";
     drip_days?: number;

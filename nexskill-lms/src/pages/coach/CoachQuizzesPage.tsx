@@ -179,7 +179,7 @@ const CoachQuizzesPage: React.FC = () => {
       // Create the quiz
       const { data: newQuiz, error: quizError } = await supabase
         .from('quizzes')
-        .insert({ title: newQuizTitle.trim(), passing_score: 70, is_published: false })
+        .insert({ title: newQuizTitle.trim(), passing_score: 70, content_status: 'draft' })
         .select('id')
         .single();
       if (quizError || !newQuiz) throw quizError;
@@ -239,7 +239,7 @@ const CoachQuizzesPage: React.FC = () => {
           passing_score: quiz.passingScore,
           time_limit_minutes: quiz.timeLimit || null,
           max_attempts: quiz.attempts || null,
-          is_published: false,
+          content_status: 'draft',
         })
         .select()
         .single();
@@ -304,7 +304,7 @@ const CoachQuizzesPage: React.FC = () => {
     try {
       const { error } = await supabase
         .from('quizzes')
-        .update({ is_published: true })
+        .update({ content_status: 'published' })
         .eq('id', quiz.id);
       if (error) throw error;
       setQuizzes(prev => prev.map(q => q.id === quiz.id ? { ...q, status: 'published' } : q));
@@ -317,7 +317,7 @@ const CoachQuizzesPage: React.FC = () => {
     try {
       const { error } = await supabase
         .from('quizzes')
-        .update({ is_published: false })
+        .update({ content_status: 'draft' })
         .eq('id', quiz.id);
       if (error) throw error;
       setQuizzes(prev => prev.map(q => q.id === quiz.id ? { ...q, status: 'draft' } : q));

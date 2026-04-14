@@ -354,7 +354,7 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
             duration: "0 min",
             summary: "",
             content_blocks: [],
-            is_published: false,
+            content_status: 'draft',
         };
         if (onAddLesson) {
             await onAddLesson(moduleId, newLesson);

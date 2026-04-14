@@ -121,7 +121,7 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
         .from('modules')
         .select('id, title, position')
         .eq('course_id', courseId)
-        .eq('is_published', true)
+        .eq('content_status', 'published')
         .order('position', { ascending: true });
 
       if (!modulesData || modulesData.length === 0) {
@@ -135,7 +135,7 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
         .from('module_content_items')
         .select('module_id, content_id, content_type, position')
         .in('module_id', moduleIds)
-        .eq('is_published', true)
+        .eq('content_status', 'published')
         .order('position', { ascending: true });
 
       const lessonIds = (itemsData ?? []).filter((i) => i.content_type === 'lesson').map((i) => i.content_id);
@@ -147,7 +147,7 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
             .from('lesson_content_items')
             .select('id, lesson_id, content_type, content_id, metadata')
             .in('lesson_id', lessonIds)
-            .eq('is_published', true)
+            .eq('content_status', 'published')
         : Promise.resolve({ data: [] });
 
       // Build maps for lesson content types and quiz content IDs

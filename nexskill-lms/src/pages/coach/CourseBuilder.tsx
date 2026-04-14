@@ -217,7 +217,7 @@ const CourseBuilder: React.FC = () => {
                       description: item.lesson_description,
                       content_blocks: contentBlocks,
                       estimated_duration_minutes: item.lesson_estimated_duration_minutes,
-                      is_published: item.lesson_is_published || item.item_is_published,
+                      content_status: item.lesson_content_status || item.item_content_status,
                       created_at: item.lesson_created_at,
                       updated_at: item.lesson_updated_at,
                       type_attr: lessonType,
@@ -235,7 +235,7 @@ const CourseBuilder: React.FC = () => {
                       time_limit_minutes: item.time_limit_minutes,
                       max_attempts: item.quiz_max_attempts,
                       requires_manual_grading: item.quiz_requires_manual_grading,
-                      is_published: item.quiz_is_published || item.item_is_published,
+                      content_status: item.quiz_content_status || item.item_content_status,
                       created_at: item.quiz_created_at,
                       updated_at: item.quiz_updated_at,
                       available_from: item.available_from,
@@ -463,7 +463,7 @@ const CourseBuilder: React.FC = () => {
     }
 
     const lessonId = uuidv4();
-    
+
     // If course is already published, save new content as unpublished (pending approval)
     const shouldSaveAsUnpublished = isCoursePublished;
     console.log('[CourseBuilder] Adding lesson - isCoursePublished:', isCoursePublished, 'will save as unpublished:', shouldSaveAsUnpublished);
@@ -475,7 +475,7 @@ const CourseBuilder: React.FC = () => {
         description: newLesson.description || "",
         content_blocks: newLesson.content_blocks || [],
         estimated_duration_minutes: newLesson.estimated_duration_minutes || 15,
-        is_published: shouldSaveAsUnpublished ? false : (newLesson.is_published || false),
+        content_status: shouldSaveAsUnpublished ? 'pending_addition' : 'published',
         course_id: courseId,
       }]);
 
@@ -499,7 +499,7 @@ const CourseBuilder: React.FC = () => {
           content_type: "lesson",
           content_id: lessonId,
           position: newPosition,
-          is_published: shouldSaveAsUnpublished ? false : (newLesson.is_published || false),
+          content_status: shouldSaveAsUnpublished ? 'pending_addition' : 'published',
         }]);
 
       if (linkError) {
@@ -516,7 +516,7 @@ const CourseBuilder: React.FC = () => {
         content_blocks: newLesson.content_blocks || [],
         duration: `${newLesson.estimated_duration_minutes || 15} min`,
         summary: newLesson.summary || "",
-        is_published: shouldSaveAsUnpublished ? false : (newLesson.is_published || false),
+        content_status: shouldSaveAsUnpublished ? 'pending_addition' : 'published',
       };
 
       setCurriculum(curriculum.map((m) =>
@@ -919,7 +919,7 @@ const CourseBuilder: React.FC = () => {
       const position = curriculum.length;
       const { data, error } = await supabase.from('modules').insert({
         course_id: courseId, title: "",
-        position, is_published: false, is_sequential: false,
+        position, content_status: 'draft', is_sequential: false,
       }).select().single();
 
       if (error) throw error;
@@ -953,7 +953,7 @@ const CourseBuilder: React.FC = () => {
     const newQuiz: Quiz = {
       id: quizId, title: quizTitle, description: "", instructions: "",
       passing_score: 70, time_limit_minutes: 30, max_attempts: 3,
-      requires_manual_grading: false, is_published: false,
+      requires_manual_grading: false, content_status: 'draft',
       late_submission_allowed: true, late_penalty_percent: 10,
     };
 
@@ -973,7 +973,7 @@ const CourseBuilder: React.FC = () => {
       const { error } = await supabase.from("quizzes").upsert(quizDataToSave, { onConflict: "id" });
       if (error) throw error;
 
-      await supabase.from("module_content_items").update({ is_published: updatedQuiz.is_published })
+      await supabase.from("module_content_items").update({ content_status: updatedQuiz.content_status })
         .match({ module_id: editingQuiz.moduleId, content_id: updatedQuiz.id, content_type: "quiz" });
 
       setCurriculum(curriculum.map((mod) =>

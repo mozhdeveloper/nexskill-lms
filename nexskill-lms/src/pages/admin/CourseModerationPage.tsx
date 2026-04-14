@@ -26,7 +26,6 @@ interface Course {
   qualityFlags: string[];
   reportsCount: number;
   description?: string;
-  is_published?: boolean;
   pending_content?: boolean;
   hasPendingContent?: boolean;
 }
@@ -85,7 +84,7 @@ const CourseModerationPage: React.FC = () => {
     score += (curriculumScore / 3) * 25;
     factors += 25;
 
-    const isPublished = course.is_published ? 1 : 0;
+    const isPublished = course.pending_content === true ? 0 : 1;
     const isVerified = course.verification_status === 'approved' ? 1 : 0;
     score += (isPublished + isVerified) / 2 * 20;
     factors += 20;
@@ -110,16 +109,16 @@ const CourseModerationPage: React.FC = () => {
 
         const { data: modulesData } = await supabase
           .from('modules')
-          .select('course_id, id, is_published');
+          .select('course_id, id, content_status');
 
         const moduleCounts = modulesData?.reduce((acc: Record<string, number>, m: any) => {
           acc[m.course_id] = (acc[m.course_id] || 0) + 1;
           return acc;
         }, {});
-        
+
         // Count unpublished modules per course
         const unpublishedModuleCounts = modulesData?.reduce((acc: Record<string, number>, m: any) => {
-          if (!m.is_published) {
+          if (m.content_status !== 'published') {
             acc[m.course_id] = (acc[m.course_id] || 0) + 1;
           }
           return acc;
@@ -127,7 +126,7 @@ const CourseModerationPage: React.FC = () => {
 
         const { data: lessonsData } = await supabase
           .from('module_content_items')
-          .select('module_id, content_type, is_published')
+          .select('module_id, content_type, content_status')
           .in('module_id', modulesData?.map(m => m.id) || []);
 
         const lessonCounts: Record<string, number> = {};
@@ -143,7 +142,7 @@ const CourseModerationPage: React.FC = () => {
             if (courseId) {
               if (item.content_type === 'lesson') {
                 lessonCounts[courseId] = (lessonCounts[courseId] || 0) + 1;
-                if (!item.is_published) {
+                if (item.content_status !== 'published') {
                   unpublishedLessonCounts[courseId] = (unpublishedLessonCounts[courseId] || 0) + 1;
                 }
               } else if (item.content_type === 'quiz') {
@@ -224,7 +223,7 @@ const CourseModerationPage: React.FC = () => {
             qualityFlags,
             reportsCount: 0,
             description: c.description,
-            is_published: c.is_published,
+            content_status: c.pending_content === true ? 'pending_addition' : 'published',
             hasUnpublishedChanges, // Flag for pending changes
             unpublishedModulesCount: unpublishedModuleCounts?.[c.id] || 0,
             unpublishedLessonsCount: unpublishedLessonCounts?.[c.id] || 0,
@@ -297,11 +296,11 @@ const CourseModerationPage: React.FC = () => {
 
       if (moduleIds.length > 0) {
         // Step 2: Publish all modules (only unpublished ones)
-        const { error: modErr } = await supabase.from('modules').update({ is_published: true }).in('id', moduleIds).eq('is_published', false);
+        const { error: modErr } = await supabase.from('modules').update({ content_status: 'published' }).in('id', moduleIds).in('content_status', ['draft', 'pending_addition']);
         if (modErr) console.error('[Admin] Modules publish error:', modErr);
 
         // Step 3: Publish all module_content_items (only unpublished ones)
-        const { error: mciErr } = await supabase.from('module_content_items').update({ is_published: true }).in('module_id', moduleIds).eq('is_published', false);
+        const { error: mciErr } = await supabase.from('module_content_items').update({ content_status: 'published' }).in('module_id', moduleIds).in('content_status', ['draft', 'pending_addition']);
         if (mciErr) console.error('[Admin] MCI publish error:', mciErr);
 
         // Step 4: Publish all lessons
@@ -313,18 +312,18 @@ const CourseModerationPage: React.FC = () => {
 
         if (lessonErr) console.error('[Admin] Lesson items fetch error:', lessonErr);
         else if (lessonItems && lessonItems.length > 0) {
-          const { error: lessonsPubErr } = await supabase.from('lessons').update({ is_published: true }).in('id', lessonItems.map(l => l.content_id)).eq('is_published', false);
+          const { error: lessonsPubErr } = await supabase.from('lessons').update({ content_status: 'published' }).in('id', lessonItems.map(l => l.content_id)).in('content_status', ['draft', 'pending_addition']);
           if (lessonsPubErr) console.error('[Admin] Lessons publish error:', lessonsPubErr);
         }
 
         // Step 5: Publish all lesson_content_items (only unpublished ones — avoids triggering reset on already-published rows)
-        const { data: lciBefore } = await supabase.from('lesson_content_items').select('id, is_published').in('module_id', moduleIds).eq('is_published', false);
+        const { data: lciBefore } = await supabase.from('lesson_content_items').select('id, content_status').in('module_id', moduleIds).in('content_status', ['draft', 'pending_addition']);
         console.log('[Admin] LCI to publish:', lciBefore);
 
-        const { error: lciErr } = await supabase.from('lesson_content_items').update({ is_published: true }).in('module_id', moduleIds).eq('is_published', false);
+        const { error: lciErr } = await supabase.from('lesson_content_items').update({ content_status: 'published' }).in('module_id', moduleIds).in('content_status', ['draft', 'pending_addition']);
         if (lciErr) console.error('[Admin] LCI publish error:', lciErr);
 
-        const { data: lciAfter } = await supabase.from('lesson_content_items').select('id, is_published').in('module_id', moduleIds).eq('is_published', false);
+        const { data: lciAfter } = await supabase.from('lesson_content_items').select('id, content_status').in('module_id', moduleIds).in('content_status', ['draft', 'pending_addition']);
         console.log('[Admin] LCI remaining unpublished:', lciAfter);
 
         // Step 6: Publish all quizzes (only unpublished ones)
@@ -335,7 +334,7 @@ const CourseModerationPage: React.FC = () => {
           .eq('content_type', 'quiz');
 
         if (quizItems && quizItems.length > 0) {
-          await supabase.from('quizzes').update({ is_published: true }).in('id', quizItems.map(q => q.content_id)).eq('is_published', false);
+          await supabase.from('quizzes').update({ content_status: 'published' }).in('id', quizItems.map(q => q.content_id)).in('content_status', ['draft', 'pending_addition']);
         }
 
         // Step 7: Publish quizzes from lesson_content_items (only unpublished ones)
@@ -346,7 +345,7 @@ const CourseModerationPage: React.FC = () => {
           .eq('content_type', 'quiz');
 
         if (lessonQuizItems && lessonQuizItems.length > 0) {
-          await supabase.from('quizzes').update({ is_published: true }).in('id', lessonQuizItems.map(q => q.content_id)).eq('is_published', false);
+          await supabase.from('quizzes').update({ content_status: 'published' }).in('id', lessonQuizItems.map(q => q.content_id)).in('content_status', ['draft', 'pending_addition']);
         }
       }
 

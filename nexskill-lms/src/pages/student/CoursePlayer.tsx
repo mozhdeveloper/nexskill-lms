@@ -116,7 +116,7 @@ const CoursePlayer: React.FC = () => {
 
         const { data: lessonData, error: lessonError } = await supabase
           .from('lessons')
-          .select('id, title, description, content_blocks, estimated_duration_minutes, is_published, created_at, updated_at')
+          .select('id, title, description, content_blocks, estimated_duration_minutes, content_status, created_at, updated_at')
           .eq('id', lessonId)
           .single();
 
@@ -162,7 +162,7 @@ const CoursePlayer: React.FC = () => {
             .from('modules')
             .select('id, position')
             .eq('course_id', courseId)
-            .eq('is_published', true)
+            .eq('content_status', 'published')
             .order('position', { ascending: true });
 
           const moduleIds = (mods || []).map((m: any) => m.id);
@@ -172,7 +172,7 @@ const CoursePlayer: React.FC = () => {
               .from('module_content_items')
               .select('module_id, content_id, content_type, position')
               .in('module_id', moduleIds)
-              .eq('is_published', true)
+              .eq('content_status', 'published')
               .order('position', { ascending: true });
 
             const moduleOrder = new Map((mods || []).map((m: any, i: number) => [m.id, i]));
@@ -313,7 +313,7 @@ const CoursePlayer: React.FC = () => {
         .from('modules')
         .select('id')
         .eq('course_id', courseId)
-        .eq('is_published', true);
+        .eq('content_status', 'published');
 
       const moduleIds = (mods || []).map((m: any) => m.id);
 

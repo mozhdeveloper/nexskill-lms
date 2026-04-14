@@ -37,7 +37,7 @@ interface QuizMeta {
   due_date: string | null;
   late_submission_allowed: boolean;
   late_penalty_percent: number;
-  is_published: boolean;
+  content_status: 'draft' | 'published' | 'pending_addition' | 'pending_deletion';
   requires_manual_grading: boolean;
   lesson_id: string | null;
 }
@@ -279,7 +279,7 @@ const QuizSession: React.FC = () => {
             .maybeSingle(),
         ]);
 
-        // Set quiz meta - use course approval instead of quiz.is_published
+        // Set quiz meta - use course approval instead of quiz.content_status
         setQuizMeta({
           id: quiz.id,
           title: quiz.title,
@@ -290,7 +290,7 @@ const QuizSession: React.FC = () => {
           due_date: quiz.due_date,
           late_submission_allowed: quiz.late_submission_allowed,
           late_penalty_percent: quiz.late_penalty_percent,
-          is_published: courseIsApproved,
+          content_status: courseIsApproved ? 'published' : 'draft',
           requires_manual_grading: quiz.requires_manual_grading,
           lesson_id: quiz.lesson_id ?? null,
         });
@@ -866,7 +866,7 @@ const QuizSession: React.FC = () => {
             latePenaltyPercent={quizMeta.late_penalty_percent}
             attemptsRemaining={attemptsRemaining}
             maxAttempts={quizMeta.max_attempts}
-            isPublished={quizMeta.is_published}
+            contentStatus={quizMeta.content_status}
           />
 
           {/* Attempt History — always render for show_history or no_attempts_remaining */}

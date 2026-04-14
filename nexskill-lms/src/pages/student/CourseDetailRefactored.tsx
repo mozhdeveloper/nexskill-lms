@@ -66,39 +66,39 @@ const CourseDetailRefactored: React.FC = () => {
       setDebugInfo("");
       console.log("[CourseDetailRefactored] Fetching curriculum directly for courseId:", courseId);
       
-      // 1. Fetch ALL modules (ignore is_published for maximum compatibility)
+      // 1. Fetch ALL modules (ignore content_status for maximum compatibility)
       const { data: modules } = await supabase
         .from("modules")
-        .select("id, title, position, is_published")
+        .select("id, title, position, content_status")
         .eq("course_id", courseId)
         .order("position", { ascending: true });
-      
+
       console.log("[CourseDetailRefactored] Modules fetched:", modules);
-      
+
       if (modules && modules.length > 0) {
         const moduleIds = modules.map(m => m.id);
         console.log("[CourseDetailRefactored] Module IDs:", moduleIds);
-        
-        // 2. Fetch ALL content items (ignore is_published)
+
+        // 2. Fetch ALL content items (ignore content_status)
         const { data: contentItems } = await supabase
           .from("module_content_items")
-          .select("module_id, content_id, content_type, position, is_published")
+          .select("module_id, content_id, content_type, position, content_status")
           .in("module_id", moduleIds)
           .order("position", { ascending: true });
-        
+
         console.log("[CourseDetailRefactored] Content items:", contentItems);
-        
+
         // Check publishing status for debugging
-        const publishedModules = modules.filter(m => m.is_published);
-        const publishedContent = contentItems?.filter(c => c.is_published);
-        
+        const publishedModules = modules.filter(m => m.content_status === 'published');
+        const publishedContent = contentItems?.filter(c => c.content_status === 'published');
+
         if (publishedModules.length !== modules.length) {
           setDebugInfo(`⚠️ ${modules.length - publishedModules.length} modules are not published`);
         }
         if ((publishedContent?.length || 0) !== (contentItems?.length || 0)) {
           setDebugInfo(prev => prev + ` | ⚠️ ${(contentItems?.length || 0) - (publishedContent?.length || 0)} content items are not published`);
         }
-        
+
         if (contentItems && contentItems.length > 0) {
           const lessonIds = contentItems
             .filter(i => i.content_type === "lesson")
@@ -106,17 +106,17 @@ const CourseDetailRefactored: React.FC = () => {
           const quizIds = contentItems
             .filter(i => i.content_type === "quiz")
             .map(i => i.content_id);
-          
+
           console.log("[CourseDetailRefactored] Lesson IDs to fetch:", lessonIds);
           console.log("[CourseDetailRefactored] Quiz IDs to fetch:", quizIds);
-          
+
           // 3. Fetch lessons and quizzes
           const [lessonsRes, quizzesRes] = await Promise.all([
-            lessonIds.length > 0 
-              ? supabase.from("lessons").select("id, title, estimated_duration_minutes, is_published").in("id", lessonIds)
+            lessonIds.length > 0
+              ? supabase.from("lessons").select("id, title, estimated_duration_minutes, content_status").in("id", lessonIds)
               : Promise.resolve({ data: [] }),
             quizIds.length > 0
-              ? supabase.from("quizzes").select("id, title, time_limit_minutes, is_published").in("id", quizIds)
+              ? supabase.from("quizzes").select("id, title, time_limit_minutes, content_status").in("id", quizIds)
               : Promise.resolve({ data: [] })
           ]);
           
@@ -189,47 +189,47 @@ const CourseDetailRefactored: React.FC = () => {
     fetchCurriculumDirectly();
   }, [courseId]);
   
-  // Function to fix curriculum visibility (simple version - just updates is_published flags)
+  // Function to fix curriculum visibility (simple version - just updates content_status flags)
   const handleFixVisibility = async () => {
     if (!courseId) return;
-    
+
     try {
       // Update modules to published
       await supabase
         .from("modules")
-        .update({ is_published: true })
+        .update({ content_status: 'published' })
         .eq("course_id", courseId);
-      
+
       // Update content items to published
       await supabase
         .from("module_content_items")
-        .update({ is_published: true })
+        .update({ content_status: 'published' })
         .in("module_id", (await supabase.from("modules").select("id").eq("course_id", courseId)).data?.map(m => m.id) || []);
-      
+
       // Update lessons to published
       await supabase
         .from("lessons")
-        .update({ is_published: true })
-        .in("id", 
+        .update({ content_status: 'published' })
+        .in("id",
           (await supabase.from("module_content_items")
             .select("content_id")
             .in("module_id", (await supabase.from("modules").select("id").eq("course_id", courseId)).data?.map(m => m.id) || [])
             .eq("content_type", "lesson")
           ).data?.map(l => l.content_id) || []
         );
-      
+
       // Update quizzes to published
       await supabase
         .from("quizzes")
-        .update({ is_published: true })
-        .in("id", 
+        .update({ content_status: 'published' })
+        .in("id",
           (await supabase.from("module_content_items")
             .select("content_id")
             .in("module_id", (await supabase.from("modules").select("id").eq("course_id", courseId)).data?.map(m => m.id) || [])
             .eq("content_type", "quiz")
           ).data?.map(q => q.content_id) || []
         );
-      
+
       setDebugInfo("✅ Curriculum published successfully!");
       alert("Curriculum visibility fixed! Refreshing...");
       
@@ -294,7 +294,7 @@ const CourseDetailRefactored: React.FC = () => {
         .from("module_content_items")
         .select("content_type, content_id")
         .in("module_id", moduleIds)
-        .eq("is_published", true);
+        .eq("content_status", "published");
 
       const lessonIds = (contentItems || [])
         .filter((i: { content_type: string }) => i.content_type === "lesson")

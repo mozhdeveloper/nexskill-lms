@@ -18,7 +18,7 @@ interface StudentContentRendererProps {
   nextItem?: { id: string; type: 'lesson' | 'quiz' } | null;
   onNavigate?: (item: { id: string; type: 'lesson' | 'quiz' }) => void;
   // Scroll completion trigger ref
-  bottomTriggerRef?: React.RefObject<HTMLDivElement>;
+  bottomTriggerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export const StudentContentRenderer: React.FC<StudentContentRendererProps> = ({

@@ -37,18 +37,18 @@ export async function fetchLessonContentItemsWithData(lessonId: string) {
 /**
  * Create a new content item
  */
-export async function createContentItem(input: CreateContentItemInput, options?: { is_published?: boolean }) {
+export async function createContentItem(input: CreateContentItemInput, options?: { content_status?: string }) {
     const { lesson_id, course_id, module_id, content_type, content_id, metadata = {}, position } = input;
 
     // Get max position if not provided
     const finalPosition = position ?? await getMaxPosition(lesson_id);
 
-    // Phase 1: Determine publish status
-    // If course is already approved, new content should be unpublished (pending admin approval)
-    // Otherwise, use the provided value or default to true (for new courses being built)
-    let isPublished: boolean;
-    if (options?.is_published !== undefined) {
-        isPublished = options.is_published;
+    // Phase 1: Determine content status
+    // If course is already approved, new content should be pending_addition (pending admin approval)
+    // Otherwise, use the provided value or default to 'published' (for new courses being built)
+    let contentStatus: string;
+    if (options?.content_status !== undefined) {
+        contentStatus = options.content_status;
     } else {
         // Auto-detect: check if course is approved
         try {
@@ -58,21 +58,21 @@ export async function createContentItem(input: CreateContentItemInput, options?:
                 .select('verification_status')
                 .eq('id', course_id)
                 .single();
-            
+
             if (courseError) {
                 console.error('[createContentItem] Error fetching course:', courseError);
             } else {
                 console.log('[createContentItem] Course verification_status:', course?.verification_status);
             }
-            
-            // If course is approved, save as unpublished (pending review)
+
+            // If course is approved, save as pending_addition (pending review)
             // Otherwise, save as published (normal course building)
-            isPublished = course?.verification_status !== 'approved';
-            console.log('[createContentItem] isPublished will be:', isPublished);
+            contentStatus = course?.verification_status !== 'approved' ? 'published' : 'pending_addition';
+            console.log('[createContentItem] content_status will be:', contentStatus);
         } catch (err) {
             console.error('[createContentItem] Exception checking course status:', err);
             // If we can't determine course status, default to published
-            isPublished = true;
+            contentStatus = 'published';
         }
     }
 
@@ -86,7 +86,7 @@ export async function createContentItem(input: CreateContentItemInput, options?:
             content_id,
             metadata,
             position: finalPosition,
-            is_published: isPublished,
+            content_status: contentStatus,
         }])
         .select()
         .single();
@@ -232,7 +232,7 @@ export async function batchCreateContentItems(items: CreateContentItemInput[]) {
                 content_id: item.content_id,
                 metadata: item.metadata || {},
                 position: item.position ?? 0,
-                is_published: item.is_published ?? true,
+                content_status: item.content_status ?? 'published',
             }))
         )
         .select();

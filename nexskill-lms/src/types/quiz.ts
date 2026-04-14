@@ -134,7 +134,7 @@ export interface Quiz {
     time_limit_minutes?: number;
     max_attempts?: number;
     requires_manual_grading: boolean;
-    is_published: boolean;
+    content_status: 'draft' | 'published' | 'pending_addition' | 'pending_deletion';
     available_from?: string;
     due_date?: string;
     late_submission_allowed: boolean;
