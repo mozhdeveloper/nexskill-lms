@@ -395,27 +395,140 @@ const CourseDetail: React.FC = () => {
     try {
       if (!user || !course) return;
 
-      // Delete all student progress first
-      const { error: cleanupError } = await supabase
-        .rpc('delete_student_course_progress', {
-          p_user_id: user.id,
-          p_course_id: course.id,
-        });
+      console.log('🗑️ LEAVE COURSE: Starting cleanup for course', course.id, 'user', user.id);
 
-      if (cleanupError) {
-        console.error('Error cleaning up progress:', cleanupError);
-        alert('Failed to clean up progress. Please try again.');
+      // STEP 1: Get all modules
+      const { data: modules } = await supabase.from('modules').select('id').eq('course_id', course.id);
+      const moduleIds = modules?.map(m => m.id) || [];
+      console.log('  Modules found:', moduleIds.length);
+
+      if (moduleIds.length === 0) {
+        console.log('  No modules, deleting enrollment only');
+        await supabase.from('enrollments').delete().match({ profile_id: user.id, course_id: course.id });
+        setIsEnrolled(false);
+        window.location.reload();
         return;
       }
 
-      // Then delete the enrollment
+      // STEP 2: Get all lesson IDs from module_content_items
+      const { data: lessonRefs } = await supabase
+        .from('module_content_items')
+        .select('content_id')
+        .in('module_id', moduleIds)
+        .eq('content_type', 'lesson');
+      const lessonIds = lessonRefs?.map(l => l.content_id) || [];
+      console.log('  Lessons found:', lessonIds.length, lessonIds);
+
+      // STEP 3: Get all quiz IDs (from module AND lesson content items)
+      const { data: moduleQuizzes } = await supabase
+        .from('module_content_items')
+        .select('content_id')
+        .in('module_id', moduleIds)
+        .eq('content_type', 'quiz');
+
+      const { data: lessonQuizRefs } = await supabase
+        .from('lesson_content_items')
+        .select('content_id')
+        .in('lesson_id', lessonIds)
+        .eq('content_type', 'quiz');
+
+      const allQuizIds = [
+        ...(moduleQuizzes?.map(q => q.content_id) || []),
+        ...(lessonQuizRefs?.map(q => q.content_id) || [])
+      ];
+      console.log('  Quizzes found:', allQuizIds.length, allQuizIds);
+
+      // STEP 4: Get all attempt IDs for this student
+      let attemptIds: string[] = [];
+      if (allQuizIds.length > 0) {
+        const { data: attempts } = await supabase
+          .from('quiz_attempts')
+          .select('id')
+          .eq('user_id', user.id)
+          .in('quiz_id', allQuizIds);
+        attemptIds = attempts?.map(a => a.id) || [];
+        console.log('  Quiz attempts found:', attemptIds.length);
+      }
+
+      // STEP 5: Delete quiz data
+      if (attemptIds.length > 0) {
+        console.log('  Deleting quiz data...');
+        const { data: submissionIds } = await supabase.from('quiz_submissions').select('id').in('quiz_attempt_id', attemptIds);
+        const subIds = submissionIds?.map(s => s.id) || [];
+        
+        if (subIds.length > 0) {
+          const { error: fbErr } = await supabase.from('quiz_feedback').delete().in('quiz_submission_id', subIds);
+          console.log('    quiz_feedback deleted:', fbErr?.message || `${subIds.length} rows`);
+        }
+        
+        const { error: qsErr } = await supabase.from('quiz_submissions').delete().in('quiz_attempt_id', attemptIds);
+        console.log('    quiz_submissions deleted:', qsErr?.message || `${attemptIds.length} rows`);
+        
+        const { error: qrErr } = await supabase.from('quiz_responses').delete().in('attempt_id', attemptIds);
+        console.log('    quiz_responses deleted:', qrErr?.message || `${attemptIds.length} rows`);
+        
+        const { error: qaErr } = await supabase.from('quiz_attempts').delete().in('id', attemptIds);
+        console.log('    quiz_attempts deleted:', qaErr?.message || `${attemptIds.length} rows`);
+      }
+
+      // STEP 6: Delete lesson progress (CRITICAL)
+      if (lessonIds.length > 0) {
+        console.log('  Deleting lesson progress for', lessonIds.length, 'lessons...');
+        
+        // Delete from lesson_content_item_progress first (FK dependency)
+        const { error: lcipErr } = await supabase
+          .from('lesson_content_item_progress')
+          .delete()
+          .eq('user_id', user.id)
+          .in('lesson_id', lessonIds);
+        console.log('    lesson_content_item_progress delete:', lcipErr?.message || 'SUCCESS');
+
+        const { error: ulpErr } = await supabase
+          .from('user_lesson_progress')
+          .delete()
+          .eq('user_id', user.id)
+          .in('lesson_id', lessonIds);
+        console.log('    user_lesson_progress delete:', ulpErr?.message || 'SUCCESS');
+
+        const { error: lasErr } = await supabase
+          .from('lesson_access_status')
+          .delete()
+          .eq('user_id', user.id)
+          .in('lesson_id', lessonIds);
+        console.log('    lesson_access_status delete:', lasErr?.message || 'SUCCESS');
+      }
+
+      // STEP 7: Delete module progress
+      try {
+        const { error } = await supabase
+          .from('user_module_progress')
+          .delete()
+          .eq('user_id', user.id)
+          .in('module_id', moduleIds);
+        console.log('    user_module_progress delete:', error?.message || 'SUCCESS');
+      } catch {
+        console.log('    user_module_progress: table not found, skipping');
+      }
+
+      // STEP 8: Verify deletion
+      const { data: remaining } = await supabase
+        .from('user_lesson_progress')
+        .select('lesson_id')
+        .eq('user_id', user.id)
+        .in('lesson_id', lessonIds);
+      console.log('    Remaining progress after delete:', remaining?.length || 0);
+
+      // STEP 9: Delete enrollment
       const { error } = await supabase.from('enrollments').delete().match({ profile_id: user.id, course_id: course.id });
       if (error) throw error;
+      console.log('✅ Enrollment deleted');
+
       setIsEnrolled(false);
       alert(`You have left ${course.title}. All your progress has been removed.`);
+      window.location.reload();
     } catch (error) {
-      console.error('Error unenrolling:', error);
-      alert('Failed to leave course. Please try again.');
+      console.error('❌ Error unenrolling:', error);
+      alert('Failed to leave course. Check console for details.');
     }
   };
 
