@@ -45,15 +45,15 @@ const CoursePlayer: React.FC = () => {
   // Ref to track completed content items locally to avoid DB fetch race conditions
   const completedContentItemsRef = useRef<Set<string>>(new Set());
 
-  // Track if lesson has been marked complete to prevent duplicate calls
-  const lessonMarkedCompleteRef = useRef(false);
+  // Track if current lesson has been marked complete (state to trigger re-renders)
+  const [currentLessonMarkedComplete, setCurrentLessonMarkedComplete] = useState(false);
 
   // Hook to detect when user scrolls to bottom of page (near Next Lesson button)
   const handlePageScrollComplete = useCallback(() => {
-    if (lessonMarkedCompleteRef.current || !lessonId || !courseId) return;
+    if (currentLessonMarkedComplete || !lessonId || !courseId) return;
 
     console.log('[CoursePlayer] User scrolled to bottom of page, marking lesson complete');
-    lessonMarkedCompleteRef.current = true;
+    setCurrentLessonMarkedComplete(true);
 
     // Update UI immediately (optimistic update)
     setCompletedLessons(prev => prev.includes(lessonId) ? prev : [...prev, lessonId]);
@@ -78,15 +78,25 @@ const CoursePlayer: React.FC = () => {
           }
         });
     });
-  }, [lessonId, courseId]);
+  }, [lessonId, courseId, currentLessonMarkedComplete]);
 
+  // Check if lesson is notes-only (no videos/quizzes)
+  const hasVideosOrQuizzes = lessonContentItems.some(item => 
+    item.content_type === 'video' || item.content_type === 'quiz'
+  );
+  const isNotesOnlyLesson = lessonContentItems.length > 0 && !hasVideosOrQuizzes;
+
+  // Only enable scroll completion for notes-only lessons
+  // Video/quizzes lessons should only complete via their own progress tracking
   const { triggerRef: bottomTriggerRef } = usePageScrollCompletion({
-    onComplete: handlePageScrollComplete,
-    enabled: !!lessonId && !!courseId && !lessonMarkedCompleteRef.current,
-    threshold: 0.3,
-  });
+  onComplete: handlePageScrollComplete,
+  enabled: !!lessonId && !!courseId && !currentLessonMarkedComplete && isNotesOnlyLesson,
+  resetKey: `${lessonId}-${isNotesOnlyLesson}`,
+});
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchLessonData = async () => {
       if (!courseId || !lessonId) return;
 
@@ -101,6 +111,7 @@ const CoursePlayer: React.FC = () => {
           .single();
 
         if (courseError) throw courseError;
+        if (cancelled) return;
         setCourseTitle(courseData.title);
 
         const { data: lessonData, error: lessonError } = await supabase
@@ -128,6 +139,7 @@ const CoursePlayer: React.FC = () => {
           moduleTitle: (moduleData.modules as unknown as { title: string } | null)?.title || ''
         };
 
+        if (cancelled) return;
         setCurrentLesson(lessonWithModule);
 
         try {
@@ -135,9 +147,12 @@ const CoursePlayer: React.FC = () => {
           console.log('[CoursePlayer] Fetched lessonContentItems for lesson', lessonId, ':', contentItems);
           console.log('[CoursePlayer] lessonContentItems.length:', contentItems.length);
           console.log('[CoursePlayer] lessonContentItems types:', contentItems.map(item => item.content_type));
+          
+          if (cancelled) return;
           setLessonContentItems(contentItems);
         } catch (contentError) {
           console.error('[CoursePlayer] Error fetching lesson content items:', contentError);
+          if (cancelled) return;
           setLessonContentItems([]);
         }
 
@@ -165,11 +180,14 @@ const CoursePlayer: React.FC = () => {
               const modDiff = (moduleOrder.get(a.module_id) ?? 0) - (moduleOrder.get(b.module_id) ?? 0);
               return modDiff !== 0 ? modDiff : a.position - b.position;
             });
+
+            if (cancelled) return;
             setFlatItemList(sorted.map((ci) => ({ id: ci.content_id, type: ci.content_type as 'lesson' | 'quiz' })));
 
             const lessonIds = sorted.filter((ci) => ci.content_type === 'lesson').map((ci) => ci.content_id);
             const quizIdsInCourse = sorted.filter((ci) => ci.content_type === 'quiz').map((ci) => ci.content_id);
 
+            if (cancelled) return;
             setTotalLessonsInCourse(lessonIds.length);
 
             if (lessonIds.length > 0) {
@@ -179,7 +197,16 @@ const CoursePlayer: React.FC = () => {
                 .eq('user_id', user.id)
                 .eq('is_completed', true)
                 .in('lesson_id', lessonIds);
-              setCompletedLessons((progressRows || []).map((r: any) => r.lesson_id));
+
+              const dbCompleted = (progressRows || []).map((r: any) => r.lesson_id);
+
+              // Merge with existing optimistic completions instead of replacing
+              // This prevents double-fetches or race conditions from wiping out optimistic state
+              if (cancelled) return;
+              setCompletedLessons(prev => {
+                const merged = new Set([...dbCompleted, ...prev]);
+                return Array.from(merged);
+              });
             }
 
             if (quizIdsInCourse.length > 0) {
@@ -189,19 +216,33 @@ const CoursePlayer: React.FC = () => {
                 .eq('user_id', user.id)
                 .eq('passed', true)
                 .in('quiz_id', quizIdsInCourse);
-              setCompletedQuizIds([...new Set((quizRows || []).map((r: any) => r.quiz_id))]);
+
+              const dbQuizCompleted = (quizRows || []).map((r: any) => r.quiz_id);
+
+              // Merge with existing optimistic completions
+              if (cancelled) return;
+              setCompletedQuizIds(prev => {
+                const merged = new Set([...dbQuizCompleted, ...prev]);
+                return Array.from(merged);
+              });
             }
           }
         }
       } catch (err) {
+        if (cancelled) return;
         console.error('Error fetching lesson data:', err);
         setError('Failed to load lesson data');
       } finally {
+        if (cancelled) return;
         setLoading(false);
       }
     };
 
     fetchLessonData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [courseId, lessonId]);
 
   const lessonNumber = flatItemList
@@ -315,6 +356,12 @@ const CoursePlayer: React.FC = () => {
   // Reset the completion tracking ref when the lesson changes
   useEffect(() => {
     completedContentItemsRef.current = new Set();
+  }, [lessonId]);
+
+  // Reset lesson completion state when navigating to a new lesson
+  // This ensures scroll-to-complete works for EVERY lesson, not just the first one
+  useEffect(() => {
+    setCurrentLessonMarkedComplete(false);
   }, [lessonId]);
 
   useEffect(() => {

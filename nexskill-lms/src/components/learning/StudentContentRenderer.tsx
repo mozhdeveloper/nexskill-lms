@@ -109,7 +109,7 @@ export const StudentContentRenderer: React.FC<StudentContentRendererProps> = ({
       </div>
 
       {/* Next / Previous Navigation — positioned underneath last content item */}
-      <div className="flex items-center justify-between pt-6">
+      <div ref={bottomTriggerRef} className="flex items-center justify-between pt-6">
         {prevItem ? (
           <button
             onClick={() => onNavigate?.(prevItem)}
@@ -127,11 +127,6 @@ export const StudentContentRenderer: React.FC<StudentContentRendererProps> = ({
           </button>
         ) : <div />}
       </div>
-
-      {/* Invisible trigger element for scroll-based lesson completion */}
-      {bottomTriggerRef && (
-        <div ref={bottomTriggerRef} className="h-px w-full" />
-      )}
     </>
   );
 };

@@ -1,109 +1,88 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface UsePageScrollCompletionOptions {
   onComplete: () => void;
   enabled?: boolean;
+  resetKey?: unknown;
 }
 
 export const usePageScrollCompletion = ({
   onComplete,
   enabled = true,
+  resetKey,
 }: UsePageScrollCompletionOptions) => {
   const triggerRef = useRef<HTMLDivElement>(null);
   const hasTriggeredRef = useRef(false);
-  const [elementReady, setElementReady] = useState(false);
   const onCompleteRef = useRef(onComplete);
+  const observerRef = useRef<IntersectionObserver | null>(null);
 
   useEffect(() => {
     onCompleteRef.current = onComplete;
   }, [onComplete]);
 
   useEffect(() => {
-    if (!enabled) return;
-    if (triggerRef.current) {
-      console.log('[usePageScrollCompletion] Element ready immediately');
-      setElementReady(true);
+    console.log('[usePageScrollCompletion] Effect ran', { enabled, resetKey, hasElement: !!triggerRef.current });
+
+    hasTriggeredRef.current = false;
+
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+
+    if (!enabled) {
+      console.log('[usePageScrollCompletion] Disabled, skipping observer setup');
       return;
     }
+
+    const attach = (el: HTMLDivElement) => {
+      console.log('[usePageScrollCompletion] Attaching IntersectionObserver to element:', el);
+      const observer = new IntersectionObserver(
+        (entries) => {
+          console.log('[usePageScrollCompletion] IntersectionObserver fired', { 
+            isIntersecting: entries[0].isIntersecting, 
+            hasTriggered: hasTriggeredRef.current,
+            intersectionRatio: entries[0].intersectionRatio,
+          });
+          if (hasTriggeredRef.current) return;
+          if (entries[0].isIntersecting) {
+            console.log('[usePageScrollCompletion] TRIGGERING onComplete');
+            hasTriggeredRef.current = true;
+            observer.disconnect();
+            observerRef.current = null;
+            onCompleteRef.current();
+          }
+        },
+        { threshold: 0.1 }
+      );
+      observer.observe(el);
+      observerRef.current = observer;
+    };
+
+    if (triggerRef.current) {
+      console.log('[usePageScrollCompletion] Element already in DOM, attaching immediately');
+      attach(triggerRef.current);
+      return;
+    }
+
+    console.log('[usePageScrollCompletion] Element not in DOM yet, polling...');
     const poll = setInterval(() => {
+      console.log('[usePageScrollCompletion] Polling...', { hasElement: !!triggerRef.current });
       if (triggerRef.current) {
         clearInterval(poll);
-        console.log('[usePageScrollCompletion] Element ready after polling');
-        setElementReady(true);
+        console.log('[usePageScrollCompletion] Found element after polling, attaching');
+        attach(triggerRef.current);
       }
-    }, 100);
-    return () => clearInterval(poll);
-  }, [enabled]);
-
-  useEffect(() => {
-    if (!enabled || !elementReady) {
-      console.log('[usePageScrollCompletion] Not setting up listener:', { enabled, elementReady });
-      return;
-    }
-
-    const el = triggerRef.current;
-    if (!el) {
-      console.log('[usePageScrollCompletion] Element ref is null');
-      return;
-    }
-
-    console.log('[usePageScrollCompletion] Setting up scroll listener');
-
-    const checkVisibility = () => {
-      if (hasTriggeredRef.current) return false;
-
-      const currentEl = triggerRef.current;
-      if (!currentEl) {
-        console.log('[usePageScrollCompletion] Element lost');
-        return false;
-      }
-
-      const rect = currentEl.getBoundingClientRect();
-      const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-      const isVisible = rect.top >= 0 && rect.top <= viewportHeight;
-
-      console.log('[usePageScrollCompletion] Visibility check:', {
-        rectTop: rect.top,
-        viewportHeight,
-        isVisible,
-        rect,
-      });
-
-      if (isVisible) {
-        console.log('[usePageScrollCompletion] Next Lesson button visible, marking lesson complete');
-        hasTriggeredRef.current = true;
-        onCompleteRef.current();
-        return true;
-      }
-      return false;
-    };
-
-    const handleScroll = () => {
-      console.log('[usePageScrollCompletion] Scroll event fired');
-      checkVisibility();
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    
-    const scrollParents: HTMLElement[] = [];
-    let parent = el.parentElement;
-    while (parent) {
-      const style = window.getComputedStyle(parent);
-      if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
-        parent.addEventListener('scroll', handleScroll, { passive: true });
-        scrollParents.push(parent);
-        console.log('[usePageScrollCompletion] Attached to parent scroll container');
-      }
-      parent = parent.parentElement;
-    }
-
-    setTimeout(checkVisibility, 200);
+    }, 50);
 
     return () => {
-      window.removeEventListener('scroll', handleScroll);
-      scrollParents.forEach(p => p.removeEventListener('scroll', handleScroll));
+      clearInterval(poll);
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+        observerRef.current = null;
+      }
     };
-  }, [enabled, elementReady]);
+  }, [enabled, resetKey]);
 
   return { triggerRef };
 };

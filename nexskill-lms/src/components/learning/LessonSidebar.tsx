@@ -97,11 +97,19 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
   completedQuizIds = [],
   lastCompletedContentItemId,
 }) => {
+  console.log('[LessonSidebar] RENDER - completedLessonIds:', completedLessonIds);
   const [sidebarModules, setSidebarModules] = useState<SidebarModule[]>([]);
   const [expandedModules, setExpandedModules] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
-  const hasFetchedRef = useRef(false);
+
+  // Refs to track current completion values for async functions (prevents stale closures)
+  const completedLessonIdsRef = useRef(completedLessonIds);
+  const completedQuizIdsRef = useRef(completedQuizIds);
+
+  // Keep refs up to date
+  useEffect(() => { completedLessonIdsRef.current = completedLessonIds; }, [completedLessonIds]);
+  useEffect(() => { completedQuizIdsRef.current = completedQuizIds; }, [completedQuizIds]);
 
   const fetchModules = useCallback(async () => {
     if (!courseId) return;
@@ -476,7 +484,24 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
         return { id: mod.id, title: mod.title, items };
       });
 
-      setSidebarModules(built);
+      // Apply completions using current values from refs to handle race conditions
+      const currentCompletedIds = completedLessonIdsRef.current;
+      const currentCompletedQuizIds = completedQuizIdsRef.current;
+
+      const builtWithCompletions = built.map((mod) => ({
+        ...mod,
+        items: mod.items.map((item) => {
+          if (item.type === 'lesson' && currentCompletedIds.includes(item.id)) {
+            return { ...item, isCompleted: true };
+          }
+          if (item.type === 'quiz' && currentCompletedQuizIds.includes(item.id)) {
+            return { ...item, isCompleted: true };
+          }
+          return item;
+        }),
+      }));
+
+      setSidebarModules(builtWithCompletions);
 
       const activeModule = built.find((m) => m.items.some((i) => i.id === activeLessonId));
       setExpandedModules(
@@ -489,13 +514,39 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
     }
   }, [courseId]);
 
-  // Only fetch once on mount
+  // Fetch modules when course changes
   useEffect(() => {
-    if (!hasFetchedRef.current) {
-      hasFetchedRef.current = true;
-      fetchModules();
-    }
-  }, []);
+    fetchModules();
+  }, [courseId]);
+
+  // Sync completion flags whenever data loads or completion state changes
+  // Uses refs to avoid stale closure issues when completions change during async operations
+  useEffect(() => {
+    // Wait for sidebar data to load before applying completions
+    if (sidebarModules.length === 0) return;
+
+    // Read from refs to always get the latest values, not stale closure values
+    const currentCompletedIds = completedLessonIdsRef.current;
+    const currentCompletedQuizIds = completedQuizIdsRef.current;
+
+    setSidebarModules((prev) => {
+      // Safety check
+      if (prev.length === 0) return prev;
+
+      return prev.map((mod) => ({
+        ...mod,
+        items: mod.items.map((item) => {
+          if (item.type === 'lesson' && currentCompletedIds.includes(item.id)) {
+            return { ...item, isCompleted: true };
+          }
+          if (item.type === 'quiz' && currentCompletedQuizIds.includes(item.id)) {
+            return { ...item, isCompleted: true };
+          }
+          return item;
+        }),
+      }));
+    });
+  }, [sidebarModules.length, completedLessonIds, completedQuizIds]);
 
   // Optimistically update sidebar when a content item is completed
   useEffect(() => {
@@ -544,48 +595,6 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
       }));
     });
   }, [lastCompletedContentItemId, activeLessonId]);
-
-  // Optimistically update sidebar when a lesson is marked complete
-  useEffect(() => {
-    if (!completedLessonIds || completedLessonIds.length === 0) return;
-
-    setSidebarModules((prev) =>
-      prev.map((mod) => ({
-        ...mod,
-        items: mod.items.map((item) => {
-          if (item.type !== 'lesson') return item;
-          if (completedLessonIds.includes(item.id) && !item.isCompleted) {
-            const pc = item.progressCount;
-            return { 
-              ...item, 
-              isCompleted: true,
-              // Sync progressCount to show complete
-              progressCount: pc ? { ...pc, completed: pc.total } : undefined,
-            };
-          }
-          return item;
-        }),
-      }))
-    );
-  }, [completedLessonIds]);
-
-  // Optimistically update sidebar when a quiz is completed
-  useEffect(() => {
-    if (!completedQuizIds || completedQuizIds.length === 0) return;
-
-    setSidebarModules((prev) =>
-      prev.map((mod) => ({
-        ...mod,
-        items: mod.items.map((item) => {
-          if (item.type !== 'quiz') return item;
-          if (completedQuizIds.includes(item.id) && !item.isCompleted) {
-            return { ...item, isCompleted: true };
-          }
-          return item;
-        }),
-      }))
-    );
-  }, [completedQuizIds]);
 
   const toggleModule = (moduleId: string) => {
     setExpandedModules((prev) =>
