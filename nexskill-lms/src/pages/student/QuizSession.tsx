@@ -7,7 +7,6 @@ import QuestionTrueFalse from '../../components/quiz/QuestionTrueFalse';
 import QuestionImageChoice from '../../components/quiz/QuestionImageChoice';
 import QuestionFileUpload from '../../components/quiz/QuestionFileUpload';
 import QuestionVideoSubmission from '../../components/quiz/QuestionVideoSubmission';
-import QuizStatusBanner from '../../components/quiz/QuizStatusBanner';
 import QuizAttemptHistory, { type PreviousAttempt } from '../../components/quiz/QuizAttemptHistory';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
@@ -61,7 +60,7 @@ interface QuizMeta {
   due_date: string | null;
   late_submission_allowed: boolean;
   late_penalty_percent: number;
-  content_status: 'draft' | 'published' | 'pending_addition' | 'pending_deletion';
+  is_published: boolean;
   requires_manual_grading: boolean;
   requires_coach_approval?: boolean;
   lesson_id: string | null;
@@ -394,7 +393,6 @@ const QuizSession: React.FC = () => {
         ]);
 
         // Set quiz meta
-        // Set quiz meta - use course approval instead of quiz.content_status
         setQuizMeta({
           id: quiz.id,
           title: quiz.title,
@@ -407,7 +405,7 @@ const QuizSession: React.FC = () => {
           due_date: quiz.due_date,
           late_submission_allowed: quiz.late_submission_allowed,
           late_penalty_percent: quiz.late_penalty_percent,
-          content_status: courseIsApproved ? 'published' : 'draft',
+          is_published: courseIsApproved,
           requires_manual_grading: quiz.requires_manual_grading,
           requires_coach_approval: quiz.requires_coach_approval || false,
           lesson_id: quiz.lesson_id ?? null,
@@ -1566,51 +1564,42 @@ const QuizSession: React.FC = () => {
   // Render: Attempt History / Resume
   // ============================================
 
-  return (
-    <StudentAppLayout>
-      <div className="min-h-screen bg-[color:var(--bg-primary)] py-8 px-6">
-        <div className="max-w-4xl mx-auto">
-          {/* Status Banner */}
-          <QuizStatusBanner
-            availableFrom={quizMeta.available_from}
-            dueDate={quizMeta.due_date}
-            lateSubmissionAllowed={quizMeta.late_submission_allowed}
-            latePenaltyPercent={quizMeta.late_penalty_percent}
-            attemptsRemaining={attemptsRemaining}
-            maxAttempts={quizMeta.max_attempts}
-            isPublished={quizMeta.content_status === 'published'}
-          />
+  if (sessionState === 'show_history' || sessionState === 'resume_or_restart') {
+    return (
+      <StudentAppLayout>
+        <div className="min-h-screen bg-[color:var(--bg-primary)] py-8 px-6">
+          <div className="max-w-4xl mx-auto">
+            <button
+              onClick={() => navigate(`/student/courses/${courseId}`)}
+              className="flex items-center gap-2 text-text-secondary hover:text-brand-primary mb-6 transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              Back to course
+            </button>
 
-          {/* Attempt History — always render for show_history or no_attempts_remaining */}
-          {(sessionState === 'show_history' || sessionState === 'no_attempts_remaining') && (
-            <QuizAttemptHistory
-              attempts={previousAttempts}
-              maxAttempts={quizMeta.max_attempts}
-              passingScore={quizMeta.passing_score}
-              canRetake={attemptsRemaining === null || attemptsRemaining > 0}
-              attemptsRemaining={attemptsRemaining}
-              attemptsUsed={attemptsUsed}
-              displayMaxAttempts={displayMaxAttempts}
-              onStartAttempt={() => handleStartAttempt(false)}
-              timeLimitMinutes={quizMeta.time_limit_minutes}
-              courseId={courseId || ''}
-              lessonId={quizMeta.lesson_id ?? null}
-            />
-          )}
+            <div className="glass-card rounded-3xl p-8 mb-6">
+              <h1 className="text-3xl font-bold text-text-primary mb-2">{quizMeta.title}</h1>
+              <p className="text-text-secondary mb-6">Review your previous attempts or start a new one.</p>
 
-
-          {/* Quiz Not Published State */}
-          {sessionState === 'not_published' && (
-            <div className="glass-card rounded-2xl p-8 text-center">
-              <Lock className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-              <h2 className="text-xl font-bold text-text-primary mb-2">Quiz Not Available</h2>
-              <p className="text-text-secondary">This quiz has not been published yet.</p>
+              <QuizAttemptHistory
+                attempts={previousAttempts}
+                maxAttempts={quizMeta.max_attempts}
+                passingScore={quizMeta.passing_score}
+                canRetake={attemptsRemaining === null || attemptsRemaining > 0}
+                attemptsRemaining={attemptsRemaining}
+                attemptsUsed={previousAttempts.length}
+                displayMaxAttempts={quizMeta.max_attempts?.toString() || '∞'}
+                onStartAttempt={() => handleStartAttempt(false)}
+                timeLimitMinutes={quizMeta.time_limit_minutes}
+                courseId={courseId || ''}
+                lessonId={quizMeta.lesson_id ?? null}
+              />
             </div>
-          )}
+          </div>
         </div>
-      </div>
-    </StudentAppLayout>
-  );
+      </StudentAppLayout>
+    );
+  }
 
   // ============================================
   // Render: Quiz In Progress
