@@ -21,6 +21,8 @@ interface CourseApprovalTableProps {
   onApprove: (courseId: string) => void;
   onReject: (courseId: string, reason: string) => void;
   onRequestChanges: (courseId: string, reason: string) => void;
+  onApproveDeletion?: (courseId: string) => void;
+  onRejectDeletion?: (courseId: string) => void;
 }
 
 const CourseApprovalTable: React.FC<CourseApprovalTableProps> = ({
@@ -29,6 +31,8 @@ const CourseApprovalTable: React.FC<CourseApprovalTableProps> = ({
   onApprove,
   onReject,
   onRequestChanges,
+  onApproveDeletion,
+  onRejectDeletion,
 }) => {
   const navigate = useNavigate();
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
@@ -264,6 +268,31 @@ const CourseApprovalTable: React.FC<CourseApprovalTableProps> = ({
                               className="px-3 py-1 text-xs font-semibold text-[#DC2626] hover:bg-[#FEE2E2] rounded-full transition-colors"
                             >
                               Reject
+                            </button>
+                          </>
+                        )}
+                        {/* Deletion approval buttons for approved courses with pending deletions */}
+                        {course.status === 'approved' && course.hasUnpublishedChanges && onApproveDeletion && onRejectDeletion && (
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onApproveDeletion(course.id);
+                              }}
+                              className="px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-full transition-colors border border-red-200"
+                              title="Approve deletion of marked content"
+                            >
+                              Approve Deletion
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onRejectDeletion(course.id);
+                              }}
+                              className="px-3 py-1 text-xs font-semibold text-amber-600 hover:bg-amber-50 rounded-full transition-colors border border-amber-200"
+                              title="Reject deletion and restore content"
+                            >
+                              Reject Deletion
                             </button>
                           </>
                         )}

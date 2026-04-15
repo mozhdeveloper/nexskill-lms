@@ -421,8 +421,8 @@ const CourseModerationPage: React.FC = () => {
 
       if (error) throw error;
 
-      setCourses(prev => prev.map(c => 
-        c.id === courseId 
+      setCourses(prev => prev.map(c =>
+        c.id === courseId
           ? { ...c, status: 'rejected' as const, qualityScore: Math.min(c.qualityScore, 40) }
           : c
       ));
@@ -431,6 +431,82 @@ const CourseModerationPage: React.FC = () => {
     } catch (error) {
       console.error('Error rejecting course:', error);
       alert(`Failed to reject course: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  // ============================================================================
+  // DELETION APPROVAL/REJECTION HANDLERS
+  // ============================================================================
+
+  const handleApproveDeletion = async (courseId: string) => {
+    if (!courseId) {
+      alert('Error: No course ID provided');
+      return;
+    }
+
+    try {
+      // Call the database function to approve deletion
+      const { data, error } = await supabase.rpc('admin_approve_deletion', {
+        p_course_id: courseId
+      });
+
+      if (error) throw error;
+
+      // Update local state
+      setCourses(prev => prev.map(c =>
+        c.id === courseId
+          ? { ...c, hasPendingContent: false, hasUnpublishedChanges: false }
+          : c
+      ));
+
+      // Fetch course title for the success message
+      const { data: courseData } = await supabase
+        .from('courses')
+        .select('title')
+        .eq('id', courseId)
+        .single();
+
+      alert(`✅ Deletion Approved!\n\nCourse: ${courseData?.title || courseId}\n\nAll marked content has been permanently deleted and student progress cleaned up.`);
+
+    } catch (error: any) {
+      console.error('Deletion approval error:', error);
+      alert(`Failed to approve deletion\n\nError: ${error.message || error}\n\nCheck console (F12) for details.`);
+    }
+  };
+
+  const handleRejectDeletion = async (courseId: string) => {
+    if (!courseId) {
+      alert('Error: No course ID provided');
+      return;
+    }
+
+    try {
+      // Call the database function to reject deletion (restore content)
+      const { data, error } = await supabase.rpc('admin_reject_deletion', {
+        p_course_id: courseId
+      });
+
+      if (error) throw error;
+
+      // Update local state
+      setCourses(prev => prev.map(c =>
+        c.id === courseId
+          ? { ...c, hasPendingContent: false, hasUnpublishedChanges: false }
+          : c
+      ));
+
+      // Fetch course title for the success message
+      const { data: courseData } = await supabase
+        .from('courses')
+        .select('title')
+        .eq('id', courseId)
+        .single();
+
+      alert(`Deletion Rejected\n\nCourse: ${courseData?.title || courseId}\n\nAll marked content has been restored and is visible to students.`);
+
+    } catch (error: any) {
+      console.error('Deletion rejection error:', error);
+      alert(`Failed to reject deletion\n\nError: ${error.message || error}\n\nCheck console (F12) for details.`);
     }
   };
 
@@ -514,6 +590,8 @@ const CourseModerationPage: React.FC = () => {
               onApprove={handleApprove}
               onReject={handleReject}
               onRequestChanges={handleRequestChanges}
+              onApproveDeletion={handleApproveDeletion}
+              onRejectDeletion={handleRejectDeletion}
             />
           </div>
 

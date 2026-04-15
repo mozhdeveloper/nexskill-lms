@@ -820,6 +820,13 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                                                 className="flex-1 min-w-0 bg-transparent border-none focus:ring-0 focus:outline-none text-sm font-medium text-gray-800 dark:text-white placeholder-gray-400"
                                                                 placeholder="Lesson title..."
                                                             />
+                                                            {/* Pending deletion badge */}
+                                                            {(item as any).content_status === 'pending_deletion' && (
+                                                                <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-full font-medium border border-red-200 dark:border-red-800">
+                                                                    <AlertCircle className="w-3 h-3" />
+                                                                    Pending Deletion
+                                                                </span>
+                                                            )}
                                                             {!lessonExpanded && hasContent && (
                                                             <div className="flex-shrink-0 flex flex-row gap-1">
                                                                 {videoBlock && (
@@ -838,7 +845,9 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
 
                                                         <button
                                                             onClick={() => handleDeleteLesson(module.id, item.id)}
-                                                            className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 dark:text-red-400 rounded-lg transition-all flex-shrink-0"
+                                                            disabled={(item as any).content_status === 'pending_deletion'}
+                                                            className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 dark:text-red-400 rounded-lg transition-all flex-shrink-0 disabled:opacity-25 disabled:cursor-not-allowed"
+                                                            title={(item as any).content_status === 'pending_deletion' ? 'Already marked for deletion' : 'Delete lesson'}
                                                         >
                                                             <Trash2 className="w-3.5 h-3.5" />
                                                         </button>
@@ -856,7 +865,11 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                                                             {(lessonContentItems?.[item.id] || []).map((contentItem, idx) => (
                                                                                 <div
                                                                                     key={contentItem.id}
-                                                                                    className="group flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-slate-700/50 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 transition-colors"
+                                                                                    className={`group flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
+                                                                                        (contentItem as any).content_status === 'pending_deletion'
+                                                                                            ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700 opacity-60'
+                                                                                            : 'bg-gray-50 dark:bg-slate-700/50 border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500'
+                                                                                    }`}
                                                                                 >
                                                                                     {/* Drag handle */}
                                                                                     <div className="flex-shrink-0 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity">
@@ -887,6 +900,13 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                                                                          contentItem.content_type === 'text' && contentItem.metadata?.content ? 'Notes' :
                                                                                          contentItem.content_type === 'text' ? 'Text' : 'Document'}
                                                                                     </span>
+                                                                                    {/* Pending deletion badge */}
+                                                                                    {(contentItem as any).content_status === 'pending_deletion' && (
+                                                                                        <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-2 py-0.5 rounded-full font-medium border border-red-200 dark:border-red-700">
+                                                                                            <AlertCircle className="w-3 h-3" />
+                                                                                            Pending Deletion
+                                                                                        </span>
+                                                                                    )}
                                                                                     {/* Play button for videos */}
                                                                                     {contentItem.content_type === 'video' && contentItem.metadata?.url && (
                                                                                         <button
@@ -929,7 +949,7 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                                                                         </button>
                                                                                     )}
                                                                                     {/* Delete button */}
-                                                                                    {onDeleteContentItem && (
+                                                                                    {onDeleteContentItem && (contentItem as any).content_status !== 'pending_deletion' && (
                                                                                         <button
                                                                                             onClick={() => onDeleteContentItem(item.id, contentItem.id)}
                                                                                             className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"

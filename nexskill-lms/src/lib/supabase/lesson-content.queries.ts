@@ -8,12 +8,14 @@ import type { LessonContentItem, ContentMetadata, CreateContentItemInput, Update
 
 /**
  * Fetch all content items for a lesson
+ * Excludes items marked for deletion (pending_deletion status)
  */
 export async function fetchLessonContentItems(lessonId: string) {
     const { data, error } = await supabase
         .from('lesson_content_items')
         .select('*')
         .eq('lesson_id', lessonId)
+        .neq('content_status', 'pending_deletion') // Exclude items marked for deletion
         .order('position', { ascending: true });
 
     if (error) throw error;
