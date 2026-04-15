@@ -133,8 +133,16 @@ export interface Quiz {
     passing_score?: number;
     time_limit_minutes?: number;
     max_attempts?: number;
+    attempt_control_enabled?: boolean; // OFF = default 1 attempt, ON = custom max_attempts
+    quiz_type?: 'standard' | 'coach_reviewed'; // Explicit quiz type
+    allow_skipped_questions?: boolean; // Whether students can skip questions
     requires_manual_grading: boolean;
+<<<<<<< HEAD
+    requires_coach_approval?: boolean;
+    is_published: boolean;
+=======
     content_status: 'draft' | 'published' | 'pending_addition' | 'pending_deletion';
+>>>>>>> origin/lms
     available_from?: string;
     due_date?: string;
     late_submission_allowed: boolean;
@@ -234,6 +242,61 @@ export interface QuizValidationResult {
     isValid: boolean;
     errors: ValidationError[];
     warnings?: ValidationError[];
+}
+
+// ============================================
+// Quiz Approval & Feedback Types
+// ============================================
+
+export type QuizSubmissionStatus = 'pending_review' | 'passed' | 'failed' | 'resubmission_required';
+
+export interface QuizSubmission {
+    id: string;
+    user_id: string;
+    quiz_id: string;
+    quiz_attempt_id: string;
+    status: QuizSubmissionStatus;
+    submitted_at: string;
+    reviewed_at?: string;
+    reviewed_by?: string;
+    review_notes?: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface QuizFeedbackMedia {
+    url: string;
+    type: 'image' | 'video' | 'document';
+    filename: string;
+    size?: number;
+}
+
+export interface QuizFeedback {
+    id: string;
+    quiz_submission_id: string;
+    coach_id: string;
+    comment: string;
+    media_urls: QuizFeedbackMedia[];
+    is_resubmission_feedback: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface LessonAccessStatus {
+    lesson_id: string;
+    is_locked: boolean;
+    unlock_reason?: 'coach_approved' | 'first_lesson' | 'no_prerequisite';
+    unlocked_at?: string;
+}
+
+export interface QuizSubmissionStatusResult {
+    submission_id: string;
+    status: QuizSubmissionStatus;
+    latest_attempt_id: string;
+    submitted_at: string;
+    reviewed_at?: string;
+    review_notes?: string;
+    has_feedback: boolean;
 }
 
 // Force the file to be treated as a module

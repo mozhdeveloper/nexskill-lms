@@ -96,6 +96,30 @@ const CourseCurriculumTab: React.FC<CourseCurriculumTabProps> = ({
         curriculum.length > 0 ? [curriculum[0].id] : []
     );
 
+    // ── Determine which items are locked based on sequential completion ───────
+    const lockedItemIds = React.useMemo(() => {
+        const locked = new Set<string>();
+        let foundUncompleted = false;
+
+        for (const module of curriculum) {
+            if (!module.lessons) continue;
+            for (const lesson of module.lessons) {
+                if (foundUncompleted) {
+                    // All items after the first uncompleted one are locked
+                    locked.add(lesson.id);
+                }
+                const isDone = lesson.type === "quiz"
+                    ? completedQuizIds.has(lesson.id)
+                    : completedLessonIds.has(lesson.id);
+
+                if (!isDone) {
+                    foundUncompleted = true;
+                }
+            }
+        }
+        return locked;
+    }, [curriculum, completedLessonIds, completedQuizIds]);
+
     // ── Fetch real durations ──────────────────────────────────────────────────
     const fetchDurations = useCallback(async () => {
         if (!courseId) return;
@@ -214,6 +238,7 @@ const CourseCurriculumTab: React.FC<CourseCurriculumTabProps> = ({
 
     const handleItemClick = (lesson: Lesson) => {
         if (!isEnrolled || !courseId) return;
+        if (lockedItemIds.has(lesson.id)) return; // Locked, can't click
         if (lesson.type === "quiz") {
             navigate(`/student/courses/${courseId}/quizzes/${lesson.id}`);
         } else {
@@ -335,7 +360,8 @@ const CourseCurriculumTab: React.FC<CourseCurriculumTabProps> = ({
                                 {module.lessons &&
                                     module.lessons.map((lesson) => {
                                         const completed = isCompleted(lesson);
-                                        const clickable = isEnrolled && courseId;
+                                        const isLocked = lockedItemIds.has(lesson.id) && !completed;
+                                        const clickable = isEnrolled && courseId && !isLocked;
                                         return (
                                             <div
                                                 key={lesson.id}
@@ -343,7 +369,9 @@ const CourseCurriculumTab: React.FC<CourseCurriculumTabProps> = ({
                                                     clickable && handleItemClick(lesson)
                                                 }
                                                 className={`flex items-center justify-between py-2 px-3 rounded-lg transition-colors ${
-                                                    clickable
+                                                    isLocked
+                                                        ? "opacity-50 cursor-not-allowed"
+                                                        : clickable
                                                         ? "cursor-pointer hover:bg-white dark:hover:bg-dark-background-card"
                                                         : "cursor-default"
                                                 } ${
@@ -358,6 +386,10 @@ const CourseCurriculumTab: React.FC<CourseCurriculumTabProps> = ({
                                                             <span className="w-5 h-5 flex items-center justify-center bg-green-500 rounded-full text-white text-xs">
                                                                 ✓
                                                             </span>
+                                                        ) : isLocked ? (
+                                                            <span className="w-5 h-5 flex items-center justify-center text-gray-400">
+                                                                🔒
+                                                            </span>
                                                         ) : (
                                                             <span className="w-5 h-5 flex items-center justify-center border-2 border-gray-300 dark:border-gray-600 rounded-full text-xs" />
                                                         )
@@ -370,6 +402,8 @@ const CourseCurriculumTab: React.FC<CourseCurriculumTabProps> = ({
                                                         className={`text-sm ${
                                                             completed
                                                                 ? "text-green-700 dark:text-green-400"
+                                                                : isLocked
+                                                                ? "text-gray-400 dark:text-gray-500"
                                                                 : "text-text-secondary dark:text-dark-text-secondary"
                                                         }`}
                                                     >

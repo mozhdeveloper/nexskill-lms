@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
-import { Video, FileQuestion, Check } from 'lucide-react';
+import { Video, FileQuestion, Lock, Check } from 'lucide-react';
+import { useLessonAccessStatus } from '../../hooks/useQuizSubmission';
 
 interface ContentItem {
   id: string;
@@ -11,8 +12,7 @@ interface ContentItem {
   isCompleted: boolean;
   itemNumber: number;
   progressCount?: { completed: number; total: number };
-  hasVideo?: boolean;
-  hasQuiz?: boolean;
+  isLocked?: boolean; // NEW: Lesson lock status
 }
 
 interface SidebarModule {
@@ -103,13 +103,21 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
-  // Refs to track current completion values for async functions (prevents stale closures)
+  // Refs to hold the latest completion state to avoid closure issues during async operations
   const completedLessonIdsRef = useRef(completedLessonIds);
   const completedQuizIdsRef = useRef(completedQuizIds);
 
-  // Keep refs up to date
-  useEffect(() => { completedLessonIdsRef.current = completedLessonIds; }, [completedLessonIds]);
-  useEffect(() => { completedQuizIdsRef.current = completedQuizIds; }, [completedQuizIds]);
+  // Update refs when props change
+  useEffect(() => {
+    completedLessonIdsRef.current = completedLessonIds;
+  }, [completedLessonIds]);
+
+  useEffect(() => {
+    completedQuizIdsRef.current = completedQuizIds;
+  }, [completedQuizIds]);
+
+  // Fetch lesson access status for lock indicators
+  const { isLessonLocked: checkLessonLocked, loading: lockLoading } = useLessonAccessStatus(courseId);
 
   const fetchModules = useCallback(async () => {
     if (!courseId) return;
@@ -546,7 +554,7 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
         }),
       }));
     });
-  }, [sidebarModules.length, completedLessonIds, completedQuizIds]);
+  }, [sidebarModules.length]);
 
   // Optimistically update sidebar when a content item is completed
   useEffect(() => {
@@ -607,6 +615,24 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
   const totalCount     = allItems.length;
   const progress       = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
+  // ── Determine locked items based on sequential completion ─────────────────
+  const lockedItemIds = React.useMemo(() => {
+    const locked = new Set<string>();
+    let foundUncompleted = false;
+
+    for (const mod of sidebarModules) {
+      for (const item of mod.items) {
+        if (foundUncompleted && !item.isCompleted) {
+          locked.add(item.id);
+        }
+        if (!item.isCompleted) {
+          foundUncompleted = true;
+        }
+      }
+    }
+    return locked;
+  }, [sidebarModules]);
+
   if (loading) {
     return (
       <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-card p-5 h-full">
@@ -664,17 +690,25 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                   {module.items.map((item) => {
                     const isActive = item.id === activeLessonId;
                     const completed = item.isCompleted;
-                    
+                    // Use sequential lock logic instead of RLS-based check
+                    const isLocked = lockedItemIds.has(item.id) && !completed;
+
                     return (
                       <button
                         key={item.id}
-                        onClick={() => onSelectLesson(item.id)}
+                        onClick={() => {
+                          if (isLocked) return;
+                          onSelectLesson(item.id);
+                        }}
+                        disabled={isLocked}
                         className={`w-full flex items-center justify-between p-3 rounded-xl transition-all ${
-                          isActive
+                          isLocked
+                            ? 'opacity-60 cursor-not-allowed bg-gray-100 dark:bg-gray-800'
+                            : isActive
                             ? 'bg-brand-primary-soft border-2 border-brand-primary'
                             : 'hover:bg-white dark:hover:bg-gray-700 hover:shadow-sm'
                         } ${
-                          completed && !isActive
+                          completed && !isActive && !isLocked
                             ? 'bg-green-50 dark:bg-green-900/10'
                             : ''
                         }`}
@@ -682,15 +716,25 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                         <div className="flex items-center gap-3 flex-1 text-left">
                           {/* Lesson number - always visible */}
                           <div className="flex-shrink-0 w-6">
-                            <span className={`text-sm font-semibold ${
-                              isActive 
-                                ? 'text-brand-primary' 
-                                : completed
-                                  ? 'text-green-600 dark:text-green-400'
-                                  : 'text-text-muted dark:text-dark-text-muted'
-                            }`}>
-                              {item.itemNumber}
-                            </span>
+                            {completed ? (
+                              <span className="w-5 h-5 flex items-center justify-center bg-green-500 rounded-full text-white text-xs">
+                                ✓
+                              </span>
+                            ) : isLocked ? (
+                              <Lock className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                            ) : (
+                              <span className={`text-sm font-semibold ${
+                                isLocked
+                                  ? 'text-gray-400 dark:text-gray-500'
+                                  : completed
+                                    ? 'text-green-600 dark:text-green-400'
+                                    : isActive
+                                      ? 'text-brand-primary'
+                                      : 'text-text-muted dark:text-dark-text-muted'
+                              }`}>
+                                {item.itemNumber}
+                              </span>
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
                             {/* Checkmark on LEFT side of lesson title */}
@@ -701,7 +745,9 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                                 </span>
                               )}
                               <p className={`text-sm font-medium truncate ${
-                                completed
+                                isLocked
+                                  ? 'text-gray-400 dark:text-gray-500'
+                                  : completed
                                   ? 'text-green-700 dark:text-green-400'
                                   : isActive
                                     ? 'text-brand-primary'
@@ -709,13 +755,21 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                               }`}>
                                 {item.title}
                               </p>
-                              {item.progressCount && (
+                              {/* Content item count beside lesson title */}
+                              {item.progressCount && !isLocked && (
                                 <span className={`text-xs font-medium flex-shrink-0 ${
                                   completed
                                     ? 'text-green-600 dark:text-green-400'
                                     : 'text-text-muted dark:text-dark-text-muted'
                                 }`}>
                                   {item.progressCount.completed}/{item.progressCount.total}
+                                </span>
+                              )}
+                              {/* Locked badge */}
+                              {isLocked && (
+                                <span className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                  <Lock className="w-3 h-3" />
+                                  Locked
                                 </span>
                               )}
                             </div>
@@ -737,7 +791,7 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                                   {item.duration}
                                 </span>
                               </div>
-                              {item.type === 'quiz' && (
+                              {item.type === 'quiz' && !isLocked && (
                                 <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full">
                                   Quiz
                                 </span>
@@ -745,7 +799,8 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                             </div>
                           </div>
                         </div>
-                        {isActive && (
+                        {/* Optional: Add chevron for active item */}
+                        {isActive && !isLocked && (
                           <svg
                             className="w-4 h-4 text-brand-primary"
                             fill="none"

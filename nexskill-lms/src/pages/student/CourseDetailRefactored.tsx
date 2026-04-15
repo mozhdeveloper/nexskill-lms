@@ -346,19 +346,73 @@ const CourseDetailRefactored: React.FC = () => {
 
   const handleUnenroll = async () => {
     const confirmed = window.confirm(
-      `Are you sure you want to leave ${course?.title}?\n\n` +
-        "You will lose access to:\n" +
-        "• Course circle discussions\n" +
-        "• Progress tracking\n" +
-        "• Community features\n\n" +
-        "You can re-enroll at any time."
+      `⚠️ WARNING: Leave ${course?.title}?\n\n` +
+        "By leaving this course, you will:\n" +
+        "• Lose ALL your progress (lessons completed, quiz attempts, scores)\n" +
+        "• Lose all your quiz answers and submissions\n" +
+        "• Lose access to Course Circle discussions\n" +
+        "• Lose all feedback and coach review history\n\n" +
+        "This action CANNOT be undone. If you re-enroll later, you'll start from scratch.\n\n" +
+        "Are you sure you want to continue?"
     );
     if (!confirmed) return;
-    const result = await unenroll();
-    if (result.success) {
-      showFeedback("success", `You have been unenrolled from ${course?.title}.`);
-    } else {
-      showFeedback("error", `Failed to unenroll: ${result.error}`);
+
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser || !course) return;
+
+      console.log('🗑️ LEAVE: Cleaning up course', course.id);
+
+      // Get modules
+      const { data: modules } = await supabase.from('modules').select('id').eq('course_id', course.id);
+      const moduleIds = modules?.map(m => m.id) || [];
+
+      if (moduleIds.length > 0) {
+        // Get lessons
+        const { data: lessonRefs } = await supabase.from('module_content_items').select('content_id').in('module_id', moduleIds).eq('content_type', 'lesson');
+        const lessonIds = lessonRefs?.map(l => l.content_id) || [];
+
+        // Get quizzes
+        const { data: modQuizzes } = await supabase.from('module_content_items').select('content_id').in('module_id', moduleIds).eq('content_type', 'quiz');
+        const { data: lessonQuizRefs } = await supabase.from('lesson_content_items').select('content_id').in('lesson_id', lessonIds).eq('content_type', 'quiz');
+        const allQuizIds = [...(modQuizzes?.map(q => q.content_id) || []), ...(lessonQuizRefs?.map(q => q.content_id) || [])];
+
+        // Get attempts
+        let attemptIds: string[] = [];
+        if (allQuizIds.length > 0) {
+          const { data: attempts } = await supabase.from('quiz_attempts').select('id').eq('user_id', authUser.id).in('quiz_id', allQuizIds);
+          attemptIds = attempts?.map(a => a.id) || [];
+        }
+
+        // Delete quiz data
+        if (attemptIds.length > 0) {
+          const { data: subs } = await supabase.from('quiz_submissions').select('id').in('quiz_attempt_id', attemptIds);
+          if (subs?.length) await supabase.from('quiz_feedback').delete().in('quiz_submission_id', subs.map(s => s.id));
+          await supabase.from('quiz_submissions').delete().in('quiz_attempt_id', attemptIds);
+          await supabase.from('quiz_responses').delete().in('attempt_id', attemptIds);
+          await supabase.from('quiz_attempts').delete().in('id', attemptIds);
+        }
+
+        // Delete lesson progress
+        if (lessonIds.length > 0) {
+          await supabase.from('lesson_content_item_progress').delete().eq('user_id', authUser.id).in('lesson_id', lessonIds);
+          await supabase.from('user_lesson_progress').delete().eq('user_id', authUser.id).in('lesson_id', lessonIds);
+          await supabase.from('lesson_access_status').delete().eq('user_id', authUser.id).in('lesson_id', lessonIds);
+        }
+
+        // Delete module progress
+        try { await supabase.from('user_module_progress').delete().eq('user_id', authUser.id).in('module_id', moduleIds); } catch {}
+      }
+
+      // Delete enrollment
+      const { error } = await supabase.from('enrollments').delete().match({ profile_id: authUser.id, course_id: course.id });
+      if (error) throw error;
+
+      showFeedback("success", `You have left ${course?.title}. All progress removed.`);
+      window.location.reload();
+    } catch (err) {
+      console.error('❌ Leave failed:', err);
+      showFeedback("error", "Failed to leave course. Check console.");
     }
   };
 
