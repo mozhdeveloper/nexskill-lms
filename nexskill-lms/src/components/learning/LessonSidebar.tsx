@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
-import { Video, FileQuestion, Lock } from 'lucide-react';
+import { Video, FileQuestion, Lock, Check } from 'lucide-react';
 import { useLessonAccessStatus } from '../../hooks/useQuizSubmission';
 
 interface ContentItem {
@@ -10,8 +10,7 @@ interface ContentItem {
   type: 'lesson' | 'quiz';
   duration: string;
   isCompleted: boolean;
-  itemNumber: number; // Sequential number across all modules
-  // NEW: Per-lesson content item progress
+  itemNumber: number;
   progressCount?: { completed: number; total: number };
   isLocked?: boolean; // NEW: Lesson lock status
 }
@@ -23,13 +22,13 @@ interface SidebarModule {
 }
 
 interface LessonSidebarProps {
-  modules?: never; // deprecated — sidebar self-fetches
+  modules?: never;
   courseId: string;
   activeLessonId: string;
   onSelectLesson: (lessonId: string) => void;
   completedLessonIds?: string[];
   completedQuizIds?: string[];
-  refreshKey?: number; // Increments to trigger progress count re-fetch
+  lastCompletedContentItemId?: string | null;
 }
 
 // ─── YouTube Duration Helpers ─────────────────────────────────────────────────
@@ -52,7 +51,6 @@ const formatDuration = (seconds: number): string => {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 };
 
-/** Fetch durations for multiple YouTube video IDs in one API call. */
 const fetchYouTubeDurations = async (
   videoIds: string[]
 ): Promise<Map<string, number>> => {
@@ -61,12 +59,11 @@ const fetchYouTubeDurations = async (
 
   const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY;
   if (!apiKey) {
-    console.warn('[LessonSidebar] VITE_YOUTUBE_API_KEY not set — cannot fetch YouTube durations');
+    console.warn('[LessonSidebar] VITE_YOUTUBE_API_KEY not set');
     return result;
   }
 
   try {
-    // YouTube API accepts up to 50 IDs per request
     const chunks: string[][] = [];
     for (let i = 0; i < videoIds.length; i += 50) {
       chunks.push(videoIds.slice(i, i + 50));
@@ -98,11 +95,26 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
   onSelectLesson,
   completedLessonIds = [],
   completedQuizIds = [],
+  lastCompletedContentItemId,
 }) => {
+  console.log('[LessonSidebar] RENDER - completedLessonIds:', completedLessonIds);
   const [sidebarModules, setSidebarModules] = useState<SidebarModule[]>([]);
   const [expandedModules, setExpandedModules] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+
+  // Refs to hold the latest completion state to avoid closure issues during async operations
+  const completedLessonIdsRef = useRef(completedLessonIds);
+  const completedQuizIdsRef = useRef(completedQuizIds);
+
+  // Update refs when props change
+  useEffect(() => {
+    completedLessonIdsRef.current = completedLessonIds;
+  }, [completedLessonIds]);
+
+  useEffect(() => {
+    completedQuizIdsRef.current = completedQuizIds;
+  }, [completedQuizIds]);
 
   // Fetch lesson access status for lock indicators
   const { isLessonLocked: checkLessonLocked, loading: lockLoading } = useLessonAccessStatus(courseId);
@@ -113,12 +125,11 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
     try {
       setLoading(true);
 
-      // ── 1. Modules ────────────────────────────────────────────────────────
       const { data: modulesData } = await supabase
         .from('modules')
         .select('id, title, position')
         .eq('course_id', courseId)
-        .eq('is_published', true)
+        .eq('content_status', 'published')
         .order('position', { ascending: true });
 
       if (!modulesData || modulesData.length === 0) {
@@ -128,47 +139,113 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
 
       const moduleIds = modulesData.map((m) => m.id);
 
-      // ── 2. Content items + lessons + quizzes + watch progress ─────────────
       const { data: itemsData } = await supabase
         .from('module_content_items')
         .select('module_id, content_id, content_type, position')
         .in('module_id', moduleIds)
-        .eq('is_published', true)
+        .eq('content_status', 'published')
         .order('position', { ascending: true });
 
       const lessonIds = (itemsData ?? []).filter((i) => i.content_type === 'lesson').map((i) => i.content_id);
       const quizIds   = (itemsData ?? []).filter((i) => i.content_type === 'quiz').map((i) => i.content_id);
 
-      const [lessonsRes, quizzesRes, videoProgressRes] = await Promise.all([
+      // Fetch lesson content items to get all videos and quizzes per lesson
+      const { data: lessonContentItems } = lessonIds.length > 0
+        ? await supabase
+            .from('lesson_content_items')
+            .select('id, lesson_id, content_type, content_id, metadata')
+            .in('lesson_id', lessonIds)
+            .eq('content_status', 'published')
+        : Promise.resolve({ data: [] });
+
+      // Build maps for lesson content types and quiz content IDs
+      const lessonVideoContentItems: Record<string, Array<{ id: string; metadata: any }>> = {};
+      const lessonQuizContentIds: Record<string, string[]> = {};
+
+      (lessonContentItems || []).forEach((item: any) => {
+        if (item.content_type === 'video') {
+          if (!lessonVideoContentItems[item.lesson_id]) {
+            lessonVideoContentItems[item.lesson_id] = [];
+          }
+          lessonVideoContentItems[item.lesson_id].push({
+            id: item.id,
+            metadata: item.metadata || {},
+          });
+        }
+        if (item.content_type === 'quiz' && item.content_id) {
+          if (!lessonQuizContentIds[item.lesson_id]) {
+            lessonQuizContentIds[item.lesson_id] = [];
+          }
+          lessonQuizContentIds[item.lesson_id].push(item.content_id);
+        }
+      });
+
+      // Collect ALL quiz IDs (both from lessons AND module-level)
+      const allQuizIds = [...new Set([
+        ...Object.values(lessonQuizContentIds).flat(),
+        ...quizIds
+      ])];
+
+      // Fetch quiz details to get time_limit_minutes
+      const { data: quizzesData } = allQuizIds.length > 0
+        ? await supabase
+            .from('quizzes')
+            .select('id, title, time_limit_minutes')
+            .in('id', allQuizIds)
+        : Promise.resolve({ data: [] });
+
+      const quizDurationMap = new Map<string, number>();
+      (quizzesData || []).forEach((quiz: any) => {
+        const durationSeconds = (quiz.time_limit_minutes || 15) * 60;
+        quizDurationMap.set(quiz.id, durationSeconds);
+      });
+
+      // Calculate total quiz duration per lesson (ONLY for quizzes inside lessons)
+      const lessonQuizDurationMap = new Map<string, number>();
+      Object.entries(lessonQuizContentIds).forEach(([lessonId, quizIdsInLesson]) => {
+        const totalQuizSeconds = quizIdsInLesson.reduce((sum, quizId) => {
+          return sum + (quizDurationMap.get(quizId) || 15 * 60);
+        }, 0);
+        lessonQuizDurationMap.set(lessonId, totalQuizSeconds);
+      });
+
+      const [lessonsRes, videoProgressRes] = await Promise.all([
         lessonIds.length > 0
           ? supabase.from('lessons').select('id, title, estimated_duration_minutes, content_blocks').in('id', lessonIds)
           : Promise.resolve({ data: [] }),
-        quizIds.length > 0
-          ? supabase.from('quizzes').select('id, title, time_limit_minutes').in('id', quizIds)
-          : Promise.resolve({ data: [] }),
         lessonIds.length > 0
-          ? supabase.from('lesson_video_progress').select('lesson_id, duration_seconds').in('lesson_id', lessonIds)
+          ? supabase.from('lesson_video_progress').select('lesson_id, video_url, duration_seconds').in('lesson_id', lessonIds)
           : Promise.resolve({ data: [] }),
       ]);
 
-      // NEW: Fetch per-lesson content item progress for progress counts
       let lessonContentProgressMap: Record<string, { completed: number; total: number }> = {};
+      let lessonContentTypesMap: Record<string, { hasVideo: boolean; hasQuiz: boolean }> = {};
+      
       if (lessonIds.length > 0 && user) {
         const { data: { user: currentUser } } = await supabase.auth.getUser();
         if (currentUser) {
-          // Get all content items for these lessons
           const { data: lessonContentItems } = await supabase
             .from('lesson_content_items')
             .select('id, lesson_id, content_type')
             .in('lesson_id', lessonIds);
 
           if (lessonContentItems) {
-            // Filter to required items only (videos and quizzes)
+            lessonContentItems.forEach((item: any) => {
+              if (!lessonContentTypesMap[item.lesson_id]) {
+                lessonContentTypesMap[item.lesson_id] = { hasVideo: false, hasQuiz: false };
+              }
+              if (item.content_type === 'video') {
+                lessonContentTypesMap[item.lesson_id].hasVideo = true;
+              }
+              if (item.content_type === 'quiz') {
+                lessonContentTypesMap[item.lesson_id].hasQuiz = true;
+              }
+            });
+
             const requiredItemIds = lessonContentItems
               .filter((item: any) => item.content_type === 'video' || item.content_type === 'quiz')
               .map((item: any) => item.id);
 
-            // Count total required per lesson
             const totalByLesson: Record<string, number> = {};
             lessonContentItems.forEach((item: any) => {
               if (item.content_type === 'video' || item.content_type === 'quiz') {
@@ -176,7 +253,6 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
               }
             });
 
-            // Get completed required items
             if (requiredItemIds.length > 0) {
               const { data: completedItems } = await supabase
                 .from('lesson_content_item_progress')
@@ -185,13 +261,11 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                 .in('content_item_id', requiredItemIds)
                 .eq('is_completed', true);
 
-              // Count completed per lesson
               const completedByLesson: Record<string, number> = {};
               (completedItems || []).forEach((item: any) => {
                 completedByLesson[item.lesson_id] = (completedByLesson[item.lesson_id] || 0) + 1;
               });
 
-              // Build the map
               lessonIds.forEach((lid: string) => {
                 const total = totalByLesson[lid] || 0;
                 const completed = completedByLesson[lid] || 0;
@@ -200,8 +274,6 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                 }
               });
 
-              // Notes-only lessons: if a lesson has zero required items (no videos/quizzes),
-              // treat it as a single item showing "1/1" regardless of how many notes exist.
               lessonContentItems.forEach((item: any) => {
                 if (!totalByLesson[item.lesson_id]) {
                   lessonContentProgressMap[item.lesson_id] = { completed: 1, total: 1 };
@@ -213,9 +285,8 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
       }
 
       const lessonsMap  = new Map((lessonsRes.data  ?? []).map((l: any) => [l.id, l]));
-      const quizzesMap  = new Map((quizzesRes.data  ?? []).map((q: any) => [q.id, q]));
+      const quizzesMap  = new Map((quizzesData  ?? []).map((q: any) => [q.id, q]));
 
-      // Watch-progress durations (fallback)
       const watchedDurationMap = new Map<string, number>();
       (videoProgressRes.data ?? []).forEach((v: any) => {
         if (v.duration_seconds > 0 && !watchedDurationMap.has(v.lesson_id)) {
@@ -223,13 +294,10 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
         }
       });
 
-      // NEW: Also fetch completed quizzes from lesson_content_item_progress
-      // This ensures quizzes inside lessons show the same green checkmark as videos
       let completedQuizContentItemIds: string[] = [];
       if (quizIds.length > 0 && user) {
         const { data: { user: currentUser } } = await supabase.auth.getUser();
         if (currentUser) {
-          // Find quiz content items inside lessons
           const { data: quizContentItems } = await supabase
             .from('lesson_content_items')
             .select('content_id')
@@ -239,7 +307,6 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
           if (quizContentItems && quizContentItems.length > 0) {
             const quizContentItemIds = quizContentItems.map((qi: any) => qi.content_id);
 
-            // Get completed quiz content items
             const { data: completedQuizItems } = await supabase
               .from('lesson_content_item_progress')
               .select('content_item_id')
@@ -247,7 +314,6 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
               .eq('is_completed', true);
 
             if (completedQuizItems && completedQuizItems.length > 0) {
-              // Map content_item_id back to content_id (quiz id) via lesson_content_items
               const completedItemIds = completedQuizItems.map((ci: any) => ci.content_item_id);
               const { data: quizItems } = await supabase
                 .from('lesson_content_items')
@@ -263,18 +329,43 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
         }
       }
 
-      // Merge both sources: quiz_attempts (standalone quizzes) + lesson_content_item_progress (in-lesson quizzes)
       const allCompletedQuizIds = [...new Set([...completedQuizIds, ...completedQuizContentItemIds])];
 
-      // ── 3. Extract durations already stored in content_blocks ─────────────
-      // Covers: Cloudinary uploads (media_metadata.duration) and
-      //         previously-fetched YouTube metadata stored on save.
-      const storedDurationMap = new Map<string, number>();
-      // Also collect YouTube video IDs that still have NO stored duration
-      const youtubeIdsToFetch: string[] = []; // video IDs
-      const lessonIdForYouTubeId = new Map<string, string>(); // ytId → lessonId
+      // ─── NEW: Calculate total video duration per lesson from lesson_content_items ───
+      const lessonVideoDurationMap = new Map<string, number>();
+      const youtubeVideoUrls: string[] = [];
+      const contentItemIdToYouTubeId = new Map<string, string>();
+      const lessonIdForYouTubeId = new Map<string, string>();
 
+      // First, try to get durations from lesson_content_items metadata
+      Object.entries(lessonVideoContentItems).forEach(([lessonId, videoItems]) => {
+        let lessonTotalSeconds = 0;
+        let hasAllDurations = true;
+
+        videoItems.forEach((videoItem) => {
+          const duration = videoItem.metadata?.duration;
+          if (typeof duration === 'number' && duration > 0) {
+            lessonTotalSeconds += duration;
+          } else {
+            hasAllDurations = false;
+            // Check if it's a YouTube video
+            const url = videoItem.metadata?.url || '';
+            const ytId = extractYouTubeId(url);
+            if (ytId) {
+              youtubeVideoUrls.push(ytId);
+              contentItemIdToYouTubeId.set(videoItem.id, ytId);
+            }
+          }
+        });
+
+        if (hasAllDurations) {
+          lessonVideoDurationMap.set(lessonId, lessonTotalSeconds);
+        }
+      });
+
+      // Fallback to content_blocks for lessons without lesson_content_items video data
       (lessonsRes.data ?? []).forEach((l: any) => {
+        if (lessonVideoDurationMap.has(l.id)) return; // Already have duration from lesson_content_items
         if (!Array.isArray(l.content_blocks)) return;
 
         const videoBlock = l.content_blocks.find(
@@ -282,41 +373,75 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
         );
         if (!videoBlock) return;
 
-        // A) Duration already stored in metadata (Cloudinary or previously-saved YouTube)
         const metaDuration =
           videoBlock.attributes?.media_metadata?.duration ??
           videoBlock.attributes?.duration ??
           null;
 
         if (typeof metaDuration === 'number' && metaDuration > 0) {
-          storedDurationMap.set(l.id, metaDuration);
+          lessonVideoDurationMap.set(l.id, metaDuration);
           return;
         }
 
-        // B) YouTube URL with no stored duration → queue for API fetch
         const url: string = videoBlock.content ?? videoBlock.url ?? '';
         const ytId = extractYouTubeId(url);
         if (ytId) {
-          youtubeIdsToFetch.push(ytId);
+          youtubeVideoUrls.push(ytId);
           lessonIdForYouTubeId.set(ytId, l.id);
         }
       });
 
-      // ── 4. Batch-fetch missing YouTube durations ───────────────────────────
+      // Fetch YouTube durations for all videos
       const youtubeDurationMap = await fetchYouTubeDurations(
-        // deduplicate
-        [...new Set(youtubeIdsToFetch)]
+        [...new Set(youtubeVideoUrls)]
       );
 
-      // Map YouTube durations back to lesson IDs
-      const youtubeLessonDurationMap = new Map<string, number>();
-      lessonIdForYouTubeId.forEach((lessonId, ytId) => {
-        const secs = youtubeDurationMap.get(ytId);
-        if (secs) youtubeLessonDurationMap.set(lessonId, secs);
+      // Apply YouTube durations to lesson_content_items
+      Object.entries(lessonVideoContentItems).forEach(([lessonId, videoItems]) => {
+        if (lessonVideoDurationMap.has(lessonId)) return; // Already have duration
+
+        let lessonTotalSeconds = 0;
+        let hasAllDurations = true;
+
+        videoItems.forEach((videoItem) => {
+          const duration = videoItem.metadata?.duration;
+          if (typeof duration === 'number' && duration > 0) {
+            lessonTotalSeconds += duration;
+          } else {
+            const ytId = contentItemIdToYouTubeId.get(videoItem.id);
+            if (ytId && youtubeDurationMap.has(ytId)) {
+              lessonTotalSeconds += youtubeDurationMap.get(ytId)!;
+            } else {
+              hasAllDurations = false;
+            }
+          }
+        });
+
+        if (hasAllDurations && lessonTotalSeconds > 0) {
+          lessonVideoDurationMap.set(lessonId, lessonTotalSeconds);
+        }
       });
 
-      // ── 5. Build sidebar structure with sequential numbering ──────────────
-      // First, collect all items in order across all modules
+      // Apply YouTube durations to content_blocks fallback
+      lessonIdForYouTubeId.forEach((lessonId, ytId) => {
+        if (!lessonVideoDurationMap.has(lessonId)) {
+          const secs = youtubeDurationMap.get(ytId);
+          if (secs) {
+            lessonVideoDurationMap.set(lessonId, secs);
+          }
+        }
+      });
+
+      // If still no video duration, fallback to watched duration
+      lessonIds.forEach((lessonId) => {
+        if (!lessonVideoDurationMap.has(lessonId)) {
+          const watchedSecs = watchedDurationMap.get(lessonId);
+          if (watchedSecs && watchedSecs > 0) {
+            lessonVideoDurationMap.set(lessonId, watchedSecs);
+          }
+        }
+      });
+
       let sequentialCounter = 1;
       const built: SidebarModule[] = modulesData.map((mod) => {
         const modItems = (itemsData ?? []).filter((i) => i.module_id === mod.id);
@@ -327,19 +452,16 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
               const l = lessonsMap.get(item.content_id);
               if (!l) return null;
 
-              // Priority:
-              // 1. YouTube API (freshly fetched)
-              // 2. Stored in content_blocks metadata (Cloudinary / prev-saved)
-              // 3. Watch-progress table
-              // 4. Estimated duration fallback
-              const ytSecs      = youtubeLessonDurationMap.get(l.id);
-              const storedSecs  = storedDurationMap.get(l.id);
-              const watchedSecs = watchedDurationMap.get(l.id);
-              const videoDuration = ytSecs ?? storedSecs ?? watchedSecs;
+              // Calculate total duration: videos + quizzes
+              const videoSeconds = lessonVideoDurationMap.get(l.id) || 0;
+              const quizSeconds = lessonQuizDurationMap.get(l.id) || 0;
+              const totalSeconds = videoSeconds + quizSeconds;
 
-              const duration = videoDuration && videoDuration > 0
-                ? formatDuration(videoDuration)
+              const duration = totalSeconds > 0
+                ? formatDuration(totalSeconds)
                 : `${(l.estimated_duration_minutes ?? 15).toString().padStart(2, '0')}:00`;
+
+              const contentTypes = lessonContentTypesMap[l.id] || { hasVideo: false, hasQuiz: false };
 
               return {
                 id:          l.id,
@@ -349,6 +471,8 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                 isCompleted: completedLessonIds.includes(l.id),
                 itemNumber: sequentialCounter++,
                 progressCount: lessonContentProgressMap[l.id],
+                hasVideo: contentTypes.hasVideo,
+                hasQuiz: contentTypes.hasQuiz,
               };
             }
 
@@ -360,7 +484,7 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
               type:        'quiz' as const,
               duration:    `${q.time_limit_minutes ?? 30}m`,
               isCompleted: allCompletedQuizIds.includes(q.id),
-              itemNumber: sequentialCounter++, // Assign sequential number
+              itemNumber: sequentialCounter++,
             };
           })
           .filter(Boolean) as ContentItem[];
@@ -368,9 +492,25 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
         return { id: mod.id, title: mod.title, items };
       });
 
-      setSidebarModules(built);
+      // Apply completions using current values from refs to handle race conditions
+      const currentCompletedIds = completedLessonIdsRef.current;
+      const currentCompletedQuizIds = completedQuizIdsRef.current;
 
-      // Auto-expand the module containing the active lesson
+      const builtWithCompletions = built.map((mod) => ({
+        ...mod,
+        items: mod.items.map((item) => {
+          if (item.type === 'lesson' && currentCompletedIds.includes(item.id)) {
+            return { ...item, isCompleted: true };
+          }
+          if (item.type === 'quiz' && currentCompletedQuizIds.includes(item.id)) {
+            return { ...item, isCompleted: true };
+          }
+          return item;
+        }),
+      }));
+
+      setSidebarModules(builtWithCompletions);
+
       const activeModule = built.find((m) => m.items.some((i) => i.id === activeLessonId));
       setExpandedModules(
         activeModule ? [activeModule.id] : built.length > 0 ? [built[0].id] : []
@@ -380,11 +520,89 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [courseId, activeLessonId, completedLessonIds.length, completedQuizIds.length]);
+  }, [courseId]);
 
+  // Fetch modules when course changes
   useEffect(() => {
     fetchModules();
-  }, [fetchModules]);
+  }, [courseId]);
+
+  // Sync completion flags whenever data loads or completion state changes
+  // Uses refs to avoid stale closure issues when completions change during async operations
+  useEffect(() => {
+    // Wait for sidebar data to load before applying completions
+    if (sidebarModules.length === 0) return;
+
+    // Read from refs to always get the latest values, not stale closure values
+    const currentCompletedIds = completedLessonIdsRef.current;
+    const currentCompletedQuizIds = completedQuizIdsRef.current;
+
+    setSidebarModules((prev) => {
+      // Safety check
+      if (prev.length === 0) return prev;
+
+      return prev.map((mod) => ({
+        ...mod,
+        items: mod.items.map((item) => {
+          if (item.type === 'lesson' && currentCompletedIds.includes(item.id)) {
+            return { ...item, isCompleted: true };
+          }
+          if (item.type === 'quiz' && currentCompletedQuizIds.includes(item.id)) {
+            return { ...item, isCompleted: true };
+          }
+          return item;
+        }),
+      }));
+    });
+  }, [sidebarModules.length]);
+
+  // Optimistically update sidebar when a content item is completed
+  useEffect(() => {
+    if (!lastCompletedContentItemId) return;
+
+    console.log('[LessonSidebar] lastCompletedContentItemId changed:', lastCompletedContentItemId);
+    
+    setSidebarModules((prev) => {
+      const targetLessonId = activeLessonId;
+      if (!targetLessonId) return prev;
+
+      return prev.map((mod) => ({
+        ...mod,
+        items: mod.items.map((item) => {
+          if (item.type !== 'lesson') return item;
+          if (item.id !== targetLessonId) return item;
+
+          const pc = item.progressCount;
+          
+          // If no progressCount (text/notes-only lesson), mark as complete directly
+          if (!pc) {
+            console.log('[LessonSidebar] No progressCount for lesson, marking as complete directly');
+            return {
+              ...item,
+              isCompleted: true,
+            };
+          }
+
+          const newCompleted = Math.min(pc.completed + 1, pc.total);
+          const lessonComplete = newCompleted >= pc.total;
+
+          console.log('[LessonSidebar] Updating lesson progress:', {
+            lessonId: item.id,
+            oldCompleted: pc.completed,
+            newCompleted,
+            total: pc.total,
+            lessonComplete
+          });
+
+          return {
+            ...item,
+            progressCount: { ...pc, completed: newCompleted },
+            isCompleted: lessonComplete || item.isCompleted,
+          };
+        }),
+      }));
+    });
+  }, [lastCompletedContentItemId, activeLessonId]);
 
   const toggleModule = (moduleId: string) => {
     setExpandedModules((prev) =>
@@ -431,7 +649,6 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
     <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-card p-5 h-full flex flex-col">
       <h3 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary mb-4">Course content</h3>
 
-      {/* Progress Summary - moved to top under "Course content" title */}
       <div className="mb-4 pb-4 border-b border-[#EDF0FB] dark:border-gray-700">
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs text-text-muted">Course progress</span>
@@ -497,7 +714,7 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                         }`}
                       >
                         <div className="flex items-center gap-3 flex-1 text-left">
-                          {/* Sequential number instead of icon */}
+                          {/* Lesson number - always visible */}
                           <div className="flex-shrink-0 w-6">
                             {completed ? (
                               <span className="w-5 h-5 flex items-center justify-center bg-green-500 rounded-full text-white text-xs">
@@ -507,16 +724,26 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                               <Lock className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                             ) : (
                               <span className={`text-sm font-semibold ${
-                                isActive
-                                  ? 'text-brand-primary'
-                                  : 'text-text-muted dark:text-dark-text-muted'
+                                isLocked
+                                  ? 'text-gray-400 dark:text-gray-500'
+                                  : completed
+                                    ? 'text-green-600 dark:text-green-400'
+                                    : isActive
+                                      ? 'text-brand-primary'
+                                      : 'text-text-muted dark:text-dark-text-muted'
                               }`}>
                                 {item.itemNumber}
                               </span>
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
+                            {/* Checkmark on LEFT side of lesson title */}
                             <div className="flex items-center gap-2">
+                              {completed && (
+                                <span className="flex-shrink-0 w-3 h-3 flex items-center justify-center bg-green-500 rounded-full text-white">
+                                  <Check className="w-3 h-3" />
+                                </span>
+                              )}
                               <p className={`text-sm font-medium truncate ${
                                 isLocked
                                   ? 'text-gray-400 dark:text-gray-500'
@@ -548,9 +775,15 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                             </div>
                             <div className="flex items-center gap-2 mt-0.5">
                               <div className="flex items-center gap-1">
-                                {/* Video or Quiz icon next to duration */}
                                 {item.type === 'lesson' ? (
-                                  <Video className="w-3 h-3 text-blue-500 dark:text-blue-400" />
+                                  <div className="flex items-center gap-1">
+                                    {(item.hasVideo || (!item.hasQuiz && !item.hasVideo)) && (
+                                      <Video className="w-3 h-3 text-blue-500 dark:text-blue-400" />
+                                    )}
+                                    {item.hasQuiz && (
+                                      <FileQuestion className="w-3 h-3 text-purple-500 dark:text-purple-400" />
+                                    )}
+                                  </div>
                                 ) : (
                                   <FileQuestion className="w-3 h-3 text-purple-500 dark:text-purple-400" />
                                 )}

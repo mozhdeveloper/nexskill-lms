@@ -9,6 +9,7 @@ interface CheckItem {
 interface CoursePublishWorkflowProps {
   courseStatus: 'draft' | 'published';
   verificationStatus: string;
+  pendingContent?: boolean;
   adminFeedback?: string;
   onPublish: () => void;
   onUnpublish: () => void;
@@ -22,6 +23,7 @@ interface CoursePublishWorkflowProps {
 const CoursePublishWorkflow: React.FC<CoursePublishWorkflowProps> = ({
   courseStatus,
   verificationStatus,
+  pendingContent = false,
   adminFeedback,
   onPublish,
   onUnpublish,
@@ -41,6 +43,10 @@ const CoursePublishWorkflow: React.FC<CoursePublishWorkflowProps> = ({
   const allComplete = checks.every((c) => c.completed);
 
   const getVerificationBadge = () => {
+    // Phase 1.5: Show "Pending Changes" when course is approved but has unpublished content
+    if (verificationStatus === 'approved' && pendingContent) {
+      return { icon: '⏳', text: 'Pending Changes', color: 'text-purple-600', bg: 'bg-purple-50 border-purple-200' };
+    }
     switch (verificationStatus) {
       case 'approved':
         return { icon: '✅', text: 'Approved', color: 'text-green-600', bg: 'bg-green-50 border-green-200' };

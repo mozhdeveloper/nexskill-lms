@@ -26,7 +26,7 @@ export const StudentContentRenderer: React.FC<StudentContentRendererProps> = ({
   contentItems,
   lessonId,
   onQuizClick,
-  onContentItemComplete,
+  onContentItemComplete, // Used for item-level progress tracking (not lesson completion)
   onVideoComplete,
   prevItem,
   nextItem,
@@ -76,6 +76,7 @@ export const StudentContentRenderer: React.FC<StudentContentRendererProps> = ({
               <TextContent
                 key={item.id}
                 contentItemId={item.id}
+                lessonId={lessonId}
                 content={item.metadata?.content}
                 onComplete={() => onContentItemComplete?.(item.id)}
               />
@@ -99,6 +100,8 @@ export const StudentContentRenderer: React.FC<StudentContentRendererProps> = ({
                 key={item.id}
                 item={item}
                 index={index}
+                lessonId={lessonId}
+                onComplete={() => onContentItemComplete?.(item.id)}
               />
             );
           }
@@ -209,67 +212,81 @@ const QuizItem: React.FC<{
   );
 };
 
-// Notes Item - NO completion checkmark
+// Notes Item - Simple display (no per-item auto-completion)
 const NotesItem: React.FC<{
   item: LessonContentItem;
   index: number;
-}> = ({ item, index }) => {
+  lessonId: string;
+  onComplete?: () => void;
+}> = ({ item, index, lessonId, onComplete }) => {
+  const { isCompleted, isLoading, markAsViewed } = useContentItemProgress({
+    lessonId,
+    contentItemId: item.id,
+    contentType: 'notes',
+    onComplete,
+  });
+
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
         <BookOpen className="w-4 h-4 text-green-600" />
         <span>{item.metadata?.title || 'Notes'}</span>
-        {/* NO checkmark for notes */}
-      </div>
-      <div className="p-5 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
-        <div
-          className="notes-content prose prose-slate dark:prose-invert max-w-none text-gray-700 dark:text-gray-300"
-          dangerouslySetInnerHTML={{ __html: item.metadata?.content || '' }}
-        />
-        {(item.metadata?.word_count || item.metadata?.reading_time) && (
-          <div className="flex items-center gap-4 mt-4 pt-3 border-t border-green-200 dark:border-green-800 text-xs text-gray-500 dark:text-gray-400">
-            {item.metadata?.word_count && (
-              <span>{item.metadata.word_count} words</span>
-            )}
-            {item.metadata?.reading_time && (
-              <span>~{item.metadata.reading_time} min read</span>
-            )}
-          </div>
+        {isCompleted && (
+          <span className="w-5 h-5 flex items-center justify-center bg-green-500 rounded-full text-white text-xs flex-shrink-0">
+            ✓
+          </span>
         )}
+      </div>
+      <div className="relative">
+        <div
+          className="p-5 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800 max-h-[60vh] overflow-y-auto"
+        >
+          <div
+            className="notes-content prose prose-slate dark:prose-invert max-w-none text-gray-700 dark:text-gray-300"
+            dangerouslySetInnerHTML={{ __html: item.metadata?.content || '' }}
+          />
+          {(item.metadata?.word_count || item.metadata?.reading_time) && (
+            <div className="flex items-center gap-4 mt-4 pt-3 border-t border-green-200 dark:border-green-800 text-xs text-gray-500 dark:text-gray-400">
+              {item.metadata?.word_count && (
+                <span>{item.metadata.word_count} words</span>
+              )}
+              {item.metadata?.reading_time && (
+                <span>~{item.metadata.reading_time} min read</span>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 };
 
-// Text Content Component - NO auto completion tracking
-// Text blocks are considered "consumed" when viewed, but don't block lesson completion
+// Text Content Component - Simple display (no per-item auto-completion)
 const TextContent: React.FC<{
   contentItemId: string;
+  lessonId: string;
   content?: string;
   onComplete?: () => void;
-}> = ({ contentItemId, content, onComplete }) => {
-  // Only track completion if this is the ONLY content in the lesson
-  // Parent will handle the "only content" logic
-  useEffect(() => {
-    // Just notify parent that this text was viewed (for analytics/logging if needed)
-    // But DON'T mark as completed in database
-    const timer = setTimeout(() => {
-      console.log('[TextContent] Text viewed (not marking complete):', contentItemId);
-      // Optionally call onComplete for tracking, but it won't affect lesson completion
-      // onComplete?.(); 
-    }, 2000);
-
-    return () => clearTimeout(timer);
-  }, [contentItemId, onComplete]);
+}> = ({ contentItemId, lessonId, content, onComplete }) => {
+  const { isCompleted } = useContentItemProgress({
+    lessonId,
+    contentItemId,
+    contentType: 'text',
+    onComplete,
+  });
 
   return (
-    <div className="prose prose-slate dark:prose-invert max-w-none p-4 bg-gray-50 dark:bg-slate-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+    <div className="relative">
       <div
-        className="text-content [&>h1]:text-2xl [&>h1]:font-bold [&>h1]:mb-4 [&>h1]:mt-6 [&>h2]:text-xl [&>h2]:font-bold [&>h2]:mb-3 [&>h2]:mt-5 [&>h3]:text-lg [&>h3]:font-semibold [&>h3]:mb-2 [&>h3]:mt-4 [&>h4]:text-base [&>h4]:font-semibold [&>h4]:mb-2 [&>h4]:mt-3 [&>ol]:list-decimal [&>ol]:ml-6 [&>ol]:my-3 [&>ul]:list-disc [&>ul]:ml-6 [&>ul]:my-3 [&>li]:mb-1 [&>p]:mb-3 [&>p]:leading-relaxed"
-        dangerouslySetInnerHTML={{
-          __html: DOMPurify.sanitize(content || 'Text content'),
-        }}
-      />
+        className="prose prose-slate dark:prose-invert max-w-none p-4 bg-gray-50 dark:bg-slate-700/50 rounded-lg border border-gray-200 dark:border-gray-600 max-h-[60vh] overflow-y-auto"
+      >
+        <div
+          className="text-content [&>h1]:text-2xl [&>h1]:font-bold [&>h1]:mb-4 [&>h1]:mt-6 [&>h2]:text-xl [&>h2]:font-bold [&>h2]:mb-3 [&>h2]:mt-5 [&>h3]:text-lg [&>h3]:font-semibold [&>h3]:mb-2 [&>h3]:mt-4 [&>h4]:text-base [&>h4]:font-semibold [&>h4]:mb-2 [&>h4]:mt-3 [&>ol]:list-decimal [&>ol]:ml-6 [&>ol]:my-3 [&>ul]:list-disc [&>ul]:ml-6 [&>ul]:my-3 [&>li]:mb-1 [&>p]:mb-3 [&>p]:leading-relaxed"
+          dangerouslySetInnerHTML={{
+            __html: DOMPurify.sanitize(content || 'Text content'),
+          }}
+        />
+      </div>
     </div>
   );
 };

@@ -129,7 +129,7 @@ const CourseUpdateRequests: React.FC = () => {
       // Publish all modules
       await supabase
         .from("modules")
-        .update({ is_published: true })
+        .update({ content_status: 'published' })
         .eq("course_id", courseId);
 
       // Publish all content items
@@ -137,20 +137,20 @@ const CourseUpdateRequests: React.FC = () => {
         .from("modules")
         .select("id")
         .eq("course_id", courseId);
-      
+
       if (modules && modules.length > 0) {
         const moduleIds = modules.map(m => m.id);
-        
+
         await supabase
           .from("module_content_items")
-          .update({ is_published: true })
+          .update({ content_status: 'published' })
           .in("module_id", moduleIds);
 
         // Publish all lessons
         await supabase
           .from("lessons")
-          .update({ is_published: true })
-          .in("id", 
+          .update({ content_status: 'published' })
+          .in("id",
             (await supabase
               .from("module_content_items")
               .select("content_id")
@@ -162,8 +162,8 @@ const CourseUpdateRequests: React.FC = () => {
         // Publish all quizzes
         await supabase
           .from("quizzes")
-          .update({ is_published: true })
-          .in("id", 
+          .update({ content_status: 'published' })
+          .in("id",
             (await supabase
               .from("module_content_items")
               .select("content_id")

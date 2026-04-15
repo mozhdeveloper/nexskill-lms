@@ -354,7 +354,7 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
             duration: "0 min",
             summary: "",
             content_blocks: [],
-            is_published: false,
+            content_status: 'draft',
         };
         if (onAddLesson) {
             await onAddLesson(moduleId, newLesson);
@@ -455,7 +455,7 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
             setContentOptions({
                 ...contentOptions,
                 notesContent: '',
-                mode: keepPickerOpen ? "picker" : null
+                mode: (keepPickerOpen ? "picker" : null) as ContentOptions["mode"]
             });
         } catch (error) {
             console.error('Error creating notes content item:', error);
@@ -821,19 +821,19 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                                                 placeholder="Lesson title..."
                                                             />
                                                             {!lessonExpanded && hasContent && (
-                                                                <div className="flex-shrink-0">
-                                                                    {videoBlock && (
-                                                                        <span className="flex items-center gap-1 text-xs text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-full font-medium">
-                                                                            <Video className="w-3 h-3" />
-                                                                        </span>
-                                                                    )}
-                                                                    {quizBlock && (
-                                                                        <span className="flex items-center gap-1 text-xs text-purple-500 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 px-2 py-0.5 rounded-full font-medium">
-                                                                            <FileQuestion className="w-3 h-3" />
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            )}
+                                                            <div className="flex-shrink-0 flex flex-row gap-1">
+                                                                {videoBlock && (
+                                                                    <span className="flex items-center gap-1 text-xs text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-full font-medium">
+                                                                        <Video className="w-3 h-3" />
+                                                                    </span>
+                                                                )}
+                                                                {quizBlock && (
+                                                                    <span className="flex items-center gap-1 text-xs text-purple-500 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 px-2 py-0.5 rounded-full font-medium">
+                                                                        <FileQuestion className="w-3 h-3" />
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                         </div>
 
                                                         <button

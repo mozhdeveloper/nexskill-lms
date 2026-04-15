@@ -10,11 +10,11 @@
         try {
           const localTheme = localStorage.getItem('ui-theme');
           const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-          
+
           if (!localTheme) {
-            // Requirement 1: Force Default Dark Mode on very first visit
-            localStorage.setItem('ui-theme', 'dark');
-            document.documentElement.classList.add('dark');
+            // Requirement 1: Force Default Light Mode on very first visit
+            localStorage.setItem('ui-theme', 'light');
+            document.documentElement.classList.remove('dark');
           } else {
             if (localTheme === 'dark') {
               document.documentElement.classList.add('dark');

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
@@ -13,6 +13,7 @@ import MarkLessonCompleteModal from '../../components/learning/MarkLessonComplet
 import type { Lesson } from '../../types/lesson';
 import type { LessonContentItem } from '../../types/lesson-content-item';
 import { fetchLessonContentItems } from '../../lib/supabase/lesson-content.queries';
+import { usePageScrollCompletion } from '../../hooks/usePageScrollCompletion';
 import { useLessonAccessStatus } from '../../hooks/useQuizSubmission';
 
 type LessonWithModule = Lesson & { moduleTitle?: string };
@@ -32,7 +33,7 @@ const CoursePlayer: React.FC = () => {
   const [showGraduation, setShowGraduation] = useState(false);
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
   const [completedQuizIds, setCompletedQuizIds] = useState<string[]>([]);
-  const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0); // Increments to trigger sidebar progress refresh
+  const [lastCompletedContentItemId, setLastCompletedContentItemId] = useState<string | null>(null);
   const [totalLessonsInCourse, setTotalLessonsInCourse] = useState(0);
   const [courseTitle, setCourseTitle] = useState('');
   const [currentLesson, setCurrentLesson] = useState<LessonWithModule | null>(null);
@@ -41,14 +42,66 @@ const CoursePlayer: React.FC = () => {
   const [flatItemList, setFlatItemList] = useState<FlatItem[]>([]);
   const [lessonContentItems, setLessonContentItems] = useState<LessonContentItem[]>([]);
   const [lockedLessonIds, setLockedLessonIds] = useState<Set<string>>(new Set());
-
-  // New state: active bottom tab
   const [activeTab, setActiveTab] = useState<BottomTab | null>(null);
+
+  // Ref to track completed content items locally to avoid DB fetch race conditions
+  const completedContentItemsRef = useRef<Set<string>>(new Set());
+
+  // Track if current lesson has been marked complete (state to trigger re-renders)
+  const [currentLessonMarkedComplete, setCurrentLessonMarkedComplete] = useState(false);
+
+  // Hook to detect when user scrolls to bottom of page (near Next Lesson button)
+  const handlePageScrollComplete = useCallback(() => {
+    if (currentLessonMarkedComplete || !lessonId || !courseId) return;
+
+    console.log('[CoursePlayer] User scrolled to bottom of page, marking lesson complete');
+    setCurrentLessonMarkedComplete(true);
+
+    // Update UI immediately (optimistic update)
+    setCompletedLessons(prev => prev.includes(lessonId) ? prev : [...prev, lessonId]);
+
+    // Mark lesson as complete in DB
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+
+      supabase
+        .from('user_lesson_progress')
+        .upsert({
+          user_id: user.id,
+          lesson_id: lessonId,
+          is_completed: true,
+          completed_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,lesson_id' })
+        .then(({ error }) => {
+          if (error) {
+            console.error('[CoursePlayer] Error marking lesson complete:', error);
+          } else {
+            console.log('[CoursePlayer] Lesson marked complete in DB');
+          }
+        });
+    });
+  }, [lessonId, courseId, currentLessonMarkedComplete]);
+
+  // Check if lesson is notes-only (no videos/quizzes)
+  const hasVideosOrQuizzes = lessonContentItems.some(item => 
+    item.content_type === 'video' || item.content_type === 'quiz'
+  );
+  const isNotesOnlyLesson = lessonContentItems.length > 0 && !hasVideosOrQuizzes;
+
+  // Only enable scroll completion for notes-only lessons
+  // Video/quizzes lessons should only complete via their own progress tracking
+  const { triggerRef: bottomTriggerRef } = usePageScrollCompletion({
+  onComplete: handlePageScrollComplete,
+  enabled: !!lessonId && !!courseId && !currentLessonMarkedComplete && isNotesOnlyLesson,
+  resetKey: `${lessonId}-${isNotesOnlyLesson}`,
+});
 
   // Fetch lesson access status (locked/unlocked)
   const { isLessonLocked } = useLessonAccessStatus(courseId);
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchLessonData = async () => {
       if (!courseId || !lessonId) return;
 
@@ -56,7 +109,6 @@ const CoursePlayer: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        // Fetch course title
         const { data: courseData, error: courseError } = await supabase
           .from('courses')
           .select('title')
@@ -64,18 +116,17 @@ const CoursePlayer: React.FC = () => {
           .single();
 
         if (courseError) throw courseError;
+        if (cancelled) return;
         setCourseTitle(courseData.title);
 
-        // Fetch lesson data including content_blocks
         const { data: lessonData, error: lessonError } = await supabase
           .from('lessons')
-          .select('id, title, description, content_blocks, estimated_duration_minutes, is_published, created_at, updated_at')
+          .select('id, title, description, content_blocks, estimated_duration_minutes, content_status, created_at, updated_at')
           .eq('id', lessonId)
           .single();
 
         if (lessonError) throw lessonError;
 
-        // Also fetch module information for the lesson
         const { data: moduleData, error: moduleError } = await supabase
           .from('module_content_items')
           .select(`
@@ -93,26 +144,30 @@ const CoursePlayer: React.FC = () => {
           moduleTitle: (moduleData.modules as unknown as { title: string } | null)?.title || ''
         };
 
+        if (cancelled) return;
         setCurrentLesson(lessonWithModule);
 
-        // Fetch content items for this lesson
         try {
           const contentItems = await fetchLessonContentItems(lessonId);
+          console.log('[CoursePlayer] Fetched lessonContentItems for lesson', lessonId, ':', contentItems);
+          console.log('[CoursePlayer] lessonContentItems.length:', contentItems.length);
+          console.log('[CoursePlayer] lessonContentItems types:', contentItems.map(item => item.content_type));
+          
+          if (cancelled) return;
           setLessonContentItems(contentItems);
         } catch (contentError) {
-          console.error('Error fetching lesson content items:', contentError);
+          console.error('[CoursePlayer] Error fetching lesson content items:', contentError);
+          if (cancelled) return;
           setLessonContentItems([]);
         }
 
-        // Fetch completed lessons using user_lesson_progress
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          // Get all modules for this course
           const { data: mods } = await supabase
             .from('modules')
             .select('id, position')
             .eq('course_id', courseId)
-            .eq('is_published', true)
+            .eq('content_status', 'published')
             .order('position', { ascending: true });
 
           const moduleIds = (mods || []).map((m: any) => m.id);
@@ -122,23 +177,24 @@ const CoursePlayer: React.FC = () => {
               .from('module_content_items')
               .select('module_id, content_id, content_type, position')
               .in('module_id', moduleIds)
-              .eq('is_published', true)
+              .eq('content_status', 'published')
               .order('position', { ascending: true });
 
-            // Build flat ordered item list (modules ordered by position, items within by position)
             const moduleOrder = new Map((mods || []).map((m: any, i: number) => [m.id, i]));
             const sorted = [...(contentItems || [])].sort((a, b) => {
               const modDiff = (moduleOrder.get(a.module_id) ?? 0) - (moduleOrder.get(b.module_id) ?? 0);
               return modDiff !== 0 ? modDiff : a.position - b.position;
             });
+
+            if (cancelled) return;
             setFlatItemList(sorted.map((ci) => ({ id: ci.content_id, type: ci.content_type as 'lesson' | 'quiz' })));
 
             const lessonIds = sorted.filter((ci) => ci.content_type === 'lesson').map((ci) => ci.content_id);
             const quizIdsInCourse = sorted.filter((ci) => ci.content_type === 'quiz').map((ci) => ci.content_id);
 
+            if (cancelled) return;
             setTotalLessonsInCourse(lessonIds.length);
 
-            // Fetch lesson completion
             if (lessonIds.length > 0) {
               const { data: progressRows } = await supabase
                 .from('user_lesson_progress')
@@ -146,10 +202,18 @@ const CoursePlayer: React.FC = () => {
                 .eq('user_id', user.id)
                 .eq('is_completed', true)
                 .in('lesson_id', lessonIds);
-              setCompletedLessons((progressRows || []).map((r: any) => r.lesson_id));
+
+              const dbCompleted = (progressRows || []).map((r: any) => r.lesson_id);
+
+              // Merge with existing optimistic completions instead of replacing
+              // This prevents double-fetches or race conditions from wiping out optimistic state
+              if (cancelled) return;
+              setCompletedLessons(prev => {
+                const merged = new Set([...dbCompleted, ...prev]);
+                return Array.from(merged);
+              });
             }
 
-            // Fetch quiz completion
             if (quizIdsInCourse.length > 0) {
               const { data: quizRows } = await supabase
                 .from('quiz_attempts')
@@ -157,33 +221,44 @@ const CoursePlayer: React.FC = () => {
                 .eq('user_id', user.id)
                 .eq('passed', true)
                 .in('quiz_id', quizIdsInCourse);
-              setCompletedQuizIds([...new Set((quizRows || []).map((r: any) => r.quiz_id))]);
+
+              const dbQuizCompleted = (quizRows || []).map((r: any) => r.quiz_id);
+
+              // Merge with existing optimistic completions
+              if (cancelled) return;
+              setCompletedQuizIds(prev => {
+                const merged = new Set([...dbQuizCompleted, ...prev]);
+                return Array.from(merged);
+              });
             }
           }
         }
       } catch (err) {
+        if (cancelled) return;
         console.error('Error fetching lesson data:', err);
         setError('Failed to load lesson data');
       } finally {
+        if (cancelled) return;
         setLoading(false);
       }
     };
 
     fetchLessonData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [courseId, lessonId]);
 
-  // Calculate lesson number (1-based index of lessons only)
   const lessonNumber = flatItemList
     .filter(item => item.type === 'lesson')
     .findIndex(item => item.id === lessonId) + 1;
 
-  // Calculate progress based on completed lessons
   const progress = totalLessonsInCourse > 0
     ? Math.min(100, Math.round((completedLessons.length / totalLessonsInCourse) * 100))
     : 0;
 
   const handleSelectLesson = (newLessonId: string) => {
-    // Check if this is a quiz or a lesson
     const item = flatItemList.find((i) => i.id === newLessonId);
     if (item?.type === 'quiz') {
       navigate(`/student/courses/${courseId}/quizzes/${newLessonId}/take`);
@@ -197,7 +272,6 @@ const CoursePlayer: React.FC = () => {
     }
   };
 
-  // Next / Previous navigation helpers
   const currentIndex = flatItemList.findIndex((i) => i.id === lessonId);
   const prevItem = currentIndex > 0 ? flatItemList[currentIndex - 1] : null;
   const nextItem = currentIndex >= 0 && currentIndex < flatItemList.length - 1 ? flatItemList[currentIndex + 1] : null;
@@ -248,7 +322,6 @@ const CoursePlayer: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Upsert into user_lesson_progress
       const { error } = await supabase
         .from('user_lesson_progress')
         .upsert({
@@ -260,7 +333,6 @@ const CoursePlayer: React.FC = () => {
 
       if (error) throw error;
 
-      // Optimistically update local state
       setCompletedLessons(prev => prev.includes(lessonId) ? prev : [...prev, lessonId]);
       setShowCompleteModal(false);
     } catch (err) {
@@ -520,7 +592,6 @@ const CoursePlayer: React.FC = () => {
     }
   }, []);
 
-  // Callback for video completion - refreshes the completed lessons list
   const handleVideoComplete = useCallback(() => {
     console.log('[CoursePlayer] Video complete - checking lesson completion');
 
@@ -538,7 +609,7 @@ const CoursePlayer: React.FC = () => {
         .from('modules')
         .select('id')
         .eq('course_id', courseId)
-        .eq('is_published', true);
+        .eq('content_status', 'published');
 
       const moduleIds = (mods || []).map((m: any) => m.id);
 
@@ -564,24 +635,27 @@ const CoursePlayer: React.FC = () => {
       }
     };
 
-    checkLessonCompletion();
-  }, [courseId, lessonId, checkAndMarkLessonComplete]);
+    refreshCompletedLessons();
+    // Removed completedLessons from deps to prevent race condition where stale DB fetch overwrites optimistic update
+  }, [courseId, lessonId]);
 
   // Handle individual content item completion
   const handleContentItemComplete = useCallback(async (completedContentItemId: string) => {
     console.log('[CoursePlayer] Content item completed:', completedContentItemId);
+    // Only update sidebar optimistically - don't check for lesson completion
+    setLastCompletedContentItemId(completedContentItemId);
+  }, []);
 
-    if (!courseId || !lessonId) return;
+  // Reset the completion tracking ref when the lesson changes
+  useEffect(() => {
+    completedContentItemsRef.current = new Set();
+  }, [lessonId]);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    // Check and mark lesson complete
-    await checkAndMarkLessonComplete(user.id, lessonId);
-
-    // Trigger sidebar progress count refresh
-    setSidebarRefreshKey(k => k + 1);
-  }, [courseId, lessonId, checkAndMarkLessonComplete]);
+  // Reset lesson completion state when navigating to a new lesson
+  // This ensures scroll-to-complete works for EVERY lesson, not just the first one
+  useEffect(() => {
+    setCurrentLessonMarkedComplete(false);
+  }, [lessonId]);
 
   // Show graduation banner when all lessons are complete
   useEffect(() => {
@@ -698,7 +772,54 @@ const CoursePlayer: React.FC = () => {
     alert('Debug check complete! Check browser console for details.');
   }, [lessonId, checkAndMarkLessonComplete]);
 
-  // Handle AI Summary tab — opens drawer instead of inline panel
+  // NEW: Check lesson completion on mount (fixes issue where lesson was already complete but not marked)
+  useEffect(() => {
+    if (!lessonId || !courseId) return;
+    
+    console.log('[CoursePlayer] 📋 Checking lesson completion on mount from database...');
+    
+    const checkOnMount = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Wait a bit for any pending saves
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Check if lesson is already complete in database
+      const { data: existingCompletion, error } = await supabase
+        .from('user_lesson_progress')
+        .select('is_completed')
+        .eq('user_id', user.id)
+        .eq('lesson_id', lessonId)
+        .eq('is_completed', true)
+        .single();
+
+      console.log('[CoursePlayer] Database query result:', existingCompletion);
+      console.log('[CoursePlayer] Database error:', error);
+
+      if (existingCompletion && existingCompletion.is_completed === true) {
+        console.log('[CoursePlayer] ✅ Lesson is COMPLETE in database - unlocking Next button');
+        // Update the component state so the Next button unlocks
+        setCompletedLessons(prev => {
+          const alreadyThere = prev.includes(lessonId);
+          console.log('[CoursePlayer] Current completedLessons:', prev);
+          console.log('[CoursePlayer] LessonId already in state?', alreadyThere);
+          if (alreadyThere) return prev;
+          const updated = [...prev, lessonId];
+          console.log('[CoursePlayer] ➕ Updated completedLessons to:', updated);
+          return updated;
+        });
+        return;
+      }
+
+      // If not complete, run the full check
+      console.log('[CoursePlayer] ⏳ Lesson not complete yet in database - running full check...');
+      await checkAndMarkLessonComplete(user.id, lessonId);
+    };
+
+    checkOnMount();
+  }, [lessonId, courseId, checkAndMarkLessonComplete]);
+
   const handleTabClick = (tab: BottomTab) => {
     if (tab === 'ai-summary') {
       setShowAIDrawer(true);
@@ -769,33 +890,26 @@ const CoursePlayer: React.FC = () => {
     );
   }
 
-  return (
-    <StudentAppLayout>
-      {/* Header */}
-      <div className="px-8 py-4 border-b border-[#EDF0FB] dark:border-gray-700">
-        <div className="flex items-start justify-between mb-2">
-          <div className="flex-1">
-            <h1 className="text-xl font-bold text-text-primary dark:text-dark-text-primary mb-1">{courseTitle}</h1>
-            <h2 className="text-lg text-text-secondary dark:text-dark-text-secondary mb-2">{currentLesson.title}</h2>
-            <div className="flex items-center gap-4 text-sm text-text-muted dark:text-dark-text-muted">
-              <span>{currentLesson.moduleTitle ?? ''}</span>
-              <span>•</span>
-              <span>Lesson {lessonNumber > 0 ? lessonNumber : 1}</span>
-              <span>•</span>
-              <span>{currentLesson.estimated_duration_minutes} min</span>
-            </div>
-          </div>
-        </div>
+  // Custom header content to pass to StudentAppLayout
+  const customHeader = (
+    <div className="flex items-center justify-between w-full">
+      <h1 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary truncate max-w-md">
+        {courseTitle}
+      </h1>
+      <div className="flex items-center gap-4">
+        {/* You can add other nav items here if needed */}
       </div>
+    </div>
+  );
 
+  return (
+    <StudentAppLayout customHeader={customHeader} hideSearch={true}>
       {/* Main Content — Udemy-style 2-column layout */}
-      <div className="flex-1 overflow-y-auto px-8 py-6">
-        <div className="flex gap-6 h-full">
-
+      <div className="flex-1 overflow-y-auto px-8 py-6 pt-4">
+        <div className="flex gap-6 items-start">
           {/* Left: Main content area (expanded) */}
           <div className="flex-1 min-w-0 flex flex-col gap-6">
-
-            {/* Content renderer — larger, more padded */}
+            {/* Content renderer */}
             <div className="bg-white dark:bg-dark-background-card rounded-2xl p-8 shadow-lg border border-gray-100 dark:border-gray-700">
               {lessonContentItems && lessonContentItems.length > 0 ? (
                 <StudentContentRenderer
@@ -809,6 +923,7 @@ const CoursePlayer: React.FC = () => {
                   onNavigatePrevious={handleNavigatePrevious}
                   onNavigateNext={handleNavigateNext}
                   isNextItemLocked={isNextItemLocked}
+                  bottomTriggerRef={bottomTriggerRef}
                 />
               ) : (
                 <ContentBlockRenderer
@@ -820,9 +935,8 @@ const CoursePlayer: React.FC = () => {
               )}
             </div>
 
-            {/* Bottom tools section — horizontal tab bar */}
+            {/* Bottom tools section */}
             <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden">
-              {/* Tab headers */}
               <div className="flex border-b border-gray-200 dark:border-gray-700">
                 {bottomTabs.map((tab) => (
                   <button
@@ -840,7 +954,6 @@ const CoursePlayer: React.FC = () => {
                 ))}
               </div>
 
-              {/* Active tab content — smooth transition */}
               {activeTab && activeTab !== 'ai-summary' && (
                 <div
                   className="p-6 transition-all duration-300 ease-in-out"
@@ -858,26 +971,26 @@ const CoursePlayer: React.FC = () => {
                 </div>
               )}
             </div>
-
           </div>
 
-          {/* Right: Course content sidebar (Udemy-style, full height, sticky) */}
-          <aside className="w-80 xl:w-96 flex-shrink-0 h-[calc(100vh-200px)] sticky top-4 overflow-y-auto rounded-2xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/60 shadow-sm
-            [&::-webkit-scrollbar]:w-1.5
-            [&::-webkit-scrollbar-track]:bg-transparent
-            [&::-webkit-scrollbar-thumb]:bg-gray-300
-            dark:[&::-webkit-scrollbar-thumb]:bg-gray-700
-            [&::-webkit-scrollbar-thumb]:rounded-full">
-            <LessonSidebar
-              courseId={courseId || ''}
-              activeLessonId={lessonId || ''}
-              onSelectLesson={handleSelectLesson}
-              completedLessonIds={completedLessons}
-              completedQuizIds={completedQuizIds}
-              refreshKey={sidebarRefreshKey}
-            />
-          </aside>
-
+          {/* Right: Course content sidebar - Fixed position */}
+          <div className="w-80 xl:w-96 flex-shrink-0 self-start">
+            <div className="fixed w-80 xl:w-96 max-h-[calc(100vh-105px)] rounded-2xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/60 shadow-sm overflow-y-auto
+              [&::-webkit-scrollbar]:w-1.5
+              [&::-webkit-scrollbar-track]:bg-transparent
+              [&::-webkit-scrollbar-thumb]:bg-gray-300
+              dark:[&::-webkit-scrollbar-thumb]:bg-gray-700
+              [&::-webkit-scrollbar-thumb]:rounded-full">
+              <LessonSidebar
+                courseId={courseId || ''}
+                activeLessonId={lessonId || ''}
+                onSelectLesson={handleSelectLesson}
+                completedLessonIds={completedLessons}
+                completedQuizIds={completedQuizIds}
+                lastCompletedContentItemId={lastCompletedContentItemId}
+              />
+            </div>
+          </div>
         </div>
       </div>
 

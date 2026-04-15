@@ -12,7 +12,7 @@ export interface LessonContentItem {
     content_id: string | null; // UUID for quiz type, null for video/text/document/notes
     metadata: ContentMetadata;
     position: number;
-    is_published: boolean;
+    content_status: 'draft' | 'published' | 'pending_addition' | 'pending_deletion';
     created_at: string;
     updated_at: string;
 }
@@ -111,7 +111,7 @@ export interface CreateContentItemInput {
     content_id?: string | null;
     metadata?: ContentMetadata;
     position?: number;
-    is_published?: boolean;
+    content_status?: 'draft' | 'published' | 'pending_addition' | 'pending_deletion';
 }
 
 /**
@@ -122,7 +122,7 @@ export interface UpdateContentItemInput {
     content_id?: string | null;
     metadata?: ContentMetadata;
     position?: number;
-    is_published?: boolean;
+    content_status?: 'draft' | 'published' | 'pending_addition' | 'pending_deletion';
 }
 
 /**

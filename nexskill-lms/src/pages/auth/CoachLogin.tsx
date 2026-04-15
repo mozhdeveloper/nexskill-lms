@@ -118,7 +118,6 @@ const CoachLogin: React.FC = () => {
                     return;
                 }
 
-                setTheme('dark');
                 navigate(defaultLandingRouteByRole['COACH']);
             }
         } catch (err) {
@@ -173,7 +172,6 @@ const CoachLogin: React.FC = () => {
                 }
 
                 // Redirect to coach dashboard
-                setTheme('dark');
                 navigate(defaultLandingRouteByRole['COACH']);
             }
 

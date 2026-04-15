@@ -57,7 +57,9 @@ const CourseList: React.FC = () => {
           const mappedCourses = data.map((course: any) => {
             let status = 'draft';
 
-            if (course.verification_status === 'approved' && course.visibility === 'public') {
+            if (course.verification_status === 'approved' && course.pending_content === true) {
+              status = 'pending_changes';
+            } else if (course.verification_status === 'approved' && course.visibility === 'public') {
               status = 'published';
             } else if (course.verification_status === 'pending_review') {
               status = 'pending';
@@ -188,7 +190,7 @@ const CourseList: React.FC = () => {
         {/* Main Content */}
         <div className="p-8">
           {/* Stats Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
             <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 dark:border-gray-700 p-5">
               <p className="text-sm text-slate-600 dark:text-dark-text-secondary mb-1">Total courses</p>
               <p className="text-3xl font-bold text-[#304DB5]">{courses.length}</p>
@@ -197,6 +199,12 @@ const CourseList: React.FC = () => {
               <p className="text-sm text-slate-600 dark:text-dark-text-secondary mb-1">Published</p>
               <p className="text-3xl font-bold text-green-600">
                 {courses.filter((c) => c.status === 'published').length}
+              </p>
+            </div>
+            <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 dark:border-gray-700 p-5">
+              <p className="text-sm text-slate-600 dark:text-dark-text-secondary mb-1">Pending Changes</p>
+              <p className="text-3xl font-bold text-purple-600">
+                {courses.filter((c) => c.status === 'pending_changes').length}
               </p>
             </div>
             <div className="bg-white dark:bg-dark-background-card rounded-2xl shadow-sm border border-slate-200 dark:border-gray-700 p-5">

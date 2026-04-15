@@ -81,7 +81,7 @@ const CourseStudents: React.FC = () => {
           .select('content_id')
           .in('module_id', moduleIds)
           .eq('content_type', 'lesson')
-          .eq('is_published', true);
+          .eq('content_status', 'published');
         lessonIds = (items || []).map(i => i.content_id);
       }
 
@@ -98,7 +98,7 @@ const CourseStudents: React.FC = () => {
 
       // 6. Quiz IDs for this course (published only) - MUST come from module_content_items
       let quizIds: string[] = [];
-      
+
       // Get quizzes from module_content_items (this is the ONLY way quizzes are linked to courses)
       if (moduleIds.length) {
         const { data: qi, error: quizItemError } = await supabase
@@ -106,7 +106,7 @@ const CourseStudents: React.FC = () => {
           .select('content_id')
           .in('module_id', moduleIds)
           .eq('content_type', 'quiz')
-          .eq('is_published', true);
+          .eq('content_status', 'published');
         
         if (quizItemError) {
           console.error('❌ Error fetching quiz content items:', quizItemError);

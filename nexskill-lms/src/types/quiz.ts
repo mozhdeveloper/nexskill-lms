@@ -137,8 +137,12 @@ export interface Quiz {
     quiz_type?: 'standard' | 'coach_reviewed'; // Explicit quiz type
     allow_skipped_questions?: boolean; // Whether students can skip questions
     requires_manual_grading: boolean;
+<<<<<<< HEAD
     requires_coach_approval?: boolean;
     is_published: boolean;
+=======
+    content_status: 'draft' | 'published' | 'pending_addition' | 'pending_deletion';
+>>>>>>> origin/lms
     available_from?: string;
     due_date?: string;
     late_submission_allowed: boolean;

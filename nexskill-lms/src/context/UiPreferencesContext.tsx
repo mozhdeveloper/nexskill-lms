@@ -29,9 +29,9 @@ export const UiPreferencesProvider: React.FC<UiPreferencesProviderProps> = ({ ch
     if (typeof window !== 'undefined') {
       // Logic mirrors index.html to ensure sync
       const persisted = localStorage.getItem('ui-theme') as Theme;
-      return persisted || 'dark'; // Default to dark if nothing saved
+      return persisted || 'light'; // Default to light if nothing saved
     }
-    return 'dark';
+    return 'light';
   });
 
   // Apply theme class to document element

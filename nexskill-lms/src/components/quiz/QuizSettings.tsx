@@ -433,9 +433,9 @@ const QuizSettings: React.FC<QuizSettingsProps> = ({ quiz, onChange }) => {
                         <label className="flex items-center gap-2 cursor-pointer">
                             <input
                                 type="checkbox"
-                                checked={quiz.is_published}
+                                checked={quiz.content_status === 'published'}
                                 onChange={(e) =>
-                                    onChange({ is_published: e.target.checked })
+                                    onChange({ content_status: e.target.checked ? 'published' : 'draft' })
                                 }
                                 className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                             />

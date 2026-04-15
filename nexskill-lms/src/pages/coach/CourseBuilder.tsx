@@ -81,6 +81,7 @@ const CourseBuilder: React.FC = () => {
   const [activeSection, setActiveSection] = useState<SectionKey>("settings");
   const [courseStatus, setCourseStatus] = useState<"draft" | "published">("draft");
   const [verificationStatus, setVerificationStatus] = useState<string>("draft");
+  const [pendingContent, setPendingContent] = useState<boolean>(false);
   const [adminFeedback, setAdminFeedback] = useState<string>("");
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [instructorName, setInstructorName] = useState<string>("Instructor");
@@ -92,15 +93,16 @@ const CourseBuilder: React.FC = () => {
       if (!courseId) return;
       const { data } = await supabase
         .from('courses')
-        .select('verification_status')
+        .select('verification_status, pending_content')
         .eq('id', courseId)
         .single();
-      
+
       const isPublished = data?.verification_status === 'approved';
       setIsCoursePublished(isPublished);
-      console.log('[CourseBuilder] Course is published:', isPublished);
+      setPendingContent(data?.pending_content || false);
+      console.log('[CourseBuilder] Course is published:', isPublished, 'pending_content:', data?.pending_content);
     };
-    
+
     checkCoursePublished();
   }, [courseId]);
 
@@ -160,6 +162,7 @@ const CourseBuilder: React.FC = () => {
         const isPublished = courseData.verification_status === 'approved';
         setCourseStatus(isPublished ? "published" : "draft");
         setVerificationStatus(courseData.verification_status || "draft");
+        setPendingContent(courseData.pending_content || false);
 
         const dbPrice = courseData.price ?? 0;
         const pricingMode: 'free' | 'one-time' | 'subscription' = dbPrice === 0 ? 'free' : 'one-time';
@@ -214,7 +217,7 @@ const CourseBuilder: React.FC = () => {
                       description: item.lesson_description,
                       content_blocks: contentBlocks,
                       estimated_duration_minutes: item.lesson_estimated_duration_minutes,
-                      is_published: item.lesson_is_published || item.item_is_published,
+                      content_status: item.lesson_content_status || item.item_content_status,
                       created_at: item.lesson_created_at,
                       updated_at: item.lesson_updated_at,
                       type_attr: lessonType,
@@ -232,7 +235,7 @@ const CourseBuilder: React.FC = () => {
                       time_limit_minutes: item.time_limit_minutes,
                       max_attempts: item.quiz_max_attempts,
                       requires_manual_grading: item.quiz_requires_manual_grading,
-                      is_published: item.quiz_is_published || item.item_is_published,
+                      content_status: item.quiz_content_status || item.item_content_status,
                       created_at: item.quiz_created_at,
                       updated_at: item.quiz_updated_at,
                       available_from: item.available_from,
@@ -460,7 +463,7 @@ const CourseBuilder: React.FC = () => {
     }
 
     const lessonId = uuidv4();
-    
+
     // If course is already published, save new content as unpublished (pending approval)
     const shouldSaveAsUnpublished = isCoursePublished;
     console.log('[CourseBuilder] Adding lesson - isCoursePublished:', isCoursePublished, 'will save as unpublished:', shouldSaveAsUnpublished);
@@ -472,7 +475,7 @@ const CourseBuilder: React.FC = () => {
         description: newLesson.description || "",
         content_blocks: newLesson.content_blocks || [],
         estimated_duration_minutes: newLesson.estimated_duration_minutes || 15,
-        is_published: shouldSaveAsUnpublished ? false : (newLesson.is_published || false),
+        content_status: shouldSaveAsUnpublished ? 'pending_addition' : 'published',
         course_id: courseId,
       }]);
 
@@ -496,7 +499,7 @@ const CourseBuilder: React.FC = () => {
           content_type: "lesson",
           content_id: lessonId,
           position: newPosition,
-          is_published: shouldSaveAsUnpublished ? false : (newLesson.is_published || false),
+          content_status: shouldSaveAsUnpublished ? 'pending_addition' : 'published',
         }]);
 
       if (linkError) {
@@ -513,14 +516,16 @@ const CourseBuilder: React.FC = () => {
         content_blocks: newLesson.content_blocks || [],
         duration: `${newLesson.estimated_duration_minutes || 15} min`,
         summary: newLesson.summary || "",
-        is_published: shouldSaveAsUnpublished ? false : (newLesson.is_published || false),
+        content_status: shouldSaveAsUnpublished ? 'pending_addition' : 'published',
       };
 
       setCurriculum(curriculum.map((m) =>
         m.id === moduleId ? { ...m, lessons: [...m.lessons, updatedNewLesson] } : m
       ));
-      
+
+      // Phase 1.5: Mark course as having pending content
       if (shouldSaveAsUnpublished) {
+        await supabase.from('courses').update({ pending_content: true }).eq('id', courseId);
         alert('✅ Lesson added! Since this course is already published, your changes will be visible to students after admin approval.');
       }
     } catch (err) {
@@ -678,6 +683,11 @@ const CourseBuilder: React.FC = () => {
         alert(`Failed to save video: ${error.message}`);
       } else {
         handleRefreshLesson(moduleId, lessonId);
+        
+        // Phase 1.5: Mark course as having pending content if already approved
+        if (isCoursePublished) {
+          await supabase.from('courses').update({ pending_content: true }).eq('id', courseId);
+        }
       }
     } catch (err) {
       console.error("[CourseBuilder] Error saving video block:", err);
@@ -812,6 +822,11 @@ const CourseBuilder: React.FC = () => {
         [lessonId]: [...(prev[lessonId] || []), newItem],
       }));
 
+      // Phase 1.5: Mark course as having pending content if already approved
+      if (isCoursePublished) {
+        await supabase.from('courses').update({ pending_content: true }).eq('id', courseId);
+      }
+
       return newItem;
     } catch (error: any) {
       console.error('Error adding content item:', error);
@@ -904,7 +919,7 @@ const CourseBuilder: React.FC = () => {
       const position = curriculum.length;
       const { data, error } = await supabase.from('modules').insert({
         course_id: courseId, title: "",
-        position, is_published: false, is_sequential: false,
+        position, content_status: 'draft', is_sequential: false,
       }).select().single();
 
       if (error) throw error;
@@ -1002,14 +1017,14 @@ const CourseBuilder: React.FC = () => {
         if (updateError) throw updateError;
       } else {
         console.log('✅ Quiz saved successfully');
-        
+
         // Verify what was actually saved in the database
         const { data: verifyData } = await supabase
           .from('quizzes')
           .select('quiz_type, requires_coach_approval, allow_skipped_questions, attempt_control_enabled')
           .eq('id', updatedQuiz.id)
           .single();
-        
+
         console.log('🔍 Database verification:');
         console.log('  Saved quiz_type:', verifyData?.quiz_type);
         console.log('  Saved requires_coach_approval:', verifyData?.requires_coach_approval);
@@ -1284,6 +1299,7 @@ const CourseBuilder: React.FC = () => {
           <CoursePublishWorkflow
             courseStatus={courseStatus}
             verificationStatus={verificationStatus}
+            pendingContent={pendingContent}
             adminFeedback={adminFeedback}
             onPublish={handlePublish}
             onUnpublish={handleUnpublish}
@@ -1332,6 +1348,8 @@ const CourseBuilder: React.FC = () => {
             onChangeSection={(section) => setActiveSection(section as SectionKey)}
             courseTitle={settings.title || "Untitled course"}
             courseStatus={courseStatus}
+            verificationStatus={verificationStatus}
+            pendingContent={pendingContent}
           />
           <div className="flex-1">
             <div className="bg-white dark:bg-dark-background-card rounded-3xl shadow-lg p-8">
