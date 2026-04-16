@@ -448,7 +448,7 @@ const CourseDetailRefactored: React.FC = () => {
 
   if (loadingCourse) {
     return (
-      <StudentAppLayout>
+      <StudentAppLayout hideSearch={true}>
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="text-center">
             <div className="w-16 h-16 border-4 border-brand-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
@@ -461,7 +461,7 @@ const CourseDetailRefactored: React.FC = () => {
 
   if (error) {
     return (
-      <StudentAppLayout>
+      <StudentAppLayout hideSearch={true}>
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="text-center text-red-500">
             <h2 className="text-2xl font-bold mb-2">Error Loading Course</h2>
@@ -480,7 +480,7 @@ const CourseDetailRefactored: React.FC = () => {
 
   if (!course) {
     return (
-      <StudentAppLayout>
+      <StudentAppLayout hideSearch={true}>
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="text-center">
             <div className="text-6xl mb-4">📚</div>
@@ -504,7 +504,7 @@ const CourseDetailRefactored: React.FC = () => {
   }
 
   return (
-    <StudentAppLayout>
+    <StudentAppLayout hideSearch={true}>
       {feedbackMessage && (
         <div
           className={`px-8 py-3 text-sm font-medium ${

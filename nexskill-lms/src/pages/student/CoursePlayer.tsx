@@ -14,7 +14,7 @@ import type { Lesson } from '../../types/lesson';
 import type { LessonContentItem } from '../../types/lesson-content-item';
 import { fetchLessonContentItems } from '../../lib/supabase/lesson-content.queries';
 import { usePageScrollCompletion } from '../../hooks/usePageScrollCompletion';
-import { useLessonAccessStatus } from '../../hooks/useQuizSubmission';
+import { getSequentialLockedItemIds } from '../../utils/sequentialLocking';
 
 type LessonWithModule = Lesson & { moduleTitle?: string };
 
@@ -263,39 +263,28 @@ const CoursePlayer: React.FC = () => {
 
   // Build sequential lock map: only lock items in sequential modules after first uncompleted item
   const sequentialLockedIds = useMemo(() => {
-    const locked = new Set<string>();
-    const moduleSequentialMap = new Map(modulesWithSequential.map(m => [m.id, m.is_sequential]));
+    const itemsByModule = new Map<string, Array<{ id: string; type: 'lesson' | 'quiz' }>>();
 
-    // Process each module separately
-    const moduleGroups = new Map<string, Array<{ id: string; type: 'lesson' | 'quiz' }>>();
     for (const item of sortedItemsWithModules) {
-      if (!moduleGroups.has(item.moduleId)) {
-        moduleGroups.set(item.moduleId, []);
+      if (!itemsByModule.has(item.moduleId)) {
+        itemsByModule.set(item.moduleId, []);
       }
-      moduleGroups.get(item.moduleId)!.push({ id: item.id, type: item.type });
+      itemsByModule.get(item.moduleId)!.push({ id: item.id, type: item.type });
     }
 
-    // Apply sequential locking within each sequential module
-    for (const [moduleId, items] of moduleGroups.entries()) {
-      const isSequential = moduleSequentialMap.get(moduleId) ?? false;
-      if (!isSequential) continue; // Only lock items in sequential modules
-
-      let foundUncompleted = false;
-      for (const item of items) {
-        if (foundUncompleted) {
-          locked.add(item.id);
-        }
-        const isDone = item.type === 'quiz'
-          ? completedQuizIds.includes(item.id)
-          : completedLessons.includes(item.id);
-
-        if (!isDone) {
-          foundUncompleted = true;
-        }
-      }
-    }
-
-    return locked;
+    return getSequentialLockedItemIds(
+      modulesWithSequential.map((module) => ({
+        id: module.id,
+        isSequential: module.is_sequential,
+        items: (itemsByModule.get(module.id) || []).map((item) => ({
+          id: item.id,
+          type: item.type,
+          completed: item.type === 'quiz'
+            ? completedQuizIds.includes(item.id)
+            : completedLessons.includes(item.id),
+        })),
+      }))
+    );
   }, [sortedItemsWithModules, modulesWithSequential, completedLessons, completedQuizIds]);
 
   const handleSelectLesson = (newLessonId: string) => {
@@ -319,19 +308,12 @@ const CoursePlayer: React.FC = () => {
   // Check if current lesson is complete (for Next button)
   const isCurrentLessonComplete = completedLessons.includes(lessonId || '');
   
-  // FIXED: Next button ONLY depends on whether current lesson is complete
-  // Do NOT check lesson_access_status table - it's separate from user_lesson_progress
-  // Source of truth: completedLessons state (backed by user_lesson_progress database)
+  // Next button should reflect actual sequential locking, not a blanket completion rule.
   const isNextItemLocked = useMemo(() => {
-    // If there's no next item, nothing to lock
     if (!nextItem) return false;
-    
-    // If current lesson IS complete → Next button enabled
-    if (isCurrentLessonComplete) return false;
-    
-    // Current lesson NOT complete → Next button locked
-    return true;
-  }, [nextItem, isCurrentLessonComplete]);
+
+    return sequentialLockedIds.has(nextItem.id);
+  }, [nextItem, sequentialLockedIds]);
 
   // Previous navigation - ALWAYS allowed, no validation
   const handleNavigatePrevious = useCallback((item: { id: string; type: 'lesson' | 'quiz' }) => {
@@ -344,8 +326,8 @@ const CoursePlayer: React.FC = () => {
 
   // Next navigation - requires current lesson to be complete
   const handleNavigateNext = useCallback((item: { id: string; type: 'lesson' | 'quiz' }) => {
-    if (!isCurrentLessonComplete) {
-      alert('🔒 Please complete all videos and quizzes in the current lesson before proceeding.');
+    if (sequentialLockedIds.has(item.id)) {
+      alert('🔒 Please complete the required lessons before proceeding.');
       return;
     }
     if (item.type === 'quiz') {
@@ -353,7 +335,7 @@ const CoursePlayer: React.FC = () => {
     } else {
       navigate(`/student/courses/${courseId}/lessons/${item.id}`);
     }
-  }, [courseId, navigate, isCurrentLessonComplete]);
+  }, [courseId, navigate, sequentialLockedIds]);
 
   const handleMarkComplete = useCallback(async () => {
     if (!lessonId || !courseId) return;
@@ -675,16 +657,22 @@ const CoursePlayer: React.FC = () => {
       }
     };
 
-    refreshCompletedLessons();
+    checkLessonCompletion();
     // Removed completedLessons from deps to prevent race condition where stale DB fetch overwrites optimistic update
   }, [courseId, lessonId]);
 
   // Handle individual content item completion
   const handleContentItemComplete = useCallback(async (completedContentItemId: string) => {
     console.log('[CoursePlayer] Content item completed:', completedContentItemId);
-    // Only update sidebar optimistically - don't check for lesson completion
     setLastCompletedContentItemId(completedContentItemId);
-  }, []);
+
+    if (!lessonId) return;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    await checkAndMarkLessonComplete(user.id, lessonId, completedContentItemId);
+  }, [lessonId, checkAndMarkLessonComplete]);
 
   // Reset the completion tracking ref when the lesson changes
   useEffect(() => {
@@ -933,9 +921,17 @@ const CoursePlayer: React.FC = () => {
   // Custom header content to pass to StudentAppLayout
   const customHeader = (
     <div className="flex items-center justify-between w-full">
-      <h1 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary truncate max-w-md">
-        {courseTitle}
-      </h1>
+      <div className="flex items-center gap-3 min-w-0">
+        <button
+          onClick={() => navigate(`/student/courses/${courseId}`)}
+          className="px-3 py-1.5 text-xs font-medium text-text-secondary dark:text-dark-text-secondary border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors whitespace-nowrap"
+        >
+          ← Go Back
+        </button>
+        <h1 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary truncate max-w-md">
+          {courseTitle}
+        </h1>
+      </div>
       <div className="flex items-center gap-4">
         {/* You can add other nav items here if needed */}
       </div>

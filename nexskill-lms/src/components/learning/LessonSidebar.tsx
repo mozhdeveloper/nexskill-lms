@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 import { Video, FileQuestion, Lock, Check } from 'lucide-react';
-import { useLessonAccessStatus } from '../../hooks/useQuizSubmission';
+import { getSequentialLockedItemIds } from '../../utils/sequentialLocking';
 
 interface ContentItem {
   id: string;
@@ -116,9 +116,6 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
   useEffect(() => {
     completedQuizIdsRef.current = completedQuizIds;
   }, [completedQuizIds]);
-
-  // Fetch lesson access status for lock indicators
-  const { isLessonLocked: checkLessonLocked, loading: lockLoading } = useLessonAccessStatus(courseId);
 
   const fetchModules = useCallback(async () => {
     if (!courseId) return;
@@ -618,23 +615,17 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
 
   // ── Determine locked items based on sequential completion ─────────────────
   const lockedItemIds = React.useMemo(() => {
-    const locked = new Set<string>();
-
-    for (const mod of sidebarModules) {
-      // Only apply sequential locking if this module has isSequential enabled
-      if (!mod.isSequential) continue;
-      
-      let foundUncompleted = false;
-      for (const item of mod.items) {
-        if (foundUncompleted && !item.isCompleted) {
-          locked.add(item.id);
-        }
-        if (!item.isCompleted) {
-          foundUncompleted = true;
-        }
-      }
-    }
-    return locked;
+    return getSequentialLockedItemIds(
+      sidebarModules.map((module) => ({
+        id: module.id,
+        isSequential: module.isSequential ?? false,
+        items: module.items.map((item) => ({
+          id: item.id,
+          type: item.type,
+          completed: item.isCompleted,
+        })),
+      }))
+    );
   }, [sidebarModules]);
 
   if (loading) {

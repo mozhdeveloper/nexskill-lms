@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../../lib/supabaseClient";
+import { getSequentialLockedItemIds } from "../../../utils/sequentialLocking";
 
 interface Lesson {
     id: string;
@@ -99,28 +100,19 @@ const CourseCurriculumTab: React.FC<CourseCurriculumTabProps> = ({
 
     // ── Determine which items are locked based on sequential completion ───────
     const lockedItemIds = React.useMemo(() => {
-        const locked = new Set<string>();
-
-        for (const module of curriculum) {
-            // Only apply sequential locking if this module has is_sequential enabled
-            if (!module.lessons || !module.is_sequential) continue;
-            
-            let foundUncompleted = false;
-            for (const lesson of module.lessons) {
-                if (foundUncompleted) {
-                    // Lock subsequent items in sequential modules only
-                    locked.add(lesson.id);
-                }
-                const isDone = lesson.type === "quiz"
-                    ? completedQuizIds.has(lesson.id)
-                    : completedLessonIds.has(lesson.id);
-
-                if (!isDone) {
-                    foundUncompleted = true;
-                }
-            }
-        }
-        return locked;
+        return getSequentialLockedItemIds(
+            curriculum.map((module) => ({
+                id: module.id,
+                isSequential: module.is_sequential ?? false,
+                items: (module.lessons || []).map((lesson) => ({
+                    id: lesson.id,
+                    type: lesson.type,
+                    completed: lesson.type === "quiz"
+                        ? completedQuizIds.has(lesson.id)
+                        : completedLessonIds.has(lesson.id),
+                })),
+            }))
+        );
     }, [curriculum, completedLessonIds, completedQuizIds]);
 
     // ── Fetch real durations ──────────────────────────────────────────────────

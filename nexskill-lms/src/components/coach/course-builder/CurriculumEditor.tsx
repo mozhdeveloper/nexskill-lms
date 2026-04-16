@@ -868,6 +868,8 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                                                                     className={`group flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
                                                                                         (contentItem as any).content_status === 'pending_deletion'
                                                                                             ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700 opacity-60'
+                                                                                            : ['pending_addition', 'draft'].includes((contentItem as any).content_status)
+                                                                                            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700'
                                                                                             : 'bg-gray-50 dark:bg-slate-700/50 border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500'
                                                                                     }`}
                                                                                 >
@@ -905,6 +907,13 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
                                                                                         <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-2 py-0.5 rounded-full font-medium border border-red-200 dark:border-red-700">
                                                                                             <AlertCircle className="w-3 h-3" />
                                                                                             Pending Deletion
+                                                                                        </span>
+                                                                                    )}
+                                                                                    {/* Pending addition badge */}
+                                                                                    {['pending_addition', 'draft'].includes((contentItem as any).content_status) && (
+                                                                                        <span className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-full font-medium border border-blue-200 dark:border-blue-800">
+                                                                                            <AlertCircle className="w-3 h-3" />
+                                                                                            Pending Approval
                                                                                         </span>
                                                                                     )}
                                                                                     {/* Play button for videos */}
