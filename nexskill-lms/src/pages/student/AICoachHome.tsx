@@ -14,13 +14,13 @@ const AICoachHome: React.FC = () => {
   const navigate = useNavigate();
   const { courses: enrolledCourses } = useEnrolledCourses();
   const courseIds = useMemo(() => enrolledCourses.map(c => c.id), [enrolledCourses]);
-  const { totalLessons, totalCompleted, totalTimeSeconds, overallPercent } = useCourseProgress(courseIds);
+  const { totalItems, totalCompleted, totalTimeSeconds, overallPercent } = useCourseProgress(courseIds);
 
   const currentCourse = enrolledCourses[0]?.title ?? 'your course';
   const studentProgress = {
     activeCourses: enrolledCourses.length,
     completedLessons: totalCompleted,
-    totalLessons: totalLessons,
+    totalLessons: totalItems,
     weeklyHours: Math.round((totalTimeSeconds / 3600) * 10) / 10,
     streakDays: 0,
     upcomingDeadlines: 0,

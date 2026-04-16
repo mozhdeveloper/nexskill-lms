@@ -145,7 +145,7 @@ const CourseStructureTree: React.FC<CourseStructureTreeProps> = ({
                 })()}
             </div>
 
-            <div className="p-2 max-h-[calc(100vh-300px)] overflow-y-auto">
+            <div className="p-2 max-h-[calc(100vh-240px)] overflow-y-auto">
                 {/* Course-level feedback option */}
                 <button
                     onClick={onSelectCourseFeedback}

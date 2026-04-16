@@ -129,14 +129,11 @@ const VerificationActions: React.FC<VerificationActionsProps> = ({
                     <h3 className="font-semibold text-gray-900">Course Details</h3>
                 </div>
 
-                <div className="p-4 space-y-4">
+                <div className="p-4 space-y-3">
                     {/* Course Title & Status */}
                     <div>
-                        <h4 className="font-medium text-gray-900">{course.title}</h4>
-                        {course.subtitle && (
-                            <p className="text-sm text-gray-500 mt-1">{course.subtitle}</p>
-                        )}
-                        <div className="mt-2 flex flex-wrap gap-2">
+                        <div className="flex items-center flex-wrap gap-2">
+                            <h4 className="font-medium text-gray-900">{course.title}</h4>
                             {course.verification_status === 'approved' && hasPendingContentChanges ? (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
                                     <AlertTriangle size={12} />
@@ -146,34 +143,35 @@ const VerificationActions: React.FC<VerificationActionsProps> = ({
                                 getStatusBadge(course.verification_status)
                             )}
                         </div>
+                        {course.subtitle && (
+                            <p className="text-sm text-gray-500 mt-0.5">{course.subtitle}</p>
+                        )}
                     </div>
 
                     {/* Course Meta */}
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div className="flex items-center gap-2 text-gray-500">
-                            <User size={14} />
-                            <span className="truncate">
-                                {course.coach?.first_name} {course.coach?.last_name}
-                            </span>
+                    <div className="grid grid-cols-3 gap-x-3 gap-y-1.5 text-sm">
+                        <div className="flex items-center gap-1.5 text-gray-500">
+                            <User size={13} />
+                            <span className="truncate">{course.coach?.first_name} {course.coach?.last_name}</span>
                         </div>
-                        <div className="flex items-center gap-2 text-gray-500">
-                            <BookOpen size={14} />
-                            <span>{course.category?.name || 'No category'}</span>
+                        <div className="flex items-center gap-1.5 text-gray-500">
+                            <BookOpen size={13} />
+                            <span className="truncate">{course.category?.name || 'No category'}</span>
                         </div>
-                        <div className="flex items-center gap-2 text-gray-500">
-                            <Clock size={14} />
+                        <div className="flex items-center gap-1.5 text-gray-500">
+                            <Clock size={13} />
                             <span>{course.duration_hours}h</span>
                         </div>
-                        <div className="flex items-center gap-2 text-gray-500">
-                            <DollarSign size={14} />
+                        <div className="flex items-center gap-1.5 text-gray-500">
+                            <DollarSign size={13} />
                             <span>₱{course.price.toLocaleString()}</span>
                         </div>
-                        <div className="flex items-center gap-2 text-gray-500">
-                            <Globe size={14} />
+                        <div className="flex items-center gap-1.5 text-gray-500">
+                            <Globe size={13} />
                             <span>{course.language || 'English'}</span>
                         </div>
-                        <div className="flex items-center gap-2 text-gray-500">
-                            <AlertTriangle size={14} />
+                        <div className="flex items-center gap-1.5 text-gray-500">
+                            <AlertTriangle size={13} />
                             <span>{course.level || 'All levels'}</span>
                         </div>
                     </div>

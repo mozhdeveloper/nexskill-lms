@@ -104,14 +104,68 @@ const MyCoursesPage: React.FC = () => {
           }
         }
 
-        // Fetch course progress
-        const { data: progressData } = await supabase
-          .from('course_progress')
-          .select('course_id, completed_lessons, total_lessons')
-          .in('course_id', courseIds)
-          .eq('profile_id', user.id);
+        // Fetch course progress (lessons + quizzes)
+        const { data: allModules } = await supabase
+          .from('modules')
+          .select('id, course_id')
+          .in('course_id', courseIds);
 
-        console.log('📊 Progress data:', progressData);
+        const moduleIds = allModules?.map(m => m.id) || [];
+        let allContentItems: { module_id: string; content_id: string; content_type: string }[] = [];
+
+        if (moduleIds.length > 0) {
+          const { data: items } = await supabase
+            .from('module_content_items')
+            .select('module_id, content_id, content_type')
+            .in('module_id', moduleIds)
+            .in('content_type', ['lesson', 'quiz'])
+            .in('content_status', ['published', 'pending_deletion']);
+          allContentItems = items || [];
+        }
+
+        const allLessonIds = allContentItems.filter(i => i.content_type === 'lesson').map(i => i.content_id);
+        const allQuizIds = allContentItems.filter(i => i.content_type === 'quiz').map(i => i.content_id);
+
+        const completedLessonSet = new Set<string>();
+        if (allLessonIds.length > 0) {
+          const { data: lessonProgress } = await supabase
+            .from('user_lesson_progress')
+            .select('lesson_id')
+            .eq('user_id', user.id)
+            .eq('is_completed', true)
+            .in('lesson_id', allLessonIds);
+          for (const lp of lessonProgress || []) completedLessonSet.add(lp.lesson_id);
+        }
+
+        const completedQuizSet = new Set<string>();
+        if (allQuizIds.length > 0) {
+          const { data: quizProgress } = await supabase
+            .from('quiz_attempts')
+            .select('quiz_id')
+            .eq('user_id', user.id)
+            .eq('passed', true)
+            .in('quiz_id', allQuizIds);
+          for (const qp of quizProgress || []) completedQuizSet.add(qp.quiz_id);
+        }
+
+        // Build per-course progress map
+        const modulesByCourse: Record<string, string[]> = {};
+        for (const m of allModules || []) {
+          if (!modulesByCourse[m.course_id]) modulesByCourse[m.course_id] = [];
+          modulesByCourse[m.course_id].push(m.id);
+        }
+
+        const progressMap: Record<string, { total: number; completed: number }> = {};
+        for (const cid of courseIds) {
+          const mIds = modulesByCourse[cid] || [];
+          const items = allContentItems.filter(i => mIds.includes(i.module_id));
+          const completed = items.filter(i =>
+            i.content_type === 'lesson' ? completedLessonSet.has(i.content_id) : completedQuizSet.has(i.content_id)
+          ).length;
+          progressMap[cid] = { total: items.length, completed };
+        }
+
+        console.log('📊 Progress data:', progressMap);
 
         // Fetch reviews for each course
         const coursesWithReviews = await Promise.all(courses.map(async (course: any) => {
@@ -133,9 +187,7 @@ const MyCoursesPage: React.FC = () => {
 
         // Combine all data
         const coursesWithDetails: EnrolledCourse[] = coursesWithReviews.map((course: any) => {
-          const progress = progressData?.find((p: any) => p.course_id === course.id);
-          const totalLessons = progress?.total_lessons || 0;
-          const completedLessons = progress?.completed_lessons || 0;
+          const prog = progressMap[course.id] || { total: 0, completed: 0 };
           
           return {
             id: course.id,
@@ -147,9 +199,9 @@ const MyCoursesPage: React.FC = () => {
             rating: course.rating,
             num_reviews: course.num_reviews,
             instructor_name: profilesMap[course.coach_id] || 'Unknown Instructor',
-            progress: totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0,
-            completed_lessons: completedLessons,
-            total_lessons: totalLessons,
+            progress: prog.total > 0 ? Math.round((prog.completed / prog.total) * 100) : 0,
+            completed_lessons: prog.completed,
+            total_lessons: prog.total,
           };
         });
 

@@ -157,9 +157,9 @@ const CourseReviewPage: React.FC = () => {
                 </div>
 
                 {/* Main Content Grid */}
-                <div className="grid grid-cols-12 gap-4 h-[calc(100vh-180px)]">
+                <div className="grid grid-cols-12 gap-4 h-[calc(100vh-180px)] overflow-hidden">
                     {/* Left Column - Course Structure (3 cols) */}
-                    <div className="col-span-3">
+                    <div className="col-span-3 sticky top-0 self-start max-h-[calc(100vh-180px)] overflow-y-auto">
                         <CourseStructureTree
                             modules={course.modules}
                             selectedLessonId={selectedLessonId}
@@ -173,7 +173,7 @@ const CourseReviewPage: React.FC = () => {
                     </div>
 
                     {/* Center Column - Content Viewer (5 cols) */}
-                    <div className="col-span-5">
+                    <div className="col-span-5 overflow-y-auto">
                         {isCourseFeedbackSelected ? (
                             <div className="bg-white rounded-2xl border border-gray-200 h-full flex flex-col">
                                 <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-[#304DB5]/5 to-transparent">
@@ -228,7 +228,7 @@ const CourseReviewPage: React.FC = () => {
                     </div>
 
                     {/* Right Column - Feedback & Actions (4 cols) */}
-                    <div className="col-span-4 space-y-4 overflow-y-auto">
+                    <div className="col-span-4 sticky top-0 self-start max-h-[calc(100vh-180px)] overflow-y-auto space-y-4">
                         {/* Verification Actions */}
                         <VerificationActions
                             course={course}
@@ -239,7 +239,7 @@ const CourseReviewPage: React.FC = () => {
                         />
 
                         {/* Feedback Panel */}
-                        <div className="h-[400px]">
+                        <div className="h-[350px]">
                             <FeedbackPanel
                                 feedback={feedback}
                                 selectedLessonId={selectedLessonId}

@@ -196,7 +196,7 @@ const CoursePlayer: React.FC = () => {
             const quizIdsInCourse = sorted.filter((ci) => ci.content_type === 'quiz').map((ci) => ci.content_id);
 
             if (cancelled) return;
-            setTotalLessonsInCourse(lessonIds.length);
+            setTotalLessonsInCourse(lessonIds.length + quizIdsInCourse.length);
 
             if (lessonIds.length > 0) {
               const { data: progressRows } = await supabase
@@ -258,7 +258,7 @@ const CoursePlayer: React.FC = () => {
     .findIndex(item => item.id === lessonId) + 1;
 
   const progress = totalLessonsInCourse > 0
-    ? Math.min(100, Math.round((completedLessons.length / totalLessonsInCourse) * 100))
+    ? Math.min(100, Math.round(((completedLessons.length + completedQuizIds.length) / totalLessonsInCourse) * 100))
     : 0;
 
   // Build sequential lock map: only lock items in sequential modules after first uncompleted item
