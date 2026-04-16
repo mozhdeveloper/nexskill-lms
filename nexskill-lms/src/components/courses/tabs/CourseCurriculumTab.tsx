@@ -13,6 +13,7 @@ interface Module {
     id: string;
     title: string;
     lessons: Lesson[];
+    is_sequential?: boolean;
 }
 
 interface CourseCurriculumTabProps {
@@ -99,13 +100,15 @@ const CourseCurriculumTab: React.FC<CourseCurriculumTabProps> = ({
     // ── Determine which items are locked based on sequential completion ───────
     const lockedItemIds = React.useMemo(() => {
         const locked = new Set<string>();
-        let foundUncompleted = false;
 
         for (const module of curriculum) {
-            if (!module.lessons) continue;
+            // Only apply sequential locking if this module has is_sequential enabled
+            if (!module.lessons || !module.is_sequential) continue;
+            
+            let foundUncompleted = false;
             for (const lesson of module.lessons) {
                 if (foundUncompleted) {
-                    // All items after the first uncompleted one are locked
+                    // Lock subsequent items in sequential modules only
                     locked.add(lesson.id);
                 }
                 const isDone = lesson.type === "quiz"

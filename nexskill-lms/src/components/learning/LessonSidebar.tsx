@@ -19,6 +19,7 @@ interface SidebarModule {
   id: string;
   title: string;
   items: ContentItem[];
+  isSequential?: boolean;
 }
 
 interface LessonSidebarProps {
@@ -127,9 +128,9 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
 
       const { data: modulesData } = await supabase
         .from('modules')
-        .select('id, title, position')
+        .select('id, title, position, is_sequential')
         .eq('course_id', courseId)
-        .eq('content_status', 'published')
+        .in('content_status', ['published', 'pending_deletion'])
         .order('position', { ascending: true });
 
       if (!modulesData || modulesData.length === 0) {
@@ -143,7 +144,7 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
         .from('module_content_items')
         .select('module_id, content_id, content_type, position')
         .in('module_id', moduleIds)
-        .eq('content_status', 'published')
+        .in('content_status', ['published', 'pending_deletion'])
         .order('position', { ascending: true });
 
       const lessonIds = (itemsData ?? []).filter((i) => i.content_type === 'lesson').map((i) => i.content_id);
@@ -155,7 +156,7 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
             .from('lesson_content_items')
             .select('id, lesson_id, content_type, content_id, metadata')
             .in('lesson_id', lessonIds)
-            .eq('content_status', 'published')
+            .in('content_status', ['published', 'pending_deletion'])
         : Promise.resolve({ data: [] });
 
       // Build maps for lesson content types and quiz content IDs
@@ -489,7 +490,7 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
           })
           .filter(Boolean) as ContentItem[];
 
-        return { id: mod.id, title: mod.title, items };
+        return { id: mod.id, title: mod.title, items, isSequential: mod.is_sequential ?? false };
       });
 
       // Apply completions using current values from refs to handle race conditions
@@ -618,9 +619,12 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
   // ── Determine locked items based on sequential completion ─────────────────
   const lockedItemIds = React.useMemo(() => {
     const locked = new Set<string>();
-    let foundUncompleted = false;
 
     for (const mod of sidebarModules) {
+      // Only apply sequential locking if this module has isSequential enabled
+      if (!mod.isSequential) continue;
+      
+      let foundUncompleted = false;
       for (const item of mod.items) {
         if (foundUncompleted && !item.isCompleted) {
           locked.add(item.id);

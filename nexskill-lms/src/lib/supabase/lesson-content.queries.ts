@@ -7,15 +7,23 @@ import { supabase } from '../supabaseClient';
 import type { LessonContentItem, ContentMetadata, CreateContentItemInput, UpdateContentItemInput } from '../types/lesson-content-item';
 
 /**
- * Fetch all content items for a lesson
- * Excludes items marked for deletion (pending_deletion status)
+ * Fetch all content items for a lesson.
+ * - students: published + pending_deletion (staged delete model)
+ * - coaches: includes pending_addition/draft so newly added content remains visible while pending
  */
-export async function fetchLessonContentItems(lessonId: string) {
+export async function fetchLessonContentItems(
+    lessonId: string,
+    options?: { viewer?: 'student' | 'coach' }
+) {
+    const statuses = options?.viewer === 'coach'
+        ? ['published', 'pending_addition', 'pending_deletion', 'draft']
+        : ['published', 'pending_deletion'];
+
     const { data, error } = await supabase
         .from('lesson_content_items')
         .select('*')
         .eq('lesson_id', lessonId)
-        .neq('content_status', 'pending_deletion') // Exclude items marked for deletion
+        .in('content_status', statuses)
         .order('position', { ascending: true });
 
     if (error) throw error;
@@ -122,7 +130,18 @@ export async function updateContentItem(contentItemId: string, updates: UpdateCo
 /**
  * Delete a content item
  */
-export async function deleteContentItem(contentItemId: string) {
+export async function deleteContentItem(contentItemId: string, options?: { softDelete?: boolean }) {
+    if (options?.softDelete) {
+        const now = new Date().toISOString();
+        const { error } = await supabase
+            .from('lesson_content_items')
+            .update({ content_status: 'pending_deletion', deleted_at: now, updated_at: now } as any)
+            .eq('id', contentItemId);
+
+        if (error) throw error;
+        return;
+    }
+
     const { error } = await supabase
         .from('lesson_content_items')
         .delete()

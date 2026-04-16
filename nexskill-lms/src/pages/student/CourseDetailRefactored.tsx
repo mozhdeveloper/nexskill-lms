@@ -69,7 +69,7 @@ const CourseDetailRefactored: React.FC = () => {
       // 1. Fetch ALL modules (ignore content_status for maximum compatibility)
       const { data: modules } = await supabase
         .from("modules")
-        .select("id, title, position, content_status")
+        .select("id, title, position, content_status, is_sequential")
         .eq("course_id", courseId)
         .order("position", { ascending: true });
 
@@ -89,8 +89,8 @@ const CourseDetailRefactored: React.FC = () => {
         console.log("[CourseDetailRefactored] Content items:", contentItems);
 
         // Check publishing status for debugging
-        const publishedModules = modules.filter(m => m.content_status === 'published');
-        const publishedContent = contentItems?.filter(c => c.content_status === 'published');
+        const publishedModules = modules.filter(m => ['published', 'pending_deletion'].includes(m.content_status));
+        const publishedContent = contentItems?.filter(c => ['published', 'pending_deletion'].includes(c.content_status));
 
         if (publishedModules.length !== modules.length) {
           setDebugInfo(`⚠️ ${modules.length - publishedModules.length} modules are not published`);
@@ -165,6 +165,7 @@ const CourseDetailRefactored: React.FC = () => {
             return {
               id: module.id,
               title: module.title,
+              is_sequential: module.is_sequential ?? false,
               lessons: lessons || []
             };
           });
@@ -175,7 +176,7 @@ const CourseDetailRefactored: React.FC = () => {
           console.warn("[CourseDetailRefactored] No content items found for modules:", moduleIds);
           setDebugInfo("⚠️ No content items found - modules may be empty");
           // Create empty modules
-          setDirectCurriculum(modules.map(m => ({ id: m.id, title: m.title, lessons: [] })));
+          setDirectCurriculum(modules.map(m => ({ id: m.id, title: m.title, is_sequential: m.is_sequential ?? false, lessons: [] })));
         }
       } else {
         console.warn("[CourseDetailRefactored] No modules found for courseId:", courseId);

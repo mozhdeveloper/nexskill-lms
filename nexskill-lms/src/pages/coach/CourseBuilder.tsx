@@ -434,9 +434,109 @@ const CourseBuilder: React.FC = () => {
     catch (error) { alert(`Error resolving module: ${(error as Error).message}`); return; }
 
     const itemName = contentType === 'quiz' ? 'quiz' : 'lesson';
-    if (!window.confirm(`Are you sure you want to delete this ${itemName}? This action cannot be undone.`)) return;
+    const deleteMessage = isCoursePublished
+      ? `Are you sure you want to request deletion for this ${itemName}? Students will keep seeing the current live version until admin approval, and only then will it be permanently removed.`
+      : `Are you sure you want to delete this ${itemName}? This action cannot be undone.`;
+    if (!window.confirm(deleteMessage)) return;
 
     try {
+      if (isCoursePublished) {
+        const now = new Date().toISOString();
+
+        const { error: markLinkError } = await supabase
+          .from("module_content_items")
+          .update({ content_status: 'pending_deletion', deleted_at: now, updated_at: now } as any)
+          .match({ module_id: resolvedModuleId, content_id: contentId, content_type: contentType });
+        if (markLinkError) {
+          alert(`Error marking ${itemName} link for deletion: ${markLinkError.message}`);
+          return;
+        }
+
+        if (contentType === 'quiz') {
+          const { error: markQuizError } = await supabase
+            .from('quizzes')
+            .update({ content_status: 'pending_deletion', deleted_at: now, updated_at: now } as any)
+            .eq('id', contentId);
+          if (markQuizError) {
+            alert(`Error marking quiz for deletion: ${markQuizError.message}`);
+            return;
+          }
+
+          await supabase
+            .from('quiz_questions')
+            .update({ deleted_at: now } as any)
+            .eq('quiz_id', contentId);
+        } else {
+          const { error: markLessonError } = await supabase
+            .from('lessons')
+            .update({ content_status: 'pending_deletion', deleted_at: now, updated_at: now } as any)
+            .eq('id', contentId);
+          if (markLessonError) {
+            alert(`Error marking lesson for deletion: ${markLessonError.message}`);
+            return;
+          }
+
+          const { data: nestedQuizRows } = await supabase
+            .from('lesson_content_items')
+            .select('content_id')
+            .eq('lesson_id', contentId)
+            .eq('content_type', 'quiz');
+
+          const nestedQuizIds = (nestedQuizRows || [])
+            .map((row: any) => row.content_id)
+            .filter(Boolean);
+
+          const { error: markLessonItemsError } = await supabase
+            .from('lesson_content_items')
+            .update({
+              content_status: 'pending_deletion',
+              deleted_at: now,
+              updated_at: now,
+              module_id: resolvedModuleId,
+              course_id: courseId,
+            } as any)
+            .eq('lesson_id', contentId);
+          if (markLessonItemsError) {
+            alert(`Error marking lesson content for deletion: ${markLessonItemsError.message}`);
+            return;
+          }
+
+          if (nestedQuizIds.length > 0) {
+            await supabase
+              .from('quizzes')
+              .update({ content_status: 'pending_deletion', deleted_at: now, updated_at: now } as any)
+              .in('id', nestedQuizIds);
+
+            await supabase
+              .from('quiz_questions')
+              .update({ deleted_at: now } as any)
+              .in('quiz_id', nestedQuizIds);
+          }
+        }
+
+        await supabase.from('courses').update({ pending_content: true }).eq('id', courseId);
+        setPendingContent(true);
+
+        setCurriculum(curriculum.map((m) =>
+          m.id === moduleId
+            ? {
+                ...m,
+                lessons: m.lessons.map((l: any) => l.id === contentId ? { ...l, content_status: 'pending_deletion' } : l),
+              }
+            : m
+        ));
+
+        if (contentType === 'lesson') {
+          setLessonContentItems(prev => ({
+            ...prev,
+            [contentId]: (prev[contentId] || []).map((item: any) => ({ ...item, content_status: 'pending_deletion' })),
+          }));
+        }
+
+        alert(`✅ ${itemName.charAt(0).toUpperCase() + itemName.slice(1)} marked for deletion. Students will keep seeing the current live version until admin approval.`);
+        return;
+      }
+
       const { error: unlinkError } = await supabase.from("module_content_items").delete()
         .match({ module_id: resolvedModuleId, content_id: contentId, content_type: contentType });
       if (unlinkError) { alert(`Error unlinking ${itemName}: ${unlinkError.message}`); return; }
@@ -782,7 +882,7 @@ const CourseBuilder: React.FC = () => {
 
     setLoadingContentItems(prev => new Set(prev).add(lessonId));
     try {
-      const items = await fetchLessonContentItems(lessonId);
+      const items = await fetchLessonContentItems(lessonId, { viewer: 'coach' });
       setLessonContentItems(prev => ({
         ...prev,
         [lessonId]: items,
@@ -835,9 +935,73 @@ const CourseBuilder: React.FC = () => {
   };
 
   const handleDeleteContentItem = async (lessonId: string, contentItemId: string) => {
-    if (!window.confirm('Are you sure you want to delete this content item?')) return;
+    const deleteMessage = isCoursePublished
+      ? 'Are you sure you want to request deletion for this content item? Students will keep seeing the current live version until admin approval, and only then will it be permanently removed.'
+      : 'Are you sure you want to delete this content item?';
+    if (!window.confirm(deleteMessage)) return;
 
     try {
+      if (isCoursePublished) {
+        const now = new Date().toISOString();
+
+        const existingItem = lessonContentItems[lessonId]?.find((item) => item.id === contentItemId);
+
+        // Resolve owning module so RLS WITH CHECK can validate coach ownership.
+        let ownerModuleId = curriculum.find(m => m.lessons.some(l => l.id === lessonId))?.id;
+        if (!ownerModuleId || ownerModuleId.startsWith('module-')) {
+          const { data: moduleLink } = await supabase
+            .from('module_content_items')
+            .select('module_id')
+            .eq('content_type', 'lesson')
+            .eq('content_id', lessonId)
+            .maybeSingle();
+
+          ownerModuleId = moduleLink?.module_id;
+        }
+
+        if (!ownerModuleId) {
+          throw new Error('Unable to resolve module ownership for this lesson content item.');
+        }
+
+        const { error: markItemError } = await supabase.rpc(
+          'coach_mark_lesson_content_item_pending_deletion',
+          {
+            p_content_item_id: contentItemId,
+            p_course_id: courseId,
+            p_module_id: ownerModuleId,
+          }
+        );
+
+        if (markItemError) {
+          throw markItemError;
+        }
+
+        if (existingItem?.content_type === 'quiz' && existingItem.content_id) {
+          await supabase
+            .from('quizzes')
+            .update({ content_status: 'pending_deletion', deleted_at: now, updated_at: now } as any)
+            .eq('id', existingItem.content_id);
+
+          await supabase
+            .from('quiz_questions')
+            .update({ deleted_at: now } as any)
+            .eq('quiz_id', existingItem.content_id);
+        }
+
+        await supabase.from('courses').update({ pending_content: true }).eq('id', courseId);
+        setPendingContent(true);
+
+        setLessonContentItems(prev => ({
+          ...prev,
+          [lessonId]: (prev[lessonId] || []).map(item =>
+            item.id === contentItemId ? { ...item, content_status: 'pending_deletion' } : item
+          ),
+        }));
+
+        alert('✅ Content item marked for deletion. Students will keep seeing the current live version until admin approval.');
+        return;
+      }
+
       await deleteContentItem(contentItemId);
 
       setLessonContentItems(prev => ({
@@ -846,7 +1010,11 @@ const CourseBuilder: React.FC = () => {
       }));
     } catch (error: any) {
       console.error('Error deleting content item:', error);
-      throw error;
+      if (error?.code === '42501') {
+        alert('Delete blocked by database security policy (RLS). Run FIX_LESSON_CONTENT_ITEMS_SOFT_DELETE_RPC.sql in Supabase SQL Editor, then retry.');
+        return;
+      }
+      alert(`Failed to delete content item: ${error?.message || 'Unknown error'}`);
     }
   };
 
@@ -936,6 +1104,99 @@ const CourseBuilder: React.FC = () => {
         setCurriculum(curriculum.filter(m => m.id !== moduleId));
         return;
       }
+
+      if (isCoursePublished) {
+        if (!window.confirm('Are you sure you want to request deletion for this module and all of its content? Students will keep seeing the current live version until admin approval.')) {
+          return;
+        }
+
+        const now = new Date().toISOString();
+
+        const { data: moduleItems, error: moduleItemsError } = await supabase
+          .from('module_content_items')
+          .select('content_id, content_type')
+          .eq('module_id', moduleId);
+
+        if (moduleItemsError) {
+          throw moduleItemsError;
+        }
+
+        const lessonIds = (moduleItems || [])
+          .filter((item: any) => item.content_type === 'lesson')
+          .map((item: any) => item.content_id)
+          .filter(Boolean);
+
+        const directQuizIds = (moduleItems || [])
+          .filter((item: any) => item.content_type === 'quiz')
+          .map((item: any) => item.content_id)
+          .filter(Boolean);
+
+        let nestedQuizIds: string[] = [];
+        if (lessonIds.length > 0) {
+          const { data: nestedQuizRows } = await supabase
+            .from('lesson_content_items')
+            .select('content_id')
+            .in('lesson_id', lessonIds)
+            .eq('content_type', 'quiz');
+
+          nestedQuizIds = (nestedQuizRows || []).map((row: any) => row.content_id).filter(Boolean);
+        }
+
+        const allQuizIds = Array.from(new Set([...directQuizIds, ...nestedQuizIds]));
+
+        const { error: markModuleError } = await supabase
+          .from('modules')
+          .update({ content_status: 'pending_deletion', deleted_at: now, updated_at: now } as any)
+          .eq('id', moduleId);
+        if (markModuleError) {
+          throw markModuleError;
+        }
+
+        const { error: markMciError } = await supabase
+          .from('module_content_items')
+          .update({ content_status: 'pending_deletion', deleted_at: now, updated_at: now } as any)
+          .eq('module_id', moduleId);
+        if (markMciError) {
+          throw markMciError;
+        }
+
+        if (lessonIds.length > 0) {
+          await supabase
+            .from('lessons')
+            .update({ content_status: 'pending_deletion', deleted_at: now, updated_at: now } as any)
+            .in('id', lessonIds);
+
+          await supabase
+            .from('lesson_content_items')
+            .update({
+              content_status: 'pending_deletion',
+              deleted_at: now,
+              updated_at: now,
+              module_id: moduleId,
+              course_id: courseId,
+            } as any)
+            .in('lesson_id', lessonIds);
+        }
+
+        if (allQuizIds.length > 0) {
+          await supabase
+            .from('quizzes')
+            .update({ content_status: 'pending_deletion', deleted_at: now, updated_at: now } as any)
+            .in('id', allQuizIds);
+
+          await supabase
+            .from('quiz_questions')
+            .update({ deleted_at: now } as any)
+            .in('quiz_id', allQuizIds);
+        }
+
+        await supabase.from('courses').update({ pending_content: true }).eq('id', courseId);
+        setPendingContent(true);
+        setCurriculum(curriculum.filter(m => m.id !== moduleId));
+        alert('✅ Module marked for deletion. Students will keep seeing the current live version until admin approval.');
+        return;
+      }
+
       const { error } = await supabase.from('modules').delete().eq('id', moduleId);
       if (error) throw error;
       setCurriculum(curriculum.filter(m => m.id !== moduleId));

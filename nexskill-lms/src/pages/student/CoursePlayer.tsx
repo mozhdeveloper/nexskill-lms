@@ -41,8 +41,9 @@ const CoursePlayer: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [flatItemList, setFlatItemList] = useState<FlatItem[]>([]);
   const [lessonContentItems, setLessonContentItems] = useState<LessonContentItem[]>([]);
-  const [lockedLessonIds, setLockedLessonIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<BottomTab | null>(null);
+  const [modulesWithSequential, setModulesWithSequential] = useState<Array<{ id: string; is_sequential: boolean }>>([]);
+  const [sortedItemsWithModules, setSortedItemsWithModules] = useState<Array<{ id: string; moduleId: string; type: 'lesson' | 'quiz' }>>([]);
 
   // Ref to track completed content items locally to avoid DB fetch race conditions
   const completedContentItemsRef = useRef<Set<string>>(new Set());
@@ -96,8 +97,7 @@ const CoursePlayer: React.FC = () => {
   resetKey: `${lessonId}-${isNotesOnlyLesson}`,
 });
 
-  // Fetch lesson access status (locked/unlocked)
-  const { isLessonLocked } = useLessonAccessStatus(courseId);
+  // Note: No longer using isLessonLocked from backend; using frontend sequential logic instead
 
   useEffect(() => {
     let cancelled = false;
@@ -165,19 +165,21 @@ const CoursePlayer: React.FC = () => {
         if (user) {
           const { data: mods } = await supabase
             .from('modules')
-            .select('id, position')
+            .select('id, position, is_sequential')
             .eq('course_id', courseId)
-            .eq('content_status', 'published')
+            .in('content_status', ['published', 'pending_deletion'])
             .order('position', { ascending: true });
 
           const moduleIds = (mods || []).map((m: any) => m.id);
+          if (cancelled) return;
+          setModulesWithSequential((mods || []).map((m: any) => ({ id: m.id, is_sequential: m.is_sequential ?? false })));
 
           if (moduleIds.length > 0) {
             const { data: contentItems } = await supabase
               .from('module_content_items')
               .select('module_id, content_id, content_type, position')
               .in('module_id', moduleIds)
-              .eq('content_status', 'published')
+              .in('content_status', ['published', 'pending_deletion'])
               .order('position', { ascending: true });
 
             const moduleOrder = new Map((mods || []).map((m: any, i: number) => [m.id, i]));
@@ -188,6 +190,7 @@ const CoursePlayer: React.FC = () => {
 
             if (cancelled) return;
             setFlatItemList(sorted.map((ci) => ({ id: ci.content_id, type: ci.content_type as 'lesson' | 'quiz' })));
+            setSortedItemsWithModules(sorted.map((ci) => ({ id: ci.content_id, moduleId: ci.module_id, type: ci.content_type as 'lesson' | 'quiz' })));
 
             const lessonIds = sorted.filter((ci) => ci.content_type === 'lesson').map((ci) => ci.content_id);
             const quizIdsInCourse = sorted.filter((ci) => ci.content_type === 'quiz').map((ci) => ci.content_id);
@@ -258,14 +261,51 @@ const CoursePlayer: React.FC = () => {
     ? Math.min(100, Math.round((completedLessons.length / totalLessonsInCourse) * 100))
     : 0;
 
+  // Build sequential lock map: only lock items in sequential modules after first uncompleted item
+  const sequentialLockedIds = useMemo(() => {
+    const locked = new Set<string>();
+    const moduleSequentialMap = new Map(modulesWithSequential.map(m => [m.id, m.is_sequential]));
+
+    // Process each module separately
+    const moduleGroups = new Map<string, Array<{ id: string; type: 'lesson' | 'quiz' }>>();
+    for (const item of sortedItemsWithModules) {
+      if (!moduleGroups.has(item.moduleId)) {
+        moduleGroups.set(item.moduleId, []);
+      }
+      moduleGroups.get(item.moduleId)!.push({ id: item.id, type: item.type });
+    }
+
+    // Apply sequential locking within each sequential module
+    for (const [moduleId, items] of moduleGroups.entries()) {
+      const isSequential = moduleSequentialMap.get(moduleId) ?? false;
+      if (!isSequential) continue; // Only lock items in sequential modules
+
+      let foundUncompleted = false;
+      for (const item of items) {
+        if (foundUncompleted) {
+          locked.add(item.id);
+        }
+        const isDone = item.type === 'quiz'
+          ? completedQuizIds.includes(item.id)
+          : completedLessons.includes(item.id);
+
+        if (!isDone) {
+          foundUncompleted = true;
+        }
+      }
+    }
+
+    return locked;
+  }, [sortedItemsWithModules, modulesWithSequential, completedLessons, completedQuizIds]);
+
   const handleSelectLesson = (newLessonId: string) => {
     const item = flatItemList.find((i) => i.id === newLessonId);
     if (item?.type === 'quiz') {
       navigate(`/student/courses/${courseId}/quizzes/${newLessonId}/take`);
     } else {
-      // Check if lesson is locked
-      if (isLessonLocked(newLessonId)) {
-        alert('This lesson is locked. Complete the previous quiz to unlock it.');
+      // Check if lesson is locked (use frontend sequential logic)
+      if (sequentialLockedIds.has(newLessonId)) {
+        alert('🔒 Please complete the previous lesson before proceeding.');
         return;
       }
       navigate(`/student/courses/${courseId}/lessons/${newLessonId}`);
@@ -609,7 +649,7 @@ const CoursePlayer: React.FC = () => {
         .from('modules')
         .select('id')
         .eq('course_id', courseId)
-        .eq('content_status', 'published');
+        .in('content_status', ['published', 'pending_deletion']);
 
       const moduleIds = (mods || []).map((m: any) => m.id);
 
