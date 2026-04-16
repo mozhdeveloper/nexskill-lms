@@ -1,27 +1,33 @@
 import React from 'react';
-import { FileText, Video, Code, Image, List, Quote, MinusSquare, ExternalLink, Clock } from 'lucide-react';
+import DOMPurify from 'dompurify';
+import { FileText, Video, HelpCircle, StickyNote, FileIcon, Clock, Plus, Trash2, Download, CheckCircle, XCircle, Upload, BookOpen } from 'lucide-react';
 
-interface ContentBlock {
+interface QuizQuestionData {
     id: string;
-    type: 'text' | 'image' | 'video' | 'code' | 'heading' | 'list' | 'quote' | 'divider' | 'embed';
-    content: string;
-    attributes?: {
-        caption?: string;
-        level?: number;
-        language?: string;
-        alt?: string;
-        external_url?: string;
-        is_external?: boolean;
-        [key: string]: any;
-    };
+    quiz_id: string;
     position: number;
+    question_type: 'multiple_choice' | 'true_false' | 'short_answer' | 'essay' | 'file_upload' | 'video_submission';
+    question_content: any[];
+    points: number;
+    answer_config: any;
+}
+
+interface LessonContentItemData {
+    id: string;
+    lesson_id: string;
+    content_type: 'video' | 'quiz' | 'text' | 'document' | 'notes';
+    content_id: string | null;
+    metadata: any;
+    position: number;
+    content_status: string;
+    quiz_questions?: QuizQuestionData[];
 }
 
 interface LessonContentViewerProps {
     lessonId: string | null;
     lessonTitle: string | null;
     lessonDescription: string | null;
-    contentBlocks: ContentBlock[];
+    lessonContentItems: LessonContentItemData[];
     estimatedDuration: number | null;
 }
 
@@ -29,7 +35,7 @@ const LessonContentViewer: React.FC<LessonContentViewerProps> = ({
     lessonId,
     lessonTitle,
     lessonDescription,
-    contentBlocks,
+    lessonContentItems,
     estimatedDuration
 }) => {
     if (!lessonId) {
@@ -43,128 +49,268 @@ const LessonContentViewer: React.FC<LessonContentViewerProps> = ({
         );
     }
 
-    const renderBlock = (block: ContentBlock) => {
-        switch (block.type) {
-            case 'text':
-                return (
-                    <div
-                        className="prose prose-sm max-w-none"
-                        dangerouslySetInnerHTML={{ __html: block.content }}
-                    />
-                );
-
-            case 'heading':
-                const level = block.attributes?.level || 2;
-                const headingClass = "font-bold text-gray-900";
-                switch (level) {
-                    case 1: return <h1 className={headingClass}>{block.content}</h1>;
-                    case 2: return <h2 className={headingClass}>{block.content}</h2>;
-                    case 3: return <h3 className={headingClass}>{block.content}</h3>;
-                    case 4: return <h4 className={headingClass}>{block.content}</h4>;
-                    case 5: return <h5 className={headingClass}>{block.content}</h5>;
-                    case 6: return <h6 className={headingClass}>{block.content}</h6>;
-                    default: return <h2 className={headingClass}>{block.content}</h2>;
-                }
-
-            case 'image':
-                return (
-                    <figure className="my-4">
-                        <img
-                            src={block.content}
-                            alt={block.attributes?.alt || 'Lesson image'}
-                            className="rounded-lg max-w-full h-auto"
-                        />
-                        {block.attributes?.caption && (
-                            <figcaption className="text-sm text-gray-500 mt-2 text-center">
-                                {block.attributes.caption}
-                            </figcaption>
-                        )}
-                    </figure>
-                );
-
-            case 'video':
-                if (block.attributes?.is_external && block.attributes?.external_url) {
-                    // External video (YouTube/Vimeo)
-                    return (
-                        <div className="my-4">
-                            <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center border">
-                                <a
-                                    href={block.attributes.external_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-2 text-[#304DB5] hover:underline"
-                                >
-                                    <ExternalLink size={20} />
-                                    View External Video
-                                </a>
-                            </div>
-                        </div>
-                    );
-                }
-                return (
-                    <div className="my-4">
-                        <video
-                            src={block.content}
-                            controls
-                            className="rounded-lg max-w-full"
-                        />
-                    </div>
-                );
-
-            case 'code':
-                return (
-                    <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto my-4">
-                        <code className="text-sm font-mono">
-                            {block.content}
-                        </code>
-                    </pre>
-                );
-
-            case 'list':
-                return (
-                    <ul className="list-disc list-inside space-y-1 my-4">
-                        {block.content.split('\n').map((item, i) => (
-                            <li key={i} className="text-gray-700">{item}</li>
-                        ))}
-                    </ul>
-                );
-
-            case 'quote':
-                return (
-                    <blockquote className="border-l-4 border-[#304DB5] pl-4 italic text-gray-600 my-4">
-                        {block.content}
-                    </blockquote>
-                );
-
-            case 'divider':
-                return <hr className="border-gray-200 my-6" />;
-
-            case 'embed':
-                return (
-                    <div className="my-4 p-4 bg-gray-50 rounded-lg border">
-                        <p className="text-sm text-gray-500">Embedded content: {block.content}</p>
-                    </div>
-                );
-
-            default:
-                return (
-                    <div className="p-4 bg-gray-50 rounded-lg border my-4">
-                        <p className="text-sm text-gray-500">Unknown block type: {block.type}</p>
-                    </div>
-                );
+    const getStatusIndicator = (status: string) => {
+        if (status === 'pending_addition') {
+            return (
+                <span className="inline-flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full font-medium border border-blue-200">
+                    <Plus size={10} />
+                    New
+                </span>
+            );
         }
+        if (status === 'pending_deletion') {
+            return (
+                <span className="inline-flex items-center gap-1 text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded-full font-medium border border-red-200">
+                    <Trash2 size={10} />
+                    Delete
+                </span>
+            );
+        }
+        return null;
     };
 
-    const getBlockIcon = (type: string) => {
-        switch (type) {
-            case 'text': return <FileText size={14} />;
-            case 'video': return <Video size={14} />;
-            case 'code': return <Code size={14} />;
-            case 'image': return <Image size={14} />;
-            case 'list': return <List size={14} />;
-            case 'quote': return <Quote size={14} />;
-            case 'divider': return <MinusSquare size={14} />;
-            default: return <FileText size={14} />;
+    const getYouTubeEmbedUrl = (url: string): string | null => {
+        const match = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+        return match ? `https://www.youtube.com/embed/${match[1]}` : null;
+    };
+
+    const renderVideo = (item: LessonContentItemData) => {
+        const url = item.metadata?.url || item.metadata?.cloudinary_secure_url;
+        const videoType = item.metadata?.video_type;
+        const title = item.metadata?.title || 'Video';
+        const duration = item.metadata?.duration;
+
+        if (!url) {
+            return (
+                <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center border">
+                    <p className="text-gray-400 text-sm">No video URL available</p>
+                </div>
+            );
+        }
+
+        if (videoType === 'youtube' || url.includes('youtube.com') || url.includes('youtu.be')) {
+            const embedUrl = getYouTubeEmbedUrl(url);
+            return (
+                <div>
+                    <p className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                        <Video size={16} className="text-purple-500" />
+                        {title}
+                        {duration && <span className="text-xs text-gray-400">({Math.round(duration / 60)} min)</span>}
+                    </p>
+                    {embedUrl ? (
+                        <div className="aspect-video rounded-lg overflow-hidden border">
+                            <iframe
+                                src={embedUrl}
+                                className="w-full h-full"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                                title={title}
+                            />
+                        </div>
+                    ) : (
+                        <a href={url} target="_blank" rel="noopener noreferrer"
+                            className="text-[#304DB5] hover:underline text-sm">
+                            Open YouTube Video
+                        </a>
+                    )}
+                </div>
+            );
+        }
+
+        return (
+            <div>
+                <p className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                    <Video size={16} className="text-purple-500" />
+                    {title}
+                    {duration && <span className="text-xs text-gray-400">({Math.round(duration / 60)} min)</span>}
+                </p>
+                <video src={url} controls className="w-full rounded-lg border" />
+            </div>
+        );
+    };
+
+    const renderTextOrNotes = (item: LessonContentItemData) => {
+        const content = item.metadata?.content;
+        const title = item.metadata?.title;
+        const readingTime = item.metadata?.reading_time;
+        const isNotes = item.content_type === 'notes';
+
+        return (
+            <div>
+                <p className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                    <StickyNote size={16} className="text-green-500" />
+                    {title || (isNotes ? 'Notes' : 'Text')}
+                    {readingTime && <span className="text-xs text-gray-400">({readingTime} min read)</span>}
+                </p>
+                {content ? (
+                    <div
+                        className="prose prose-sm max-w-none bg-gray-50 rounded-lg p-4 border"
+                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }}
+                    />
+                ) : (
+                    <p className="text-sm text-gray-400 italic">No content</p>
+                )}
+            </div>
+        );
+    };
+
+    const renderDocument = (item: LessonContentItemData) => {
+        const fileName = item.metadata?.file_name || 'Document';
+        const downloadUrl = item.metadata?.download_url;
+        const fileSize = item.metadata?.file_size;
+
+        return (
+            <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg border">
+                <FileIcon size={24} className="text-gray-500 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{fileName}</p>
+                    {fileSize && (
+                        <p className="text-xs text-gray-400">{(fileSize / 1024 / 1024).toFixed(2)} MB</p>
+                    )}
+                </div>
+                {downloadUrl && (
+                    <a
+                        href={downloadUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-sm text-[#304DB5] hover:underline"
+                    >
+                        <Download size={14} />
+                        Download
+                    </a>
+                )}
+            </div>
+        );
+    };
+
+    const renderQuestionContent = (blocks: any[]) => {
+        if (!blocks || blocks.length === 0) return null;
+        return blocks.map((block: any, i: number) => {
+            if (block.type === 'text' && block.content) {
+                return <span key={i} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(block.content) }} />;
+            }
+            return <span key={i}>{block.content || ''}</span>;
+        });
+    };
+
+    const renderQuiz = (item: LessonContentItemData) => {
+        const title = item.metadata?.title || 'Quiz';
+        const questions = item.quiz_questions || [];
+
+        return (
+            <div>
+                <p className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                    <HelpCircle size={16} className="text-orange-500" />
+                    {title}
+                    <span className="text-xs text-gray-400">({questions.length} question{questions.length !== 1 ? 's' : ''})</span>
+                </p>
+                {questions.length === 0 ? (
+                    <p className="text-sm text-gray-400 italic">No questions added yet</p>
+                ) : (
+                    <div className="space-y-4">
+                        {questions.sort((a, b) => a.position - b.position).map((q, qi) => (
+                            <div key={q.id} className="bg-gray-50 rounded-lg border p-4">
+                                <div className="flex items-start gap-2 mb-2">
+                                    <span className="text-xs font-bold text-gray-400 mt-0.5">Q{qi + 1}</span>
+                                    <div className="flex-1 text-sm text-gray-900">
+                                        {renderQuestionContent(q.question_content)}
+                                    </div>
+                                    <span className="text-[10px] text-gray-400 whitespace-nowrap">{q.points} pt{q.points !== 1 ? 's' : ''}</span>
+                                </div>
+                                {renderAnswerConfig(q)}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    const renderAnswerConfig = (q: QuizQuestionData) => {
+        const { question_type, answer_config } = q;
+
+        if (question_type === 'multiple_choice' && answer_config?.options) {
+            return (
+                <div className="ml-6 space-y-1.5">
+                    {answer_config.options.map((opt: any) => (
+                        <div key={opt.id} className={`flex items-center gap-2 text-sm px-3 py-1.5 rounded-md ${
+                            opt.is_correct ? 'bg-green-50 border border-green-200' : 'bg-white border border-gray-100'
+                        }`}>
+                            {opt.is_correct ? (
+                                <CheckCircle size={14} className="text-green-500 flex-shrink-0" />
+                            ) : (
+                                <XCircle size={14} className="text-gray-300 flex-shrink-0" />
+                            )}
+                            <span className={opt.is_correct ? 'text-green-700' : 'text-gray-600'}>{opt.text}</span>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        if (question_type === 'true_false') {
+            const correct = answer_config?.correct_answer;
+            return (
+                <div className="ml-6 space-y-1.5">
+                    {[true, false].map(val => (
+                        <div key={String(val)} className={`flex items-center gap-2 text-sm px-3 py-1.5 rounded-md ${
+                            correct === val ? 'bg-green-50 border border-green-200' : 'bg-white border border-gray-100'
+                        }`}>
+                            {correct === val ? (
+                                <CheckCircle size={14} className="text-green-500 flex-shrink-0" />
+                            ) : (
+                                <XCircle size={14} className="text-gray-300 flex-shrink-0" />
+                            )}
+                            <span className={correct === val ? 'text-green-700' : 'text-gray-600'}>
+                                {val ? 'True' : 'False'}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        if (question_type === 'short_answer') {
+            const accepted = answer_config?.accepted_answers || [];
+            return (
+                <div className="ml-6 text-sm text-gray-500">
+                    {accepted.length > 0 ? (
+                        <p>Accepted answers: <span className="font-medium text-gray-700">{accepted.join(', ')}</span></p>
+                    ) : (
+                        <p className="italic">Manually graded</p>
+                    )}
+                </div>
+            );
+        }
+
+        if (question_type === 'essay') {
+            return (
+                <div className="ml-6 text-sm text-gray-500 flex items-center gap-1">
+                    <BookOpen size={14} />
+                    <span>Essay response — manually graded</span>
+                </div>
+            );
+        }
+
+        if (question_type === 'file_upload' || question_type === 'video_submission') {
+            return (
+                <div className="ml-6 text-sm text-gray-500 flex items-center gap-1">
+                    <Upload size={14} />
+                    <span>{question_type === 'file_upload' ? 'File upload' : 'Video submission'} — manually graded</span>
+                </div>
+            );
+        }
+
+        return null;
+    };
+
+    const renderContentItem = (item: LessonContentItemData) => {
+        switch (item.content_type) {
+            case 'video': return renderVideo(item);
+            case 'text': case 'notes': return renderTextOrNotes(item);
+            case 'document': return renderDocument(item);
+            case 'quiz': return renderQuiz(item);
+            default: return <p className="text-sm text-gray-400">Unknown content type: {item.content_type}</p>;
         }
     };
 
@@ -184,29 +330,32 @@ const LessonContentViewer: React.FC<LessonContentViewerProps> = ({
                 )}
             </div>
 
-            {/* Content */}
+            {/* Content Items */}
             <div className="flex-1 overflow-y-auto p-6">
-                {contentBlocks.length === 0 ? (
+                {lessonContentItems.length === 0 ? (
                     <div className="text-center py-12 text-gray-500">
                         <FileText size={48} className="mx-auto mb-3 opacity-50" />
-                        <p>No content blocks in this lesson</p>
+                        <p>No content items in this lesson</p>
                     </div>
                 ) : (
-                    <div className="space-y-4">
-                        {contentBlocks
+                    <div className="space-y-6">
+                        {lessonContentItems
                             .sort((a, b) => a.position - b.position)
-                            .map((block, index) => (
+                            .map((item) => (
                                 <div
-                                    key={block.id || index}
-                                    className="relative group"
+                                    key={item.id}
+                                    className={`rounded-xl border p-5 transition-colors ${
+                                        item.content_status === 'pending_deletion'
+                                            ? 'border-red-200 bg-red-50/30'
+                                            : item.content_status === 'pending_addition'
+                                            ? 'border-blue-200 bg-blue-50/30'
+                                            : 'border-gray-200'
+                                    }`}
                                 >
-                                    {/* Block type indicator */}
-                                    <div className="absolute -left-8 top-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <span className="text-gray-400" title={block.type}>
-                                            {getBlockIcon(block.type)}
-                                        </span>
-                                    </div>
-                                    {renderBlock(block)}
+                                    {getStatusIndicator(item.content_status) && (
+                                        <div className="mb-3">{getStatusIndicator(item.content_status)}</div>
+                                    )}
+                                    {renderContentItem(item)}
                                 </div>
                             ))}
                     </div>

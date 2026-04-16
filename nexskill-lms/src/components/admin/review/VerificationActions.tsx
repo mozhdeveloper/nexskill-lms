@@ -24,6 +24,7 @@ interface CourseInfo {
 interface VerificationActionsProps {
     course: CourseInfo;
     unresolvedFeedbackCount: number;
+    hasPendingContentChanges: boolean;
     onUpdateStatus: (status: CourseVerificationStatus, feedback?: string) => Promise<void>;
     onAddFeedback: (lessonId: string | null, content: string) => Promise<void>;
 }
@@ -31,6 +32,7 @@ interface VerificationActionsProps {
 const VerificationActions: React.FC<VerificationActionsProps> = ({
     course,
     unresolvedFeedbackCount,
+    hasPendingContentChanges,
     onUpdateStatus,
     onAddFeedback
 }) => {
@@ -134,8 +136,15 @@ const VerificationActions: React.FC<VerificationActionsProps> = ({
                         {course.subtitle && (
                             <p className="text-sm text-gray-500 mt-1">{course.subtitle}</p>
                         )}
-                        <div className="mt-2">
-                            {getStatusBadge(course.verification_status)}
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            {course.verification_status === 'approved' && hasPendingContentChanges ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                                    <AlertTriangle size={12} />
+                                    Pending Changes
+                                </span>
+                            ) : (
+                                getStatusBadge(course.verification_status)
+                            )}
                         </div>
                     </div>
 

@@ -2,12 +2,34 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import type { AdminVerificationFeedback, CourseVerificationStatus } from '../types/db';
 
+interface QuizQuestionData {
+    id: string;
+    quiz_id: string;
+    position: number;
+    question_type: 'multiple_choice' | 'true_false' | 'short_answer' | 'essay' | 'file_upload' | 'video_submission';
+    question_content: any[];
+    points: number;
+    answer_config: any;
+}
+
+interface LessonContentItemData {
+    id: string;
+    lesson_id: string;
+    content_type: 'video' | 'quiz' | 'text' | 'document' | 'notes';
+    content_id: string | null;
+    metadata: any;
+    position: number;
+    content_status: string;
+    quiz_questions?: QuizQuestionData[];
+}
+
 interface ModuleContentItem {
     id: string;
     module_id: string;
     content_type: 'lesson' | 'quiz';
     content_id: string;
     position: number;
+    content_status: string;
     lesson_id: string | null;
     lesson_title: string | null;
     lesson_description: string | null;
@@ -15,6 +37,7 @@ interface ModuleContentItem {
     estimated_duration_minutes: number | null;
     quiz_id: string | null;
     quiz_title: string | null;
+    lesson_content_items: LessonContentItemData[];
 }
 
 interface ModuleWithContent {
@@ -22,6 +45,8 @@ interface ModuleWithContent {
     title: string;
     description: string | null;
     position: number;
+    content_status: string;
+    is_sequential: boolean;
     content_items: ModuleContentItem[];
 }
 
@@ -90,7 +115,7 @@ export const useCourseVerification = (courseId: string | undefined): UseCourseVe
             // Fetch modules with their content
             const { data: modulesData, error: modulesError } = await supabase
                 .from('modules')
-                .select('id, title, description, position')
+                .select('id, title, description, position, content_status, is_sequential')
                 .eq('course_id', courseId)
                 .order('position', { ascending: true });
 
@@ -104,7 +129,7 @@ export const useCourseVerification = (courseId: string | undefined): UseCourseVe
                 // Fetch content items linking modules to lessons/quizzes
                 const { data: mciData, error: mciError } = await supabase
                     .from('module_content_items')
-                    .select('id, module_id, content_type, content_id, position, is_published')
+                    .select('id, module_id, content_type, content_id, position, is_published, content_status')
                     .in('module_id', moduleIds)
                     .order('position', { ascending: true });
 
@@ -116,9 +141,23 @@ export const useCourseVerification = (courseId: string | undefined): UseCourseVe
                 if (lessonIds.length > 0) {
                     const { data: lessonsData } = await supabase
                         .from('lessons')
-                        .select('id, title, description, estimated_duration_minutes')
+                        .select('id, title, description, estimated_duration_minutes, content_status')
                         .in('id', lessonIds);
                     for (const l of lessonsData || []) lessonsMap[l.id] = l;
+                }
+
+                // Fetch lesson content items for all lessons
+                let lessonContentItemsMap: Record<string, LessonContentItemData[]> = {};
+                if (lessonIds.length > 0) {
+                    const { data: lciData } = await supabase
+                        .from('lesson_content_items')
+                        .select('id, lesson_id, content_type, content_id, metadata, position, content_status')
+                        .in('lesson_id', lessonIds)
+                        .order('position', { ascending: true });
+                    for (const lci of lciData || []) {
+                        if (!lessonContentItemsMap[lci.lesson_id]) lessonContentItemsMap[lci.lesson_id] = [];
+                        lessonContentItemsMap[lci.lesson_id].push(lci);
+                    }
                 }
 
                 // Fetch quiz details for quiz-type items
@@ -132,6 +171,35 @@ export const useCourseVerification = (courseId: string | undefined): UseCourseVe
                     for (const q of quizzesData || []) quizzesMap[q.id] = q;
                 }
 
+                // Fetch quiz questions for quiz-type lesson content items
+                const quizLciIds = Object.values(lessonContentItemsMap).flat()
+                    .filter(lci => lci.content_type === 'quiz' && lci.content_id)
+                    .map(lci => lci.content_id!);
+                // Also include module-level quiz IDs
+                const allQuizIdsForQuestions = [...new Set([...quizIds, ...quizLciIds])];
+                let quizQuestionsMap: Record<string, QuizQuestionData[]> = {};
+                if (allQuizIdsForQuestions.length > 0) {
+                    const { data: questionsData } = await supabase
+                        .from('quiz_questions')
+                        .select('id, quiz_id, position, question_type, question_content, points, answer_config')
+                        .in('quiz_id', allQuizIdsForQuestions)
+                        .order('position', { ascending: true });
+                    for (const q of questionsData || []) {
+                        if (!quizQuestionsMap[q.quiz_id]) quizQuestionsMap[q.quiz_id] = [];
+                        quizQuestionsMap[q.quiz_id].push(q);
+                    }
+                }
+
+                // Enrich lesson content items with quiz questions
+                for (const lessonId of Object.keys(lessonContentItemsMap)) {
+                    lessonContentItemsMap[lessonId] = lessonContentItemsMap[lessonId].map(lci => {
+                        if (lci.content_type === 'quiz' && lci.content_id) {
+                            return { ...lci, quiz_questions: quizQuestionsMap[lci.content_id] || [] };
+                        }
+                        return lci;
+                    });
+                }
+
                 // Map to content items format
                 contentItems = (mciData || []).map((item: any) => {
                     const lesson = item.content_type === 'lesson' ? lessonsMap[item.content_id] : null;
@@ -142,6 +210,7 @@ export const useCourseVerification = (courseId: string | undefined): UseCourseVe
                         content_type: item.content_type,
                         content_id: item.content_id,
                         position: item.position || 0,
+                        content_status: lesson?.content_status || quiz?.content_status || item.content_status || 'published',
                         lesson_id: lesson?.id || null,
                         lesson_title: lesson?.title || null,
                         lesson_description: lesson?.description || '',
@@ -149,6 +218,7 @@ export const useCourseVerification = (courseId: string | undefined): UseCourseVe
                         estimated_duration_minutes: lesson?.estimated_duration_minutes || 0,
                         quiz_id: quiz?.id || null,
                         quiz_title: quiz?.title || null,
+                        lesson_content_items: lesson ? (lessonContentItemsMap[lesson.id] || []) : [],
                     };
                 });
             }
@@ -162,20 +232,33 @@ export const useCourseVerification = (courseId: string | undefined): UseCourseVe
             // Fetch feedback for this course
             const { data: feedbackData, error: feedbackError } = await supabase
                 .from('admin_verification_feedback')
-                .select(`
-          *,
-          admin:profiles!feedback_admin_fkey(first_name, last_name)
-        `)
+                .select('*')
                 .eq('course_id', courseId)
                 .order('created_at', { ascending: false });
 
             if (feedbackError) throw feedbackError;
 
+            // Enrich feedback with admin names from profiles
+            const adminIds = [...new Set((feedbackData || []).map(f => f.admin_id))];
+            let adminMap: Record<string, { first_name: string | null; last_name: string | null }> = {};
+            if (adminIds.length > 0) {
+                const { data: admins } = await supabase
+                    .from('profiles')
+                    .select('id, first_name, last_name')
+                    .in('id', adminIds);
+                for (const a of admins || []) adminMap[a.id] = { first_name: a.first_name, last_name: a.last_name };
+            }
+
+            const enrichedFeedback = (feedbackData || []).map(f => ({
+                ...f,
+                admin: adminMap[f.admin_id] || null
+            }));
+
             setCourse({
                 ...courseData,
                 modules: modulesWithContent
             });
-            setFeedback(feedbackData || []);
+            setFeedback(enrichedFeedback);
 
         } catch (err) {
             console.error('Error fetching course verification data:', err);

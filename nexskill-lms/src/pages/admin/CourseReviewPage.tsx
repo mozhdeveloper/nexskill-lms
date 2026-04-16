@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import AdminAppLayout from '../../layouts/AdminAppLayout';
@@ -25,6 +25,7 @@ const CourseReviewPage: React.FC = () => {
     const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
     const [selectedLessonTitle, setSelectedLessonTitle] = useState<string | null>(null);
     const [isCourseFeedbackSelected, setIsCourseFeedbackSelected] = useState(false);
+    const [visitedLessons, setVisitedLessons] = useState<Set<string>>(new Set());
 
     // Calculate feedback counts per lesson
     const feedbackCounts = useMemo(() => {
@@ -47,6 +48,19 @@ const CourseReviewPage: React.FC = () => {
         return feedback.filter(f => !f.is_resolved).length;
     }, [feedback]);
 
+    // Check if any modules or content items have pending changes
+    const hasPendingContentChanges = useMemo(() => {
+        if (!course) return false;
+        return course.modules.some(m =>
+            m.content_status === 'pending_addition' ||
+            m.content_status === 'pending_deletion' ||
+            m.content_items.some(ci =>
+                ci.content_status === 'pending_addition' ||
+                ci.content_status === 'pending_deletion'
+            )
+        );
+    }, [course]);
+
     // Get selected lesson content
     const selectedLessonContent = useMemo(() => {
         if (!selectedLessonId || !course) return null;
@@ -60,7 +74,7 @@ const CourseReviewPage: React.FC = () => {
                     id: item.lesson_id,
                     title: item.lesson_title,
                     description: item.lesson_description,
-                    contentBlocks: item.content_blocks || [],
+                    lessonContentItems: item.lesson_content_items || [],
                     estimatedDuration: item.estimated_duration_minutes
                 };
             }
@@ -72,7 +86,21 @@ const CourseReviewPage: React.FC = () => {
         setSelectedLessonId(lessonId);
         setSelectedLessonTitle(lessonTitle);
         setIsCourseFeedbackSelected(false);
+        setVisitedLessons(prev => new Set(prev).add(lessonId));
     };
+
+    // Auto-select the first lesson when course data loads
+    useEffect(() => {
+        if (course && !selectedLessonId && !isCourseFeedbackSelected) {
+            for (const module of course.modules) {
+                const firstLesson = module.content_items.find(ci => ci.content_type === 'lesson');
+                if (firstLesson) {
+                    handleSelectLesson(firstLesson.lesson_id, firstLesson.lesson_title);
+                    break;
+                }
+            }
+        }
+    }, [course]);
 
     const handleSelectCourseFeedback = () => {
         setSelectedLessonId(null);
@@ -140,6 +168,7 @@ const CourseReviewPage: React.FC = () => {
                             courseLevelFeedbackCount={courseLevelFeedbackCount}
                             onSelectCourseFeedback={handleSelectCourseFeedback}
                             isCourseFeedbackSelected={isCourseFeedbackSelected}
+                            visitedLessons={visitedLessons}
                         />
                     </div>
 
@@ -192,7 +221,7 @@ const CourseReviewPage: React.FC = () => {
                                 lessonId={selectedLessonContent?.id || null}
                                 lessonTitle={selectedLessonContent?.title || null}
                                 lessonDescription={selectedLessonContent?.description || null}
-                                contentBlocks={selectedLessonContent?.contentBlocks || []}
+                                lessonContentItems={selectedLessonContent?.lessonContentItems || []}
                                 estimatedDuration={selectedLessonContent?.estimatedDuration || null}
                             />
                         )}
@@ -204,6 +233,7 @@ const CourseReviewPage: React.FC = () => {
                         <VerificationActions
                             course={course}
                             unresolvedFeedbackCount={unresolvedFeedbackCount}
+                            hasPendingContentChanges={hasPendingContentChanges}
                             onUpdateStatus={updateVerificationStatus}
                             onAddFeedback={addFeedback}
                         />
