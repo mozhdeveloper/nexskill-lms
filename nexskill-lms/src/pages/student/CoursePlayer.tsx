@@ -15,6 +15,8 @@ import type { LessonContentItem } from '../../types/lesson-content-item';
 import { fetchLessonContentItems } from '../../lib/supabase/lesson-content.queries';
 import { usePageScrollCompletion } from '../../hooks/usePageScrollCompletion';
 import { getSequentialLockedItemIds } from '../../utils/sequentialLocking';
+import { IoArrowBack } from "react-icons/io5";
+
 
 type LessonWithModule = Lesson & { moduleTitle?: string };
 
@@ -920,18 +922,20 @@ const CoursePlayer: React.FC = () => {
 
   // Custom header content to pass to StudentAppLayout
   const customHeader = (
-    <div className="flex items-center justify-between w-full">
-      <div className="flex items-center gap-3 min-w-0">
-        <button
+    <div className="flex items-center w-full">
+      <button
           onClick={() => navigate(`/student/courses/${courseId}`)}
-          className="px-3 py-1.5 text-xs font-medium text-text-secondary dark:text-dark-text-secondary border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors whitespace-nowrap"
+          className=" w-38 mr-3 text-large   transition-colors flex items-center  gap-2 text-gray-500 hover:text-gray-700"
         >
-          ← Go Back
-        </button>
-        <h1 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary truncate max-w-md">
-          {courseTitle}
-        </h1>
-      </div>
+          <IoArrowBack /> Go Back
+      </button>
+      
+       
+      <h1 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary truncate max-w-md">
+        {courseTitle}
+      </h1>
+      
+
       <div className="flex items-center gap-4">
         {/* You can add other nav items here if needed */}
       </div>
@@ -940,8 +944,10 @@ const CoursePlayer: React.FC = () => {
 
   return (
     <StudentAppLayout customHeader={customHeader} hideSearch={true}>
+     
       {/* Main Content — Udemy-style 2-column layout */}
       <div className="flex-1 overflow-y-auto px-8 py-6 pt-4">
+        
         <div className="flex gap-6 items-start">
           {/* Left: Main content area (expanded) */}
           <div className="flex-1 min-w-0 flex flex-col gap-6">
