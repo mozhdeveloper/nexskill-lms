@@ -109,9 +109,7 @@ const StudentAppLayout: React.FC<StudentAppLayoutProps> = ({
           >
             My Courses
           </Link>
-          <button className="hidden sm:flex p-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-all">
-            <HelpCircle className="w-5 h-5" />
-          </button>
+          
           
           <button className="hidden sm:flex p-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-all relative">
             <Bell className="w-5 h-5" />
