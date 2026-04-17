@@ -1458,7 +1458,9 @@ const QuizSession: React.FC = () => {
                         Q{index + 1}: {response.question_text}
                       </h4>
                       {response.is_correct ? (
-                        <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 ml-2" />
+                        <span className="w-5 h-5 text-green-600 flex-shrink-0 ml-2">
+                          {index + 1}
+                        </span>
                       ) : (
                         <XCircle className="w-5 h-5 text-orange-600 flex-shrink-0 ml-2" />
                       )}

@@ -21,6 +21,7 @@ interface SidebarModule {
   id: string;
   title: string;
   items: ContentItem[];
+  duration?: string;
   isSequential?: boolean;
 }
 
@@ -445,6 +446,7 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
       let sequentialCounter = 1;
       const built: SidebarModule[] = modulesData.map((mod) => {
         const modItems = (itemsData ?? []).filter((i) => i.module_id === mod.id);
+        let moduleLessonDurationSeconds = 0;
 
         const items: ContentItem[] = modItems
           .map((item) => {
@@ -460,6 +462,10 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
               const duration = totalSeconds > 0
                 ? formatDuration(totalSeconds)
                 : `${(l.estimated_duration_minutes ?? 15).toString().padStart(2, '0')}:00`;
+
+              moduleLessonDurationSeconds += totalSeconds > 0
+                ? totalSeconds
+                : (l.estimated_duration_minutes ?? 15) * 60;
 
               const contentTypes = lessonContentTypesMap[l.id] || { hasVideo: false, hasQuiz: false };
 
@@ -488,7 +494,13 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
           })
           .filter(Boolean) as ContentItem[];
 
-        return { id: mod.id, title: mod.title, items, isSequential: mod.is_sequential ?? false };
+        return {
+          id: mod.id,
+          title: mod.title,
+          items,
+          duration: moduleLessonDurationSeconds > 0 ? formatDuration(moduleLessonDurationSeconds) : undefined,
+          isSequential: mod.is_sequential ?? false,
+        };
       });
 
       // Apply completions using current values from refs to handle race conditions
@@ -676,9 +688,16 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                  <span className="font-medium text-text-primary dark:text-dark-text-primary text-sm">{module.title}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-text-primary dark:text-dark-text-primary text-sm truncate">{module.title}</div>
+                    {(module.items.length > 0 || module.duration) && (
+                      <div className="text-xs text-text-muted dark:text-dark-text-muted mt-0.5">
+                        {modCompleted}/{module.items.length}
+                        {module.duration && ` | ${module.duration}`}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <span className="text-xs text-text-muted ml-2">{modCompleted}/{module.items.length}</span>
               </button>
 
               {isExpanded && (
@@ -712,25 +731,9 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
                         <div className="flex items-center gap-3 flex-1 text-left">
                           {/* Lesson number - always visible */}
                           <div className="flex-shrink-0 w-6">
-                            {completed ? (
-                              <span className="w-5 h-5 flex items-center justify-center bg-green-500 rounded-full text-white text-xs">
-                                ✓
-                              </span>
-                            ) : isLocked ? (
-                              <Lock className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                            ) : (
-                              <span className={`text-sm font-semibold ${
-                                isLocked
-                                  ? 'text-gray-400 dark:text-gray-500'
-                                  : completed
-                                    ? 'text-green-600 dark:text-green-400'
-                                    : isActive
-                                      ? 'text-brand-primary'
-                                      : 'text-text-muted dark:text-dark-text-muted'
-                              }`}>
-                                {item.itemNumber}
-                              </span>
-                            )}
+                            <span className="text-sm font-semibold">
+                              {item.itemNumber}
+                            </span>
                           </div>
                           <div className="flex-1 min-w-0">
                             {/* Checkmark on LEFT side of lesson title */}
