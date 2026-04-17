@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import { useVideoProtection } from '../../hooks/useVideoProtection';
 
 interface HTML5VideoPlayerProps {
   videoUrl: string;
@@ -22,9 +23,13 @@ export const HTML5VideoPlayer: React.FC<HTML5VideoPlayerProps> = ({
   startTime = 0,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const lastSaveTimeRef = useRef<number>(0);
   const hasLoadedMetadataRef = useRef(false);
   const lastSeekTimeRef = useRef<number>(0); // Track last seek position
+
+  // Content protection: blur on screenshot/recording/devtools
+  useVideoProtection(containerRef);
 
   // Handle duration change and seek to start time
   const handleDurationChange = () => {
@@ -90,12 +95,19 @@ export const HTML5VideoPlayer: React.FC<HTML5VideoPlayerProps> = ({
   };
 
   return (
-    <div className="aspect-video bg-black rounded-lg overflow-hidden">
+    <div
+      ref={containerRef}
+      className="aspect-video bg-black rounded-lg overflow-hidden relative"
+      style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+    >
       <video
         ref={videoRef}
         src={videoUrl}
         controls
+        controlsList="nodownload"
+        disablePictureInPicture
         className="w-full h-full"
+        style={{ pointerEvents: 'auto' }}
         onDurationChange={handleDurationChange}
         onLoadedMetadata={handleDurationChange}
         onTimeUpdate={handleTimeUpdate}

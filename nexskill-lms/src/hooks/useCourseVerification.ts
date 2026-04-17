@@ -61,6 +61,7 @@ interface CourseWithDetails {
     duration_hours: number;
     price: number;
     verification_status: CourseVerificationStatus;
+    pending_content: boolean;
     created_at: string;
     updated_at: string;
     coach_id: string | null;
@@ -316,25 +317,107 @@ export const useCourseVerification = (courseId: string | undefined): UseCourseVe
         if (!courseId) return;
 
         try {
-            const updates: any = { 
-                verification_status: status,
-                updated_at: new Date().toISOString()
-            };
+            if (status === 'approved') {
+                // Full approval flow: publish all content (same as CourseModerationPage)
 
-            const { data, error: updateError } = await supabase
-                .from('courses')
-                .update(updates)
-                .eq('id', courseId)
-                .select();
+                // Check for pending deletions
+                const { data: pendingDeletionRows } = await supabase.rpc('get_pending_deletions');
+                const hasPendingDeletions = (pendingDeletionRows || []).some((row: any) => row.course_id === courseId);
 
-            if (updateError) {
-                console.error('Supabase update error:', updateError);
-                throw updateError;
-            }
+                if (hasPendingDeletions) {
+                    const { error } = await supabase.rpc('admin_approve_deletion', { p_course_id: courseId });
+                    if (error) throw error;
+                    await fetchCourseDetails();
+                    return;
+                }
 
-            if (!data || data.length === 0) {
-                console.error('No rows updated - check RLS policies');
-                throw new Error('Failed to update course - permission denied or course not found');
+                // Get all modules for this course
+                const { data: modulesData, error: modulesError } = await supabase
+                    .from('modules')
+                    .select('id')
+                    .eq('course_id', courseId);
+                if (modulesError) throw modulesError;
+
+                const moduleIds = modulesData?.map(m => m.id) || [];
+
+                if (moduleIds.length > 0) {
+                    // Publish modules
+                    await supabase.from('modules').update({ content_status: 'published' })
+                        .in('id', moduleIds).in('content_status', ['draft', 'pending_addition']);
+
+                    // Publish module_content_items
+                    await supabase.from('module_content_items').update({ content_status: 'published' })
+                        .in('module_id', moduleIds).in('content_status', ['draft', 'pending_addition']);
+
+                    // Publish lessons
+                    const { data: lessonItems } = await supabase
+                        .from('module_content_items')
+                        .select('content_id')
+                        .in('module_id', moduleIds)
+                        .eq('content_type', 'lesson');
+                    if (lessonItems && lessonItems.length > 0) {
+                        await supabase.from('lessons').update({ content_status: 'published' })
+                            .in('id', lessonItems.map(l => l.content_id)).in('content_status', ['draft', 'pending_addition']);
+                    }
+
+                    // Publish lesson_content_items
+                    await supabase.from('lesson_content_items').update({ content_status: 'published' })
+                        .in('module_id', moduleIds).in('content_status', ['draft', 'pending_addition']);
+
+                    // Publish module-level quizzes
+                    const { data: quizItems } = await supabase
+                        .from('module_content_items')
+                        .select('content_id')
+                        .in('module_id', moduleIds)
+                        .eq('content_type', 'quiz');
+                    if (quizItems && quizItems.length > 0) {
+                        await supabase.from('quizzes').update({ content_status: 'published' })
+                            .in('id', quizItems.map(q => q.content_id)).in('content_status', ['draft', 'pending_addition']);
+                    }
+
+                    // Publish lesson-level quizzes
+                    const { data: lessonQuizItems } = await supabase
+                        .from('lesson_content_items')
+                        .select('content_id')
+                        .in('module_id', moduleIds)
+                        .eq('content_type', 'quiz');
+                    if (lessonQuizItems && lessonQuizItems.length > 0) {
+                        await supabase.from('quizzes').update({ content_status: 'published' })
+                            .in('id', lessonQuizItems.map(q => q.content_id)).in('content_status', ['draft', 'pending_addition']);
+                    }
+                }
+
+                // Approve course and clear pending_content
+                const { data, error: updateError } = await supabase
+                    .from('courses')
+                    .update({
+                        verification_status: 'approved',
+                        pending_content: false,
+                        visibility: 'public',
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', courseId)
+                    .select();
+
+                if (updateError) throw updateError;
+                if (!data || data.length === 0) {
+                    throw new Error('Failed to update course - permission denied or course not found');
+                }
+            } else {
+                // Non-approve status updates (reject, changes_requested, etc.)
+                const { data, error: updateError } = await supabase
+                    .from('courses')
+                    .update({
+                        verification_status: status,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', courseId)
+                    .select();
+
+                if (updateError) throw updateError;
+                if (!data || data.length === 0) {
+                    throw new Error('Failed to update course - permission denied or course not found');
+                }
             }
 
             await fetchCourseDetails();

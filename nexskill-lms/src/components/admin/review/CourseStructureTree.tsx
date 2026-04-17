@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronRight, ChevronDown, FileText, HelpCircle, MessageSquare, Plus, Trash2, Lock, AlertCircle } from 'lucide-react';
+import { ChevronRight, ChevronDown, FileText, HelpCircle, Plus, Trash2, Lock, AlertCircle } from 'lucide-react';
 
 interface LessonContentItemData {
     id: string;
@@ -39,10 +39,6 @@ interface CourseStructureTreeProps {
     selectedLessonId: string | null;
     onSelectLesson: (lessonId: string, lessonTitle: string) => void;
     feedbackCounts: FeedbackCount;
-    courseLevelFeedbackCount: number;
-    onSelectCourseFeedback: () => void;
-    isCourseFeedbackSelected: boolean;
-    visitedLessons: Set<string>;
 }
 
 const isPending = (status: string) =>
@@ -63,10 +59,6 @@ const CourseStructureTree: React.FC<CourseStructureTreeProps> = ({
     selectedLessonId,
     onSelectLesson,
     feedbackCounts,
-    courseLevelFeedbackCount,
-    onSelectCourseFeedback,
-    isCourseFeedbackSelected,
-    visitedLessons
 }) => {
     const [expandedModules, setExpandedModules] = React.useState<Set<string>>(
         new Set(modules.map(m => m.id))
@@ -104,15 +96,6 @@ const CourseStructureTree: React.FC<CourseStructureTreeProps> = ({
         return null;
     };
 
-    // Check if module "!" should show: has pending content AND not all pending lessons visited
-    const moduleNeedsAttention = (module: Module): boolean => {
-        if (!moduleHasPendingContent(module)) return false;
-        const pendingLessonIds = module.content_items
-            .filter(i => lessonHasPendingContent(i) && i.lesson_id)
-            .map(i => i.lesson_id!);
-        return pendingLessonIds.some(id => !visitedLessons.has(id));
-    };
-
     return (
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-200 bg-gradient-to-r from-[#304DB5]/5 to-transparent">
@@ -145,28 +128,10 @@ const CourseStructureTree: React.FC<CourseStructureTreeProps> = ({
                 })()}
             </div>
 
-            <div className="p-2 max-h-[calc(100vh-240px)] overflow-y-auto">
-                {/* Course-level feedback option */}
-                <button
-                    onClick={onSelectCourseFeedback}
-                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm transition-colors mb-2 ${isCourseFeedbackSelected
-                            ? 'bg-[#304DB5] text-white'
-                            : 'hover:bg-gray-100 text-gray-700'
-                        }`}
-                >
-                    <MessageSquare size={16} />
-                    <span className="flex-1">Course-Level Feedback</span>
-                    {courseLevelFeedbackCount > 0 && (
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${isCourseFeedbackSelected ? 'bg-white/20' : 'bg-amber-100 text-amber-700'
-                            }`}>
-                            {courseLevelFeedbackCount}
-                        </span>
-                    )}
-                </button>
-
-                <div className="border-t border-gray-100 pt-2">
+            <div className="p-2">
+                <div>
                     {modules.map((module) => {
-                        const showModuleAlert = moduleNeedsAttention(module);
+                        const showModuleAlert = moduleHasPendingContent(module);
 
                         return (
                             <div key={module.id} className="mb-1">
@@ -207,8 +172,6 @@ const CourseStructureTree: React.FC<CourseStructureTreeProps> = ({
                                             const feedbackCount = itemId ? feedbackCounts[itemId] || 0 : 0;
                                             const isSelected = selectedLessonId === itemId;
                                             const hasPending = lessonHasPendingContent(item);
-                                            const isVisited = itemId ? visitedLessons.has(itemId) : false;
-                                            const showAlert = hasPending && !isVisited;
 
                                             return (
                                                 <button
@@ -216,13 +179,13 @@ const CourseStructureTree: React.FC<CourseStructureTreeProps> = ({
                                                     onClick={() => isLesson && itemId && itemTitle && onSelectLesson(itemId, itemTitle)}
                                                     disabled={!isLesson}
                                                     className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm transition-colors ${
-                                                        isVisited && item.content_status === 'pending_deletion'
+                                                        item.content_status === 'pending_deletion'
                                                             ? 'border-l-3 border-red-400 bg-red-50/50 opacity-60'
-                                                            : isVisited && item.content_status === 'pending_addition'
+                                                            : item.content_status === 'pending_addition'
                                                             ? 'border-l-3 border-blue-400 bg-blue-50/50'
                                                             : ''
                                                     } ${isSelected
-                                                            ? 'bg-[#304DB5] text-white'
+                                                            ? 'bg-[#304DB5]/10 text-gray-900 font-semibold'
                                                             : isLesson
                                                                 ? 'hover:bg-gray-100 text-gray-700'
                                                                 : 'text-gray-400 cursor-not-allowed'
@@ -234,12 +197,12 @@ const CourseStructureTree: React.FC<CourseStructureTreeProps> = ({
                                                         <HelpCircle size={14} className="flex-shrink-0" />
                                                     )}
                                                     <span className="flex-1 truncate">{itemTitle || 'Untitled'}</span>
-                                                    {showAlert && (
+                                                    {hasPending && (
                                                         <AlertCircle size={14} className="text-amber-500 flex-shrink-0" />
                                                     )}
-                                                    {isVisited && <StatusBadge status={item.content_status} />}
+                                                    <StatusBadge status={item.content_status} />
                                                     {feedbackCount > 0 && (
-                                                        <span className={`text-xs px-2 py-0.5 rounded-full ${isSelected ? 'bg-white/20' : 'bg-amber-100 text-amber-700'
+                                                        <span className={`text-xs px-2 py-0.5 rounded-full ${isSelected ? 'bg-[#304DB5]/20 text-[#304DB5]' : 'bg-amber-100 text-amber-700'
                                                             }`}>
                                                             {feedbackCount}
                                                         </span>

@@ -24,8 +24,6 @@ const CourseReviewPage: React.FC = () => {
 
     const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
     const [selectedLessonTitle, setSelectedLessonTitle] = useState<string | null>(null);
-    const [isCourseFeedbackSelected, setIsCourseFeedbackSelected] = useState(false);
-    const [visitedLessons, setVisitedLessons] = useState<Set<string>>(new Set());
 
     // Calculate feedback counts per lesson
     const feedbackCounts = useMemo(() => {
@@ -36,11 +34,6 @@ const CourseReviewPage: React.FC = () => {
             }
         });
         return counts;
-    }, [feedback]);
-
-    // Course-level feedback count
-    const courseLevelFeedbackCount = useMemo(() => {
-        return feedback.filter(f => f.lesson_id === null).length;
     }, [feedback]);
 
     // Unresolved feedback count
@@ -82,16 +75,21 @@ const CourseReviewPage: React.FC = () => {
         return null;
     }, [selectedLessonId, course]);
 
+    const handleUpdateStatus = async (status: Parameters<typeof updateVerificationStatus>[0], feedback?: string) => {
+        await updateVerificationStatus(status, feedback);
+        if (status === 'approved') {
+            navigate('/admin/courses/moderation');
+        }
+    };
+
     const handleSelectLesson = (lessonId: string, lessonTitle: string) => {
         setSelectedLessonId(lessonId);
         setSelectedLessonTitle(lessonTitle);
-        setIsCourseFeedbackSelected(false);
-        setVisitedLessons(prev => new Set(prev).add(lessonId));
     };
 
     // Auto-select the first lesson when course data loads
     useEffect(() => {
-        if (course && !selectedLessonId && !isCourseFeedbackSelected) {
+        if (course && !selectedLessonId) {
             for (const module of course.modules) {
                 const firstLesson = module.content_items.find(ci => ci.content_type === 'lesson');
                 if (firstLesson) {
@@ -101,12 +99,6 @@ const CourseReviewPage: React.FC = () => {
             }
         }
     }, [course]);
-
-    const handleSelectCourseFeedback = () => {
-        setSelectedLessonId(null);
-        setSelectedLessonTitle(null);
-        setIsCourseFeedbackSelected(true);
-    };
 
     if (loading) {
         return (
@@ -165,66 +157,18 @@ const CourseReviewPage: React.FC = () => {
                             selectedLessonId={selectedLessonId}
                             onSelectLesson={handleSelectLesson}
                             feedbackCounts={feedbackCounts}
-                            courseLevelFeedbackCount={courseLevelFeedbackCount}
-                            onSelectCourseFeedback={handleSelectCourseFeedback}
-                            isCourseFeedbackSelected={isCourseFeedbackSelected}
-                            visitedLessons={visitedLessons}
                         />
                     </div>
 
                     {/* Center Column - Content Viewer (5 cols) */}
                     <div className="col-span-5 overflow-y-auto">
-                        {isCourseFeedbackSelected ? (
-                            <div className="bg-white rounded-2xl border border-gray-200 h-full flex flex-col">
-                                <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-[#304DB5]/5 to-transparent">
-                                    <h2 className="text-lg font-semibold text-gray-900">Course Overview</h2>
-                                </div>
-                                <div className="flex-1 overflow-y-auto p-6">
-                                    <div className="space-y-4">
-                                        <div>
-                                            <h3 className="font-medium text-gray-700">Title</h3>
-                                            <p className="text-gray-900">{course.title}</p>
-                                        </div>
-                                        {course.subtitle && (
-                                            <div>
-                                                <h3 className="font-medium text-gray-700">Subtitle</h3>
-                                                <p className="text-gray-900">{course.subtitle}</p>
-                                            </div>
-                                        )}
-                                        {course.short_description && (
-                                            <div>
-                                                <h3 className="font-medium text-gray-700">Short Description</h3>
-                                                <p className="text-gray-600">{course.short_description}</p>
-                                            </div>
-                                        )}
-                                        {course.long_description && (
-                                            <div>
-                                                <h3 className="font-medium text-gray-700">Long Description</h3>
-                                                <div
-                                                    className="prose prose-sm max-w-none text-gray-600"
-                                                    dangerouslySetInnerHTML={{ __html: course.long_description }}
-                                                />
-                                            </div>
-                                        )}
-                                        <div className="pt-4 border-t">
-                                            <h3 className="font-medium text-gray-700 mb-2">Course Structure</h3>
-                                            <p className="text-sm text-gray-500">
-                                                {course.modules.length} modules, {' '}
-                                                {course.modules.reduce((acc, m) => acc + m.content_items.length, 0)} items total
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <LessonContentViewer
+                        <LessonContentViewer
                                 lessonId={selectedLessonContent?.id || null}
                                 lessonTitle={selectedLessonContent?.title || null}
                                 lessonDescription={selectedLessonContent?.description || null}
                                 lessonContentItems={selectedLessonContent?.lessonContentItems || []}
                                 estimatedDuration={selectedLessonContent?.estimatedDuration || null}
-                            />
-                        )}
+                        />
                     </div>
 
                     {/* Right Column - Feedback & Actions (4 cols) */}
@@ -234,7 +178,7 @@ const CourseReviewPage: React.FC = () => {
                             course={course}
                             unresolvedFeedbackCount={unresolvedFeedbackCount}
                             hasPendingContentChanges={hasPendingContentChanges}
-                            onUpdateStatus={updateVerificationStatus}
+                            onUpdateStatus={handleUpdateStatus}
                             onAddFeedback={addFeedback}
                         />
 
@@ -244,7 +188,7 @@ const CourseReviewPage: React.FC = () => {
                                 feedback={feedback}
                                 selectedLessonId={selectedLessonId}
                                 selectedLessonTitle={selectedLessonTitle}
-                                isCourseLevelView={isCourseFeedbackSelected}
+                                isCourseLevelView={false}
                                 onAddFeedback={addFeedback}
                                 onResolveFeedback={resolveFeedback}
                             />

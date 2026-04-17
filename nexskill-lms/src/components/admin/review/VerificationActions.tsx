@@ -134,8 +134,8 @@ const VerificationActions: React.FC<VerificationActionsProps> = ({
                     <div>
                         <div className="flex items-center flex-wrap gap-2">
                             <h4 className="font-medium text-gray-900">{course.title}</h4>
-                            {course.verification_status === 'approved' && hasPendingContentChanges ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                            {course.verification_status === 'approved' && (course.pending_content || hasPendingContentChanges) ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
                                     <AlertTriangle size={12} />
                                     Pending Changes
                                 </span>
@@ -194,7 +194,7 @@ const VerificationActions: React.FC<VerificationActionsProps> = ({
 
                         <button
                             onClick={handleApprove}
-                            disabled={submitting !== null || course.verification_status === 'approved'}
+                            disabled={submitting !== null || (course.verification_status === 'approved' && !course.pending_content && !hasPendingContentChanges)}
                             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                             <CheckCircle size={18} />
