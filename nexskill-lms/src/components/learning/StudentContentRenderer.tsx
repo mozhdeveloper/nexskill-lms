@@ -20,6 +20,8 @@ interface StudentContentRendererProps {
   onNavigateNext?: (item: { id: string; type: 'lesson' | 'quiz' }) => void;
   // Lock status props
   isNextItemLocked?: boolean;
+  // New prop for bottom trigger reference
+  bottomTriggerRef?: React.RefObject<HTMLDivElement>;
 }
 
 export const StudentContentRenderer: React.FC<StudentContentRendererProps> = ({
@@ -33,6 +35,7 @@ export const StudentContentRenderer: React.FC<StudentContentRendererProps> = ({
   onNavigatePrevious,
   onNavigateNext,
   isNextItemLocked = false,
+  bottomTriggerRef,
 }) => {
   if (!contentItems || contentItems.length === 0) {
     return (

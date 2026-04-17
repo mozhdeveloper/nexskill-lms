@@ -8,6 +8,7 @@ import QuestionImageChoice from '../../components/quiz/QuestionImageChoice';
 import QuestionFileUpload from '../../components/quiz/QuestionFileUpload';
 import QuestionVideoSubmission from '../../components/quiz/QuestionVideoSubmission';
 import QuizAttemptHistory, { type PreviousAttempt } from '../../components/quiz/QuizAttemptHistory';
+import QuizStatusBanner from '../../components/quiz/QuizStatusBanner';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 import { useQuizSubmission, checkQuizAttemptPermission } from '../../hooks/useQuizSubmission';
@@ -240,17 +241,17 @@ const QuizSession: React.FC = () => {
   // Resume dialog state
   const [showResumeDialog, setShowResumeDialog] = useState(false);
 
-  // File/Video upload state
+  // File/Video upload state (from friend's file)
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, File[]>>({});
   const [uploadedVideos, setUploadedVideos] = useState<Record<string, File | null>>({});
   const [uploadingFiles, setUploadingFiles] = useState<boolean>(false);
 
-  // Previous submission responses for pending review view
+  // Previous submission responses for pending review view (from friend's file)
   const [previousResponses, setPreviousResponses] = useState<PreviousResponseWithQuestion[]>([]);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Fetch submission status for pending review check
+  // Fetch submission status for pending review check (from friend's file)
   const { submission, loading: submissionLoading } = useQuizSubmission(quizId);
 
   // ============================================
@@ -392,7 +393,7 @@ const QuizSession: React.FC = () => {
             .maybeSingle(),
         ]);
 
-        // Set quiz meta
+        // Set quiz meta (merged: includes description, instructions from friend's file)
         setQuizMeta({
           id: quiz.id,
           title: quiz.title,
@@ -449,7 +450,7 @@ const QuizSession: React.FC = () => {
         }));
         setPreviousAttempts(formattedAttempts);
 
-        // Check if there's a pending submission that blocks new attempts
+        // Check if there's a pending submission that blocks new attempts (from friend's file)
         if (quiz.requires_coach_approval && submission && submission.status === 'pending_review') {
           // Fetch previous responses for view-only mode (use left join)
           if (submission.latest_attempt_id) {
@@ -522,7 +523,7 @@ const QuizSession: React.FC = () => {
           setShowResumeDialog(true);
         }
 
-        // Determine initial state
+        // Determine initial state (merged logic)
         const now = Date.now();
         const availableFrom = quiz.available_from ? new Date(quiz.available_from).getTime() : null;
         const dueDate = quiz.due_date ? new Date(quiz.due_date).getTime() : null;
@@ -540,6 +541,7 @@ const QuizSession: React.FC = () => {
           } else if (inProgress) {
             setSessionState('resume_or_restart');
           } else {
+            // Use start_screen from friend's file instead of show_history directly
             setSessionState('start_screen');
           }
         }
@@ -619,8 +621,11 @@ const QuizSession: React.FC = () => {
 
         if (q.type === 'true-false') {
           isCorrect = userAnswer === q.correctAnswer;
-        } else {
+        } else if (q.type === 'multiple-choice' || q.type === 'image-choice') {
           isCorrect = userAnswer === q.correctOptionId;
+        } else {
+          // File upload and video submission are not auto-graded
+          isCorrect = false;
         }
 
         if (isCorrect) {
@@ -657,21 +662,117 @@ const QuizSession: React.FC = () => {
 
         if (q.type === 'true-false') {
           isCorrect = userAnswer === q.correctAnswer;
-        } else {
+        } else if (q.type === 'multiple-choice' || q.type === 'image-choice') {
           isCorrect = userAnswer === q.correctOptionId;
+        } else if (q.type === 'file-upload' || q.type === 'video-submission') {
+          isCorrect = false;
         }
+
+        let pointsEarned = isCorrect ? q.points : 0;
+
+        if (isLateSubmission && quizMeta.late_penalty_percent > 0 && isCorrect) {
+          pointsEarned = Math.max(0, q.points - Math.round((q.points * quizMeta.late_penalty_percent) / 100));
+        }
+
+        const responseData: any = {
+          answer: userAnswer ?? null,
+          uploaded_files: uploadedFileUrls[q.id] || null,
+        };
 
         return {
           attempt_id: attempt.id,
           question_id: q.id,
-          response_data: { answer: userAnswer ?? null },
-          points_earned: isCorrect ? (penalizedScore !== undefined ? Math.max(0, q.points - Math.round((q.points * quizMeta.late_penalty_percent) / 100)) : q.points) : 0,
+          response_data: responseData,
+          points_earned: pointsEarned,
           points_possible: q.points,
           is_correct: isCorrect,
+          requires_grading: q.requires_manual_grading || (q.type === 'file-upload') || (q.type === 'video-submission'),
         };
       });
 
-      await supabase.from('quiz_responses').insert(responses);
+      const { error: rErr } = await supabase.from('quiz_responses').insert(responses);
+      if (rErr) console.error('Error saving responses:', rErr);
+
+      // Mark quiz content item as complete if passed (from your file)
+      if (passed) {
+        try {
+          const { data: quizData, error: quizErr } = await supabase
+            .from('quizzes')
+            .select('lesson_id')
+            .eq('id', quizMeta.id)
+            .single();
+
+          if (!quizErr && quizData?.lesson_id) {
+            const { data: quizContentItem } = await supabase
+              .from('lesson_content_items')
+              .select('id')
+              .eq('lesson_id', quizData.lesson_id)
+              .eq('content_type', 'quiz')
+              .eq('content_id', quizMeta.id)
+              .maybeSingle();
+
+            if (quizContentItem) {
+              const { error: progressErr } = await supabase
+                .from('lesson_content_item_progress')
+                .upsert({
+                  user_id: user.id,
+                  lesson_id: quizData.lesson_id,
+                  content_item_id: quizContentItem.id,
+                  content_type: 'quiz',
+                  is_completed: true,
+                  completed_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                  progress_data: { quiz_score: scorePercent, passed: true },
+                }, {
+                  onConflict: 'user_id,lesson_id,content_item_id',
+                });
+
+              if (progressErr) {
+                console.error('Failed to mark quiz content item complete:', progressErr);
+              } else {
+                console.log('✅ Quiz content item marked complete — DB trigger will check ALL required items');
+              }
+            }
+          }
+
+          // If quiz does NOT require coach approval, unlock the next lesson immediately (from friend's file)
+          if (!quizMeta.requires_coach_approval) {
+            console.log('🔓 Quiz passed without coach approval requirement — unlocking next lesson');
+            const { error: unlockErr } = await supabase
+              .rpc('unlock_next_lesson', {
+                p_user_id: user.id,
+                p_quiz_id: quizMeta.id,
+              });
+
+            if (unlockErr) {
+              console.error('Failed to unlock next lesson:', unlockErr);
+            } else {
+              console.log('✅ Next lesson unlocked successfully');
+            }
+          }
+        } catch (err) {
+          console.error('Error marking quiz completion:', err);
+        }
+      }
+
+      // VERIFY: Check if quiz_submissions was created (for coach-reviewed quizzes)
+      if (isCoachReviewed) {
+        console.log('🔎 Checking if quiz_submissions was created...');
+        const { data: checkSubmission, error: checkError } = await supabase
+          .from('quiz_submissions')
+          .select('*')
+          .eq('quiz_attempt_id', currentAttempt.id)
+          .single();
+
+        if (checkError) {
+          console.error('❌ quiz_submissions NOT found!');
+          console.error('  Error:', checkError);
+        } else {
+          console.log('✅ quiz_submissions created successfully!');
+          console.log('  Submission ID:', checkSubmission.id);
+          console.log('  Status:', checkSubmission.status);
+        }
+      }
 
       navigate(`/student/courses/${courseId}/quizzes/${quizId}/result`, {
         state: {
@@ -688,7 +789,7 @@ const QuizSession: React.FC = () => {
           questions,
           userAnswers: selectedAnswers,
           passed,
-          attemptNumber: attempt.attempt_number,
+          attemptNumber: currentAttempt.attempt_number,
           penalizedScore: penalizedScore !== undefined ? Math.round((penalizedScore / totalPoints) * 100) : undefined,
           attemptsRemaining: quizMeta.max_attempts === null
             ? null
@@ -820,7 +921,7 @@ const QuizSession: React.FC = () => {
     setSubmitting(true);
 
     try {
-      // Upload files and videos before calculating score
+      // Upload files and videos before calculating score (from friend's file)
       setUploadingFiles(true);
 
       const uploadedFileUrls: Record<string, any> = {};
@@ -853,7 +954,7 @@ const QuizSession: React.FC = () => {
             uploadedFileUrls[question.id] = {
               type: 'video',
               url,
-              filename: uploadedVideos[question.id]!.name
+              filename: uploadedVideos[question.id].name
             };
           } catch (error: any) {
             console.error(`Failed to upload video for question ${question.id}:`, error);
@@ -885,8 +986,11 @@ const QuizSession: React.FC = () => {
 
         if (q.type === 'true-false') {
           isCorrect = userAnswer === q.correctAnswer;
-        } else {
+        } else if (q.type === 'multiple-choice' || q.type === 'image-choice') {
           isCorrect = userAnswer === q.correctOptionId;
+        } else {
+          // File upload and video submission are not auto-graded
+          isCorrect = false;
         }
 
         if (isCorrect) {
@@ -911,8 +1015,6 @@ const QuizSession: React.FC = () => {
       const passed = scorePercent >= quizMeta.passing_score;
 
       // CRITICAL: For coach-reviewed quizzes, ALWAYS use 'submitted' status
-      // so the database trigger creates a quiz_submissions record for coach review.
-      // Standard quizzes without coach approval use 'graded' for auto-grading.
       const isCoachReviewed = quizMeta.requires_coach_approval;
       let finalStatus: 'submitted' | 'graded' = requiresManualGrading || isCoachReviewed ? 'submitted' : 'graded';
 
@@ -922,8 +1024,7 @@ const QuizSession: React.FC = () => {
       console.log('  requires_coach_approval:', quizMeta.requires_coach_approval);
       console.log('  requires_manual_grading:', requiresManualGrading);
       console.log('  isCoachReviewed:', isCoachReviewed);
-      console.log('  finalStatus:', finalStatus, '(should be "submitted" for coach review)');
-      console.log('  Attempt ID:', currentAttempt.id);
+      console.log('  finalStatus:', finalStatus);
 
       const { error: updateErr } = await supabase
         .from('quiz_attempts')
@@ -942,9 +1043,6 @@ const QuizSession: React.FC = () => {
       }
 
       console.log('✅ quiz_attempts updated successfully');
-      console.log('  Status set to:', finalStatus);
-      console.log('  If this is "submitted", the database trigger should fire');
-      console.log('  and create a quiz_submissions record for coach review');
 
       const responses = questions.map((q) => {
         const userAnswer = selectedAnswers[q.id];
@@ -952,10 +1050,10 @@ const QuizSession: React.FC = () => {
 
         if (q.type === 'true-false') {
           isCorrect = userAnswer === q.correctAnswer;
+        } else if (q.type === 'multiple-choice' || q.type === 'image-choice') {
+          isCorrect = userAnswer === q.correctOptionId;
         } else if (q.type === 'file-upload' || q.type === 'video-submission') {
           isCorrect = false;
-        } else {
-          isCorrect = userAnswer === q.correctOptionId;
         }
 
         let pointsEarned = isCorrect ? q.points : 0;
@@ -983,6 +1081,7 @@ const QuizSession: React.FC = () => {
       const { error: rErr } = await supabase.from('quiz_responses').insert(responses);
       if (rErr) console.error('Error saving responses:', rErr);
 
+      // Mark quiz content item as complete if passed (from your file)
       if (passed) {
         try {
           const { data: quizData, error: quizErr } = await supabase
@@ -1024,7 +1123,7 @@ const QuizSession: React.FC = () => {
             }
           }
 
-          // If quiz does NOT require coach approval, unlock the next lesson immediately
+          // If quiz does NOT require coach approval, unlock the next lesson immediately (from friend's file)
           if (!quizMeta.requires_coach_approval) {
             console.log('🔓 Quiz passed without coach approval requirement — unlocking next lesson');
             const { error: unlockErr } = await supabase
@@ -1056,23 +1155,17 @@ const QuizSession: React.FC = () => {
         if (checkError) {
           console.error('❌ quiz_submissions NOT found!');
           console.error('  Error:', checkError);
-          console.log('  This means the database trigger did not fire');
-          console.log('  Possible causes:');
-          console.log('    1. Trigger does not exist');
-          console.log('    2. Status was not "submitted"');
-          console.log('    3. Quiz does not have requires_coach_approval=true');
         } else {
           console.log('✅ quiz_submissions created successfully!');
           console.log('  Submission ID:', checkSubmission.id);
           console.log('  Status:', checkSubmission.status);
-          console.log('  Coach should now see this in Quiz Reviews');
         }
       }
 
       navigate(`/student/courses/${courseId}/quizzes/${quizId}/result`, {
         state: {
           score: scorePercent,
-          correctCount: questions.filter((q) => {
+          correctCount: questions.filter((q, i) => {
             const userAnswer = selectedAnswers[q.id];
             if (q.type === 'true-false') {
               return userAnswer === q.correctAnswer;
@@ -1093,6 +1186,7 @@ const QuizSession: React.FC = () => {
           maxAttempts: quizMeta.max_attempts,
           timeLimitMinutes: quizMeta.time_limit_minutes,
           lessonId: quizMeta.lesson_id ?? null,
+          requiresCoachApproval: quizMeta.requires_coach_approval || false,
         },
       });
     } catch (err) {
@@ -1151,7 +1245,6 @@ const QuizSession: React.FC = () => {
     const uploadedUrls: string[] = [];
 
     for (const file of files) {
-      const fileExt = file.name.split('.').pop();
       const fileName = `${attemptId}/${questionId}/${Date.now()}_${file.name}`;
 
       const { error: uploadError } = await supabase.storage
@@ -1198,7 +1291,7 @@ const QuizSession: React.FC = () => {
   };
 
   // ============================================
-  // Render: Start Screen (replaces QuizStart)
+  // Render: Start Screen (from friend's file)
   // ============================================
 
   const renderStartScreen = () => {
@@ -1297,7 +1390,7 @@ const QuizSession: React.FC = () => {
   };
 
   // ============================================
-  // Render: Pending Review (View Only - Cannot Retake)
+  // Render: Pending Review (from friend's file)
   // ============================================
 
   const renderPendingReview = () => {

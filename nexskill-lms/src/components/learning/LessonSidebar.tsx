@@ -12,6 +12,8 @@ interface ContentItem {
   isCompleted: boolean;
   itemNumber: number;
   progressCount?: { completed: number; total: number };
+  hasVideo?: boolean;
+  hasQuiz?: boolean;
   isLocked?: boolean; // NEW: Lesson lock status
 }
 
@@ -148,13 +150,13 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
       const quizIds   = (itemsData ?? []).filter((i) => i.content_type === 'quiz').map((i) => i.content_id);
 
       // Fetch lesson content items to get all videos and quizzes per lesson
-      const { data: lessonContentItems } = lessonIds.length > 0
+      const { data: lessonContentItems } = (lessonIds.length > 0
         ? await supabase
             .from('lesson_content_items')
             .select('id, lesson_id, content_type, content_id, metadata')
             .in('lesson_id', lessonIds)
             .in('content_status', ['published', 'pending_deletion'])
-        : Promise.resolve({ data: [] });
+        : { data: [] }) as { data: any[] };
 
       // Build maps for lesson content types and quiz content IDs
       const lessonVideoContentItems: Record<string, Array<{ id: string; metadata: any }>> = {};
@@ -185,12 +187,12 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
       ])];
 
       // Fetch quiz details to get time_limit_minutes
-      const { data: quizzesData } = allQuizIds.length > 0
+      const { data: quizzesData } = (allQuizIds.length > 0
         ? await supabase
             .from('quizzes')
             .select('id, title, time_limit_minutes')
             .in('id', allQuizIds)
-        : Promise.resolve({ data: [] });
+        : { data: [] }) as { data: any[] };
 
       const quizDurationMap = new Map<string, number>();
       (quizzesData || []).forEach((quiz: any) => {
@@ -474,14 +476,13 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
               };
             }
 
-            const q = quizzesMap.get(item.content_id);
-            if (!q) return null;
+            const q = quizzesMap.get(item.content_id) || {};
             return {
-              id:          q.id,
-              title:       q.title,
+              id:          q.id || '',
+              title:       q.title || '',
               type:        'quiz' as const,
               duration:    `${q.time_limit_minutes ?? 30}m`,
-              isCompleted: allCompletedQuizIds.includes(q.id),
+              isCompleted: allCompletedQuizIds.includes(q.id || ''),
               itemNumber: sequentialCounter++,
             };
           })

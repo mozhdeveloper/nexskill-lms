@@ -25,7 +25,7 @@ interface FlatItem {
   type: 'lesson' | 'quiz';
 }
 
-type BottomTab = 'downloads' | 'notes' | 'ask-ai' | 'ai-summary';
+type BottomTab = 'downloads' | 'notes' | 'ask-ai' | 'ai-summary' | 'debug';
 
 const CoursePlayer: React.FC = () => {
   const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>();
@@ -859,11 +859,11 @@ const CoursePlayer: React.FC = () => {
   };
 
   const bottomTabs: { id: BottomTab; label: string; icon: string }[] = [
-    { id: 'downloads', label: 'Downloads', icon: '📥' },
-    { id: 'notes', label: 'Notes', icon: '📝' },
-    { id: 'ask-ai', label: 'Ask AI', icon: '🤖' },
-    { id: 'ai-summary', label: 'AI Summary', icon: '✨' },
-    { id: 'debug', label: 'Debug', icon: '🔧' },
+    { id: 'downloads', label: 'Downloads', icon: '\ud83d\udce5' },
+    { id: 'notes', label: 'Notes', icon: '\ud83d\udcdd' },
+    { id: 'ask-ai', label: 'Ask AI', icon: '\ud83e\udd16' },
+    { id: 'ai-summary', label: 'AI Summary', icon: '\u2728' },
+    { id: 'debug' as BottomTab, label: 'Debug', icon: '\ud83d\udd27' },
   ];
 
   if (loading) {
@@ -965,7 +965,7 @@ const CoursePlayer: React.FC = () => {
                   onNavigatePrevious={handleNavigatePrevious}
                   onNavigateNext={handleNavigateNext}
                   isNextItemLocked={isNextItemLocked}
-                  bottomTriggerRef={bottomTriggerRef}
+                  bottomTriggerRef={bottomTriggerRef as React.RefObject<HTMLDivElement>}
                 />
               ) : (
                 <ContentBlockRenderer

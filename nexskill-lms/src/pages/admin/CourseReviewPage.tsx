@@ -93,7 +93,7 @@ const CourseReviewPage: React.FC = () => {
             for (const module of course.modules) {
                 const firstLesson = module.content_items.find(ci => ci.content_type === 'lesson');
                 if (firstLesson) {
-                    handleSelectLesson(firstLesson.lesson_id, firstLesson.lesson_title);
+                    handleSelectLesson(firstLesson.lesson_id || '', firstLesson.lesson_title || '');
                     break;
                 }
             }

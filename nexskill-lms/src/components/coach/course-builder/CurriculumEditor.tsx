@@ -321,7 +321,7 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
 
     const handleAddModule = () => {
         if (onAddModule) { onAddModule(); return; }
-        onChange([...curriculum, { id: `module-${Date.now()}`, title: "", lessons: [] }]);
+        onChange([...curriculum, { id: `module-${Date.now()}`, title: "", lessons: [], content_status: 'draft' }]);
     };
 
     const handleDeleteModule = async (moduleId: string) => {
@@ -362,7 +362,7 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
             const withId = { ...newLesson, id: `lesson-${Date.now()}` };
             onChange(curriculum.map((m) =>
                 m.id === moduleId
-                    ? { ...m, lessons: [...m.lessons, { ...withId, type: "lesson" } as ContentItem] }
+                    ? { ...m, lessons: [...m.lessons, { ...withId, type: "lesson", is_published: false } as ContentItem] }
                     : m
             ));
         }

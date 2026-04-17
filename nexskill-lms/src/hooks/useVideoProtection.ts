@@ -1,114 +1,88 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 
 /**
- * Best-effort video content protection (without DRM).
- * Deters casual screenshots, screen recording, and screen sharing
- * by blurring the video container when capture is detected.
- *
- * NOT a substitute for DRM — determined users can bypass this.
+ * Prototype video content protection.
+ * - PrintScreen / Win+Shift+S → black overlay (auto-dismisses when focus returns)
+ * - DevTools open → black overlay (auto-clears when closed)
+ * - Right-click, download, PiP disabled
+ * - Keyboard shortcuts for DevTools/save blocked
  */
+type BlackoutReason = 'printscreen' | 'devtools' | 'screenshare' | null;
+
 export function useVideoProtection(containerRef: React.RefObject<HTMLElement | null>) {
-  const isProtecting = useRef(false);
+  const [isBlackout, setIsBlackout] = useState(false);
+  const blackoutReason = useRef<BlackoutReason>(null);
+  const focusListenerRef = useRef<(() => void) | null>(null);
 
-  const blurVideo = useCallback(() => {
-    if (containerRef.current && !isProtecting.current) {
-      isProtecting.current = true;
-      containerRef.current.style.filter = 'blur(30px)';
-      containerRef.current.style.transition = 'filter 0.1s';
-    }
-  }, [containerRef]);
+  const showBlackout = useCallback((reason: NonNullable<BlackoutReason>) => {
+    blackoutReason.current = reason;
+    setIsBlackout(true);
 
-  const unblurVideo = useCallback(() => {
-    if (containerRef.current && isProtecting.current) {
-      isProtecting.current = false;
-      containerRef.current.style.filter = 'none';
+    // For screenshot blackouts, auto-dismiss when the user returns focus
+    if (reason === 'printscreen') {
+      // Remove any existing listener first
+      if (focusListenerRef.current) {
+        window.removeEventListener('focus', focusListenerRef.current);
+      }
+      const onFocusReturn = () => {
+        // Small delay so the blackout is still visible during the transition back
+        setTimeout(() => {
+          if (blackoutReason.current === 'printscreen') {
+            blackoutReason.current = null;
+            setIsBlackout(false);
+          }
+        }, 500);
+        window.removeEventListener('focus', onFocusReturn);
+        focusListenerRef.current = null;
+      };
+      focusListenerRef.current = onFocusReturn;
+      window.addEventListener('focus', onFocusReturn);
     }
-  }, [containerRef]);
+  }, []);
+
+  const hideBlackout = useCallback((reason: NonNullable<BlackoutReason>) => {
+    if (blackoutReason.current === reason) {
+      blackoutReason.current = null;
+      setIsBlackout(false);
+    }
+  }, []);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    // --- 1. Block PrintScreen key (Windows) ---
+    const isPrintScreen = (e: KeyboardEvent) =>
+      e.key === 'PrintScreen' || e.code === 'PrintScreen' || e.keyCode === 44;
+
+    // --- 1. PrintScreen / Win+Shift+S → black overlay ---
     const handleKeyDown = (e: KeyboardEvent) => {
-      // PrintScreen
-      if (e.key === 'PrintScreen') {
-        blurVideo();
-        // Attempt to clear clipboard
+      if (isPrintScreen(e)) {
+        e.preventDefault();
+        showBlackout('printscreen');
         navigator.clipboard?.writeText?.('').catch(() => {});
-        setTimeout(unblurVideo, 1500);
       }
-      // Snipping Tool shortcuts (Win+Shift+S)
-      if (e.key === 's' && e.shiftKey && e.metaKey) {
-        blurVideo();
-        setTimeout(unblurVideo, 3000);
+      // Win+Shift+S (Snipping Tool) — may not fire on all Windows versions
+      if (e.key.toLowerCase() === 's' && e.shiftKey && (e.metaKey || e.getModifierState?.('OS'))) {
+        showBlackout('printscreen');
       }
-      // macOS screenshot shortcuts (Cmd+Shift+3, Cmd+Shift+4, Cmd+Shift+5)
-      if (e.metaKey && e.shiftKey && ['3', '4', '5'].includes(e.key)) {
-        blurVideo();
-        setTimeout(unblurVideo, 3000);
+      // Block F12, Ctrl+S, Ctrl+U, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C
+      if (
+        e.key === 'F12' ||
+        (e.ctrlKey && ['s', 'u', 'p'].includes(e.key.toLowerCase())) ||
+        (e.ctrlKey && e.shiftKey && ['i', 'j', 'c'].includes(e.key.toLowerCase()))
+      ) {
+        e.preventDefault();
       }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'PrintScreen') {
-        // Double-clear clipboard on key release too
+      if (isPrintScreen(e)) {
+        showBlackout('printscreen');
         navigator.clipboard?.writeText?.('').catch(() => {});
       }
     };
 
-    // --- 2. Visibility change (tab switch / alt-tab) ---
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        blurVideo();
-      } else {
-        // Small delay before unblurring to catch quick switch-back screenshots
-        setTimeout(unblurVideo, 300);
-      }
-    };
-
-    // --- 3. Blur on window focus loss ---
-    const handleBlur = () => blurVideo();
-    const handleFocus = () => setTimeout(unblurVideo, 300);
-
-    // --- 4. Disable right-click on the video container ---
-    const handleContextMenu = (e: MouseEvent) => {
-      e.preventDefault();
-      return false;
-    };
-
-    // --- 5. Prevent drag (stops drag-to-desktop save) ---
-    const handleDragStart = (e: DragEvent) => {
-      e.preventDefault();
-      return false;
-    };
-
-    // --- 6. Detect screen capture / recording APIs ---
-    // When screen sharing starts via getDisplayMedia, blur
-    let mediaStreamCleanup: (() => void) | null = null;
-
-    const detectScreenCapture = () => {
-      // Override getDisplayMedia to detect when screen sharing starts
-      if (navigator.mediaDevices?.getDisplayMedia) {
-        const originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
-        navigator.mediaDevices.getDisplayMedia = async function (constraints?: DisplayMediaStreamOptions) {
-          blurVideo();
-          const stream = await originalGetDisplayMedia(constraints);
-          // When screen share stops, unblur
-          stream.getVideoTracks().forEach((track) => {
-            track.addEventListener('ended', () => {
-              unblurVideo();
-            });
-          });
-          return stream;
-        };
-        mediaStreamCleanup = () => {
-          navigator.mediaDevices.getDisplayMedia = originalGetDisplayMedia;
-        };
-      }
-    };
-
-    // --- 7. DevTools detection (resize-based heuristic) ---
+    // --- 2. DevTools detection ---
     let devToolsOpen = false;
     const checkDevTools = () => {
       const widthThreshold = window.outerWidth - window.innerWidth > 160;
@@ -117,52 +91,76 @@ export function useVideoProtection(containerRef: React.RefObject<HTMLElement | n
 
       if (isOpen && !devToolsOpen) {
         devToolsOpen = true;
-        blurVideo();
+        showBlackout('devtools');
       } else if (!isOpen && devToolsOpen) {
         devToolsOpen = false;
-        unblurVideo();
+        hideBlackout('devtools');
       }
     };
     const devtoolsInterval = setInterval(checkDevTools, 1000);
 
-    // --- 8. Detect Picture-in-Picture (prevents PiP recording) ---
-    const handlePipEnter = () => blurVideo();
-    const handlePipLeave = () => unblurVideo();
+    // --- 3. Disable right-click ---
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
 
+    // --- 4. Prevent drag ---
+    const handleDragStart = (e: DragEvent) => {
+      e.preventDefault();
+    };
+
+    // --- 5. Disable PiP ---
     const videoEl = container.querySelector('video');
     if (videoEl) {
-      videoEl.addEventListener('enterpictureinpicture', handlePipEnter);
-      videoEl.addEventListener('leavepictureinpicture', handlePipLeave);
-      // Disable PiP entirely
       videoEl.disablePictureInPicture = true;
     }
 
-    // Attach listeners
+    // --- 6. Detect browser-based screen share/recording ---
+    let mediaStreamCleanup: (() => void) | null = null;
+    if (navigator.mediaDevices?.getDisplayMedia) {
+      const originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
+      navigator.mediaDevices.getDisplayMedia = async function (constraints?: DisplayMediaStreamOptions) {
+        showBlackout('screenshare');
+        const stream = await originalGetDisplayMedia(constraints);
+        // When screen share/recording stops, remove blackout
+        stream.getVideoTracks().forEach((track) => {
+          track.addEventListener('ended', () => {
+            hideBlackout('screenshare');
+          });
+        });
+        return stream;
+      };
+      mediaStreamCleanup = () => {
+        navigator.mediaDevices.getDisplayMedia = originalGetDisplayMedia;
+      };
+    }
+
+    // Attach
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', handleBlur);
-    window.addEventListener('focus', handleFocus);
     container.addEventListener('contextmenu', handleContextMenu);
     container.addEventListener('dragstart', handleDragStart);
-    detectScreenCapture();
 
-    // Cleanup
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('keyup', handleKeyUp);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handleBlur);
-      window.removeEventListener('focus', handleFocus);
       container.removeEventListener('contextmenu', handleContextMenu);
       container.removeEventListener('dragstart', handleDragStart);
       clearInterval(devtoolsInterval);
       mediaStreamCleanup?.();
-
-      if (videoEl) {
-        videoEl.removeEventListener('enterpictureinpicture', handlePipEnter);
-        videoEl.removeEventListener('leavepictureinpicture', handlePipLeave);
+      if (focusListenerRef.current) {
+        window.removeEventListener('focus', focusListenerRef.current);
       }
     };
-  }, [containerRef, blurVideo, unblurVideo]);
+  }, [containerRef, showBlackout, hideBlackout]);
+
+  // Manual dismiss (fallback if auto-dismiss doesn't trigger)
+  const dismissBlackout = useCallback(() => {
+    if (blackoutReason.current === 'printscreen') {
+      blackoutReason.current = null;
+      setIsBlackout(false);
+    }
+  }, []);
+
+  return { isBlackout, dismissBlackout };
 }
