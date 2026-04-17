@@ -176,6 +176,10 @@ export class SupabaseStorageUploadService {
             import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY
         ) as string;
 
+        // Get the current session to use the user's access token for the Authorization header
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token || anonKey;
+
         if (!supabaseUrl || !anonKey) {
             throw new Error('Supabase URL or key not configured');
         }
@@ -199,7 +203,10 @@ export class SupabaseStorageUploadService {
             }
 
             xhr.open('POST', uploadUrl);
-            xhr.setRequestHeader('Authorization', `Bearer ${anonKey}`);
+            // Use the user's token for Authorization
+            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+            // ALWAYS include the apikey header for Supabase REST requests
+            xhr.setRequestHeader('apikey', anonKey);
             xhr.setRequestHeader('Content-Type', file.type);
             // x-upsert: true → replaces the file if it already exists
             xhr.setRequestHeader('x-upsert', 'true');
