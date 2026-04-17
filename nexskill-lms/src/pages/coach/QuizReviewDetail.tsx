@@ -74,10 +74,12 @@ const QuizReviewDetail: React.FC = () => {
   // Feedback form state
   const [feedbackComment, setFeedbackComment] = useState('');
   const [mediaFiles, setMediaFiles] = useState<QuizFeedbackMedia[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [selectedMedia, setSelectedMedia] = useState<QuizFeedbackMedia | null>(null);
 
   // Helper to extract text from question_content JSON
   const extractQuestionText = (questionContent: any): string => {
@@ -209,6 +211,10 @@ const QuizReviewDetail: React.FC = () => {
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
+        const tempId = Math.random().toString(36).substring(7);
+        
+        setUploadingFiles(prev => new Set(prev).add(tempId));
+
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
         const filePath = `feedback/${submissionId}/${fileName}`;
@@ -218,7 +224,14 @@ const QuizReviewDetail: React.FC = () => {
           .from('quiz-feedback')
           .upload(filePath, file);
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          setUploadingFiles(prev => {
+            const next = new Set(prev);
+            next.delete(tempId);
+            return next;
+          });
+          throw uploadError;
+        }
 
         // Get public URL
         const { data: urlData } = supabase.storage
@@ -236,10 +249,16 @@ const QuizReviewDetail: React.FC = () => {
             },
           ]);
         }
+        
+        setUploadingFiles(prev => {
+          const next = new Set(prev);
+          next.delete(tempId);
+          return next;
+        });
       }
     } catch (err: any) {
       console.error('Error uploading media:', err);
-      setError('Failed to upload media. Please try again.');
+      setError(`Failed to upload media: ${err.message || 'Unknown error'}`);
     } finally {
       setUploading(false);
     }
@@ -251,6 +270,11 @@ const QuizReviewDetail: React.FC = () => {
 
   const handleReviewSubmit = useCallback(async (status: 'passed' | 'failed') => {
     if (!user || !submission) return;
+
+    if (uploadingFiles.size > 0) {
+      setError('Please wait for all files to finish uploading before submitting.');
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
@@ -319,42 +343,50 @@ const QuizReviewDetail: React.FC = () => {
     } finally {
       setSubmitting(false);
     }
-  }, [user, submission, feedbackComment, mediaFiles, courseId, navigate]);
+  }, [user, submission, feedbackComment, mediaFiles, courseId, navigate, uploadingFiles.size]);
 
   const renderMediaPreview = (media: QuizFeedbackMedia, index: number) => {
     return (
-      <div key={index} className="relative group">
+      <div key={index} className="relative group cursor-pointer" onClick={() => setSelectedMedia(media)}>
         {media.type === 'image' && (
           <img
             src={media.url}
             alt={media.filename}
-            className="w-full h-32 object-cover rounded-lg"
+            className="w-full h-32 object-cover rounded-lg border border-gray-200"
           />
         )}
         {media.type === 'video' && (
           <div className="relative">
             <video
               src={media.url}
-              className="w-full h-32 object-cover rounded-lg"
+              className="w-full h-32 object-cover rounded-lg border border-gray-200"
               muted
             />
-            <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-lg">
-              <Video className="w-8 h-8 text-white" />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-lg group-hover:bg-black/40 transition-colors">
+              <Play className="w-8 h-8 text-white" />
             </div>
           </div>
         )}
         {media.type === 'document' && (
-          <div className="w-full h-32 flex items-center justify-center bg-gray-100 rounded-lg">
-            <FileText className="w-12 h-12 text-gray-400" />
+          <div className="w-full h-32 flex flex-col items-center justify-center bg-gray-100 rounded-lg border border-gray-200">
+            <FileText className="w-10 h-10 text-gray-400 mb-2" />
+            <span className="text-[10px] text-text-secondary px-2 text-center truncate w-full">
+              {media.filename}
+            </span>
           </div>
         )}
         <button
-          onClick={() => removeMedia(index)}
-          className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={(e) => {
+            e.stopPropagation();
+            removeMedia(index);
+          }}
+          className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-md"
         >
           <Trash2 className="w-4 h-4" />
         </button>
-        <p className="text-xs text-text-secondary mt-1 truncate">{media.filename}</p>
+        <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] px-2 py-1 rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity truncate">
+          {media.filename}
+        </div>
       </div>
     );
   };
@@ -626,72 +658,130 @@ const QuizReviewDetail: React.FC = () => {
                   />
                 </div>
 
-                {/* Media Upload */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-text-secondary mb-2">
-                    Attachments (Optional)
-                  </label>
-                  <div className="flex gap-2 mb-3">
-                    <label className="flex-1 cursor-pointer">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        onChange={(e) => handleMediaUpload(e, 'image')}
-                        disabled={uploading}
-                        className="hidden"
-                      />
-                      <div className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed border-gray-300 hover:border-brand-primary transition-colors disabled:opacity-50">
-                        <ImageIcon className="w-4 h-4" />
-                        <span className="text-sm">Image</span>
-                      </div>
+                  {/* Media Upload */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-text-secondary mb-2">
+                      Attachments (Optional)
                     </label>
-                    <label className="flex-1 cursor-pointer">
-                      <input
-                        type="file"
-                        accept="video/*"
-                        multiple
-                        onChange={(e) => handleMediaUpload(e, 'video')}
-                        disabled={uploading}
-                        className="hidden"
-                      />
-                      <div className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed border-gray-300 hover:border-brand-primary transition-colors disabled:opacity-50">
-                        <Video className="w-4 h-4" />
-                        <span className="text-sm">Video</span>
+                    <div className="flex gap-2 mb-3">
+                      <label className="flex-1 cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={(e) => handleMediaUpload(e, 'image')}
+                          disabled={uploading}
+                          className="hidden"
+                        />
+                        <div className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed border-gray-300 hover:border-brand-primary transition-colors disabled:opacity-50">
+                          <ImageIcon className="w-4 h-4" />
+                          <span className="text-sm">Image</span>
+                        </div>
+                      </label>
+                      <label className="flex-1 cursor-pointer">
+                        <input
+                          type="file"
+                          accept="video/*"
+                          multiple
+                          onChange={(e) => handleMediaUpload(e, 'video')}
+                          disabled={uploading}
+                          className="hidden"
+                        />
+                        <div className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed border-gray-300 hover:border-brand-primary transition-colors disabled:opacity-50">
+                          <Video className="w-4 h-4" />
+                          <span className="text-sm">Video</span>
+                        </div>
+                      </label>
+                      <label className="flex-1 cursor-pointer">
+                        <input
+                          type="file"
+                          accept=".pdf,.doc,.docx"
+                          multiple
+                          onChange={(e) => handleMediaUpload(e, 'document')}
+                          disabled={uploading}
+                          className="hidden"
+                        />
+                        <div className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed border-gray-300 hover:border-brand-primary transition-colors disabled:opacity-50">
+                          <FileText className="w-4 h-4" />
+                          <span className="text-sm">Doc</span>
+                        </div>
+                      </label>
+                    </div>
+
+                    {/* Uploading Status */}
+                    {uploadingFiles.size > 0 && (
+                      <div className="mb-3 flex items-center gap-2 text-sm text-brand-primary animate-pulse">
+                        <div className="w-4 h-4 border-2 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
+                        <span>Uploading {uploadingFiles.size} file(s)...</span>
                       </div>
-                    </label>
-                    <label className="flex-1 cursor-pointer">
-                      <input
-                        type="file"
-                        accept=".pdf,.doc,.docx"
-                        multiple
-                        onChange={(e) => handleMediaUpload(e, 'document')}
-                        disabled={uploading}
-                        className="hidden"
-                      />
-                      <div className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed border-gray-300 hover:border-brand-primary transition-colors disabled:opacity-50">
-                        <FileText className="w-4 h-4" />
-                        <span className="text-sm">Doc</span>
+                    )}
+
+                    {/* Uploaded Media Preview */}
+                    {mediaFiles.length > 0 && (
+                      <div className="grid grid-cols-2 gap-3 mt-3">
+                        {mediaFiles.map((media, index) => renderMediaPreview(media, index))}
                       </div>
-                    </label>
+                    )}
                   </div>
 
-                  {/* Uploaded Media Preview */}
-                  {mediaFiles.length > 0 && (
-                    <div className="grid grid-cols-2 gap-3 mt-3">
-                      {mediaFiles.map((media, index) => renderMediaPreview(media, index))}
-                    </div>
-                  )}
+                  <p className="text-xs text-text-secondary">
+                    Your feedback will be visible to the student and help them improve their understanding.
+                  </p>
                 </div>
-
-                <p className="text-xs text-text-secondary">
-                  Your feedback will be visible to the student and help them improve their understanding.
-                </p>
               </div>
             </div>
           </div>
         </div>
-      </div>
+
+        {/* Media Preview Modal */}
+        {selectedMedia && (
+          <div
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4"
+            onClick={() => setSelectedMedia(null)}
+          >
+            <div className="relative max-w-5xl max-h-full" onClick={(e) => e.stopPropagation()}>
+              {selectedMedia.type === 'image' && (
+                <img
+                  src={selectedMedia.url}
+                  alt={selectedMedia.filename}
+                  className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+                />
+              )}
+              {selectedMedia.type === 'video' && (
+                <video
+                  src={selectedMedia.url}
+                  controls
+                  autoPlay
+                  className="max-w-full max-h-[90vh] rounded-lg shadow-2xl"
+                />
+              )}
+              {selectedMedia.type === 'document' && (
+                <div className="bg-white p-8 rounded-xl shadow-2xl flex flex-col items-center">
+                  <FileText className="w-24 h-24 text-brand-primary mb-4" />
+                  <h3 className="text-xl font-bold text-text-primary mb-2">{selectedMedia.filename}</h3>
+                  <p className="text-text-secondary mb-6">
+                    {selectedMedia.size ? `${(selectedMedia.size / 1024 / 1024).toFixed(2)} MB` : 'Size unknown'}
+                  </p>
+                  <a
+                    href={selectedMedia.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold bg-brand-primary text-white hover:bg-brand-primary-dark transition-all"
+                  >
+                    <ExternalLink className="w-5 h-5" />
+                    Open Document
+                  </a>
+                </div>
+              )}
+              <button
+                onClick={() => setSelectedMedia(null)}
+                className="absolute -top-4 -right-4 w-10 h-10 rounded-full bg-white text-black flex items-center justify-center hover:bg-gray-100 transition-colors shadow-xl"
+              >
+                <XCircle className="w-6 h-6" />
+              </button>
+            </div>
+          </div>
+        )}
     </CoachAppLayout>
   );
 };

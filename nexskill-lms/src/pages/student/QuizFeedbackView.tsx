@@ -15,6 +15,7 @@ import {
   Video,
   AlertCircle,
   MessageSquare,
+  ExternalLink,
 } from 'lucide-react';
 import type { QuizFeedbackMedia } from '../../types/quiz';
 
@@ -104,21 +105,31 @@ const QuizFeedbackView: React.FC = () => {
     switch (media.type) {
       case 'image':
         return (
-          <img
-            src={media.url}
-            alt={media.filename}
-            className="w-full h-auto rounded-lg"
-            onClick={() => setSelectedMedia(media)}
-          />
+          <div className="relative group cursor-pointer" onClick={() => setSelectedMedia(media)}>
+            <img
+              src={media.url}
+              alt={media.filename}
+              className="w-full h-40 object-cover rounded-lg border border-gray-200"
+            />
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center rounded-lg">
+              <ImageIcon className="text-white opacity-0 group-hover:opacity-100 w-8 h-8" />
+            </div>
+            <p className="text-[10px] text-text-secondary mt-1 truncate">{media.filename}</p>
+          </div>
         );
       case 'video':
         return (
-          <video
-            src={media.url}
-            controls
-            className="w-full rounded-lg"
-            style={{ maxHeight: '400px' }}
-          />
+          <div className="relative group cursor-pointer" onClick={() => setSelectedMedia(media)}>
+            <video
+              src={media.url}
+              className="w-full h-40 object-cover rounded-lg border border-gray-200"
+              muted
+            />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors rounded-lg">
+              <Play className="w-10 h-10 text-white" />
+            </div>
+            <p className="text-[10px] text-text-secondary mt-1 truncate">{media.filename}</p>
+          </div>
         );
       case 'document':
         return (
@@ -126,15 +137,13 @@ const QuizFeedbackView: React.FC = () => {
             href={media.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 transition-colors"
+            className="flex flex-col items-center justify-center h-40 bg-gray-50 rounded-lg border border-gray-200 hover:border-brand-primary hover:bg-white transition-all group"
           >
-            <FileText className="w-8 h-8 text-blue-600" />
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-gray-900 truncate">{media.filename}</p>
-              <p className="text-sm text-gray-500">
-                {media.size ? `${(media.size / 1024).toFixed(1)} KB` : 'Open file'}
-              </p>
-            </div>
+            <FileText className="w-12 h-12 text-gray-400 group-hover:text-brand-primary mb-2 transition-colors" />
+            <p className="text-xs font-medium text-text-primary px-3 text-center line-clamp-2">{media.filename}</p>
+            <p className="text-[10px] text-text-secondary mt-1">
+              {media.size ? `${(media.size / 1024).toFixed(1)} KB` : 'Open file'}
+            </p>
           </a>
         );
       default:
@@ -340,9 +349,9 @@ const QuizFeedbackView: React.FC = () => {
                         <FileText className="w-4 h-4" />
                         Attachments ({fb.media_urls.length})
                       </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                         {fb.media_urls.map((media, mediaIndex) => (
-                          <div key={mediaIndex} className="bg-white rounded-lg p-4 border border-gray-200">
+                          <div key={mediaIndex}>
                             {renderMediaPreview(media)}
                           </div>
                         ))}
@@ -364,15 +373,7 @@ const QuizFeedbackView: React.FC = () => {
             </div>
           )}
 
-          {/* Review Notes from Submission */}
-          {submission.review_notes && (
-            <div className="glass-card rounded-2xl p-6 mb-6">
-              <h3 className="text-lg font-semibold text-text-primary mb-3">Review Notes</h3>
-              <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                <p className="text-text-primary whitespace-pre-wrap">{submission.review_notes}</p>
-              </div>
-            </div>
-          )}
+          
 
           {/* Action Buttons */}
           <div className="glass-card rounded-2xl p-6">
@@ -410,22 +411,50 @@ const QuizFeedbackView: React.FC = () => {
       </div>
 
       {/* Media Preview Modal */}
-      {selectedMedia && selectedMedia.type === 'image' && (
+      {selectedMedia && (
         <div
-          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4"
           onClick={() => setSelectedMedia(null)}
         >
-          <div className="relative max-w-5xl max-h-full">
-            <img
-              src={selectedMedia.url}
-              alt={selectedMedia.filename}
-              className="max-w-full max-h-[90vh] object-contain rounded-lg"
-            />
+          <div className="relative max-w-5xl max-h-full" onClick={(e) => e.stopPropagation()}>
+            {selectedMedia.type === 'image' && (
+              <img
+                src={selectedMedia.url}
+                alt={selectedMedia.filename}
+                className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+              />
+            )}
+            {selectedMedia.type === 'video' && (
+              <video
+                src={selectedMedia.url}
+                controls
+                autoPlay
+                className="max-w-full max-h-[90vh] rounded-lg shadow-2xl"
+              />
+            )}
+            {selectedMedia.type === 'document' && (
+              <div className="bg-white p-8 rounded-xl shadow-2xl flex flex-col items-center">
+                <FileText className="w-24 h-24 text-brand-primary mb-4" />
+                <h3 className="text-xl font-bold text-text-primary mb-2">{selectedMedia.filename}</h3>
+                <p className="text-text-secondary mb-6">
+                  {selectedMedia.size ? `${(selectedMedia.size / 1024 / 1024).toFixed(2)} MB` : 'Size unknown'}
+                </p>
+                <a
+                  href={selectedMedia.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold bg-brand-primary text-white hover:bg-brand-primary-dark transition-all"
+                >
+                  <ExternalLink className="w-5 h-5" />
+                  Open Document
+                </a>
+              </div>
+            )}
             <button
               onClick={() => setSelectedMedia(null)}
-              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/90 flex items-center justify-center hover:bg-white transition-colors"
+              className="absolute -top-4 -right-4 w-10 h-10 rounded-full bg-white text-black flex items-center justify-center hover:bg-gray-100 transition-colors shadow-xl"
             >
-              <XCircle className="w-6 h-6 text-gray-900" />
+              <XCircle className="w-6 h-6" />
             </button>
           </div>
         </div>

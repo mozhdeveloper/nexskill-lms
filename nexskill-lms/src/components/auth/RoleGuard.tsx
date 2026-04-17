@@ -85,7 +85,7 @@ const RoleGuard: React.FC<RoleGuardProps> = ({ children, allowedRoles }) => {
               onClick={() => navigate(-1)}
               className="w-full py-3 px-6 bg-[#F5F7FF] text-[#304DB5] font-medium rounded-full hover:bg-[#E0E5FF] transition-all"
             >
-              Go Back
+              
             </button>
           </div>
 
