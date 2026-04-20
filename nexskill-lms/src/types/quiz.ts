@@ -40,6 +40,7 @@ export interface MultipleChoiceOption {
     id: string;
     text: string;
     is_correct: boolean;
+    is_other?: boolean;
 }
 
 export interface MultipleChoiceConfig {
@@ -64,6 +65,16 @@ export interface EssayConfig {
     rubric?: string;
 }
 
+export interface ParagraphConfig {
+    max_length?: number;
+    placeholder?: string;
+}
+
+export interface DropdownConfig {
+    options: MultipleChoiceOption[];
+    randomize_options?: boolean;
+}
+
 export interface FileUploadConfig {
     accepted_file_types: string[];
     max_file_size_mb: number;
@@ -80,9 +91,11 @@ export interface VideoSubmissionConfig {
 
 export type AnswerConfig =
     | MultipleChoiceConfig
+    | DropdownConfig
     | TrueFalseConfig
     | ShortAnswerConfig
     | EssayConfig
+    | ParagraphConfig
     | FileUploadConfig
     | VideoSubmissionConfig;
 
@@ -105,8 +118,10 @@ export interface ResponseData {
 
 export type QuestionType =
     | "multiple_choice"
+    | "dropdown"
     | "true_false"
     | "short_answer"
+    | "paragraph"
     | "essay"
     | "file_upload"
     | "video_submission";
@@ -137,12 +152,9 @@ export interface Quiz {
     quiz_type?: 'standard' | 'coach_reviewed'; // Explicit quiz type
     allow_skipped_questions?: boolean; // Whether students can skip questions
     requires_manual_grading: boolean;
-<<<<<<< HEAD
     requires_coach_approval?: boolean;
     is_published: boolean;
-=======
-    content_status: 'draft' | 'published' | 'pending_addition' | 'pending_deletion';
->>>>>>> origin/lms
+    content_status?: 'draft' | 'published' | 'pending_addition' | 'pending_deletion';
     available_from?: string;
     due_date?: string;
     late_submission_allowed: boolean;

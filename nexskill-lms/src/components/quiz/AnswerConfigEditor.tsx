@@ -1,17 +1,21 @@
 import React from "react";
 import MultipleChoiceEditor from "./answer-configs/MultipleChoiceEditor";
+import DropdownEditor from "./answer-configs/DropdownEditor";
 import TrueFalseEditor from "./answer-configs/TrueFalseEditor";
 import ShortAnswerEditor from "./answer-configs/ShortAnswerEditor";
 import EssayEditor from "./answer-configs/EssayEditor";
+import ParagraphEditor from "./answer-configs/ParagraphEditor";
 import FileUploadEditor from "./answer-configs/FileUploadEditor";
 import VideoSubmissionEditor from "./answer-configs/VideoSubmissionEditor";
 import type {
     QuestionType,
     AnswerConfig,
     MultipleChoiceConfig,
+    DropdownConfig,
     TrueFalseConfig,
     ShortAnswerConfig,
     EssayConfig,
+    ParagraphConfig,
     FileUploadConfig,
     VideoSubmissionConfig,
 } from "../../types/quiz";
@@ -37,6 +41,13 @@ const AnswerConfigEditor: React.FC<AnswerConfigEditorProps> = ({
                     }
                 />
             );
+        case "dropdown":
+            return (
+                <DropdownEditor
+                    config={config as DropdownConfig}
+                    onChange={onChange as (config: DropdownConfig) => void}
+                />
+            );
         case "true_false":
             return (
                 <TrueFalseEditor
@@ -56,6 +67,13 @@ const AnswerConfigEditor: React.FC<AnswerConfigEditorProps> = ({
                 <EssayEditor
                     config={config as EssayConfig}
                     onChange={onChange as (config: EssayConfig) => void}
+                />
+            );
+        case "paragraph":
+            return (
+                <ParagraphEditor
+                    config={config as ParagraphConfig}
+                    onChange={onChange as (config: ParagraphConfig) => void}
                 />
             );
         case "file_upload":

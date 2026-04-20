@@ -1,9 +1,12 @@
 import React from 'react';
+import type { ContentBlock } from '../../types/quiz';
+import QuestionPrompt from './QuestionPrompt';
 
 interface QuestionTrueFalseProps {
   question: {
     id: string;
     questionText: string;
+    questionContent?: ContentBlock[];
   };
   value: boolean | null;
   onChange: (value: boolean) => void;
@@ -17,10 +20,11 @@ const QuestionTrueFalse: React.FC<QuestionTrueFalseProps> = ({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-xl font-semibold text-slate-900 mb-2">
-          {question.questionText}
-        </h3>
-        <p className="text-slate-600">Select whether this statement is true or false.</p>
+        <QuestionPrompt
+          questionText={question.questionText}
+          questionContent={question.questionContent}
+          subtitle="Select whether this statement is true or false."
+        />
       </div>
 
       <div className="flex gap-4">

@@ -1,16 +1,15 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { Trash2 } from "lucide-react";
-import type { MultipleChoiceConfig } from "../../../types/quiz";
+import type { DropdownConfig } from "../../../types/quiz";
 
-interface MultipleChoiceEditorProps {
-    config: MultipleChoiceConfig;
-    onChange: (config: MultipleChoiceConfig) => void;
+interface DropdownEditorProps {
+    config: DropdownConfig;
+    onChange: (config: DropdownConfig) => void;
 }
 
 const generateId = () =>
-    `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 
-// Individual option input component with local state
 interface OptionInputProps {
     option: { id: string; text: string; is_correct: boolean; is_other?: boolean };
     index: number;
@@ -18,7 +17,6 @@ interface OptionInputProps {
     onToggleCorrect: (id: string) => void;
     onRemove: (id: string) => void;
     canRemove: boolean;
-    allowMultiple: boolean;
 }
 
 const OptionInput: React.FC<OptionInputProps> = React.memo(({
@@ -28,13 +26,9 @@ const OptionInput: React.FC<OptionInputProps> = React.memo(({
     onToggleCorrect,
     onRemove,
     canRemove,
-    allowMultiple,
 }) => {
-    // Use ref to track if input is focused to avoid overwriting during active editing
     const isFocusedRef = useRef(false);
     const [localText, setLocalText] = useState(option.text);
-
-    // Sync local state when option.text changes from parent (only when not focused)
     const displayValue = isFocusedRef.current ? localText : option.text;
 
     const handleFocus = useCallback(() => {
@@ -49,18 +43,14 @@ const OptionInput: React.FC<OptionInputProps> = React.memo(({
         }
     }, [localText, option.text, option.id, onTextChange, option.is_other]);
 
-    const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        setLocalText(e.target.value);
-    }, []);
-
     return (
         <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-700 rounded-lg group">
             <label className="flex items-center cursor-pointer">
                 <input
-                    type={allowMultiple ? "checkbox" : "radio"}
+                    type="radio"
                     checked={option.is_correct}
                     onChange={() => onToggleCorrect(option.id)}
-                    className="w-4 h-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                    className="w-4 h-4 text-green-600 focus:ring-green-500 border-gray-300"
                 />
                 {option.is_correct && (
                     <span className="ml-2 text-xs text-green-600 dark:text-green-400">
@@ -72,12 +62,12 @@ const OptionInput: React.FC<OptionInputProps> = React.memo(({
             <input
                 type="text"
                 value={displayValue}
-                onChange={handleChange}
+                onChange={(e) => setLocalText(e.target.value)}
                 onFocus={handleFocus}
                 onBlur={handleBlur}
                 readOnly={option.is_other}
                 placeholder={`Option ${index + 1}`}
-                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent read-only:bg-gray-100 dark:read-only:bg-slate-900"
+                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white read-only:bg-gray-100 dark:read-only:bg-slate-900"
             />
 
             {canRemove && (
@@ -93,81 +83,63 @@ const OptionInput: React.FC<OptionInputProps> = React.memo(({
     );
 });
 
-OptionInput.displayName = "OptionInput";
+OptionInput.displayName = "DropdownOptionInput";
 
-const MultipleChoiceEditor: React.FC<MultipleChoiceEditorProps> = ({
-    config,
-    onChange,
-}) => {
-    const options = config.options || [];
+const DropdownEditor: React.FC<DropdownEditorProps> = ({ config, onChange }) => {
+    const safeOptions = config.options || [];
 
     const addOption = useCallback(() => {
         onChange({
             ...config,
             options: [
-                ...options,
+                ...safeOptions,
                 { id: generateId(), text: "", is_correct: false },
             ],
         });
-    }, [config, onChange, options]);
+    }, [config, onChange, safeOptions]);
 
     const addOtherOption = useCallback(() => {
-        if (options.some((opt) => opt.is_other)) return;
-
+        if (safeOptions.some((opt) => opt.is_other)) return;
         onChange({
             ...config,
             options: [
-                ...options,
-                {
-                    id: generateId(),
-                    text: "Other",
-                    is_correct: false,
-                    is_other: true,
-                },
+                ...safeOptions,
+                { id: generateId(), text: "Other", is_correct: false, is_other: true },
             ],
         });
-    }, [config, onChange, options]);
+    }, [config, onChange, safeOptions]);
 
     const removeOption = useCallback((id: string) => {
-        if (options.length <= 2) return;
+        if (safeOptions.length <= 2) return;
         onChange({
             ...config,
-            options: options.filter((opt) => opt.id !== id),
+            options: safeOptions.filter((opt) => opt.id !== id),
         });
-    }, [config, onChange, options]);
+    }, [config, onChange, safeOptions]);
 
     const updateOptionText = useCallback((id: string, text: string) => {
         onChange({
             ...config,
-            options: options.map((opt) =>
+            options: safeOptions.map((opt) =>
                 opt.id === id ? { ...opt, text } : opt
             ),
         });
-    }, [config, onChange, options]);
+    }, [config, onChange, safeOptions]);
 
     const toggleCorrect = useCallback((id: string) => {
-        if (config.allow_multiple) {
-            onChange({
-                ...config,
-                options: options.map((opt) =>
-                    opt.id === id ? { ...opt, is_correct: !opt.is_correct } : opt
-                ),
-            });
-        } else {
-            onChange({
-                ...config,
-                options: options.map((opt) => ({
-                    ...opt,
-                    is_correct: opt.id === id,
-                })),
-            });
-        }
-    }, [config, onChange, options]);
+        onChange({
+            ...config,
+            options: safeOptions.map((opt) => ({
+                ...opt,
+                is_correct: opt.id === id,
+            })),
+        });
+    }, [config, onChange, safeOptions]);
 
     return (
         <div className="space-y-4">
             <div className="space-y-2">
-                {options.map((option, index) => (
+                {safeOptions.map((option, index) => (
                     <OptionInput
                         key={option.id}
                         option={option}
@@ -175,8 +147,7 @@ const MultipleChoiceEditor: React.FC<MultipleChoiceEditorProps> = ({
                         onTextChange={updateOptionText}
                         onToggleCorrect={toggleCorrect}
                         onRemove={removeOption}
-                        canRemove={options.length > 2}
-                        allowMultiple={config.allow_multiple}
+                        canRemove={safeOptions.length > 2}
                     />
                 ))}
             </div>
@@ -193,50 +164,14 @@ const MultipleChoiceEditor: React.FC<MultipleChoiceEditorProps> = ({
                 <button
                     type="button"
                     onClick={addOtherOption}
-                    disabled={options.some((opt) => opt.is_other)}
+                    disabled={safeOptions.some((opt) => opt.is_other)}
                     className="text-blue-600 hover:text-blue-700 font-medium disabled:text-gray-400"
                 >
                     Add "Other"
                 </button>
             </div>
 
-            <div className="flex flex-col gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
-                <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                        type="checkbox"
-                        checked={config.allow_multiple}
-                        onChange={(e) =>
-                            onChange({
-                                ...config,
-                                allow_multiple: e.target.checked,
-                            })
-                        }
-                        className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                        Allow multiple selections
-                    </span>
-                </label>
-
-                <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                        type="checkbox"
-                        checked={config.randomize_options}
-                        onChange={(e) =>
-                            onChange({
-                                ...config,
-                                randomize_options: e.target.checked,
-                            })
-                        }
-                        className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                        Randomize option order
-                    </span>
-                </label>
-            </div>
-
-            {!options.some((opt) => opt.is_correct) && (
+            {!safeOptions.some((opt) => opt.is_correct) && (
                 <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                     <p className="text-sm text-yellow-800 dark:text-yellow-200">
                         All questions must have a correct answer selected.
@@ -247,4 +182,4 @@ const MultipleChoiceEditor: React.FC<MultipleChoiceEditorProps> = ({
     );
 };
 
-export default MultipleChoiceEditor;
+export default DropdownEditor;

@@ -68,6 +68,15 @@ interface PricingData {
   subscriptionInterval?: "monthly" | "yearly";
 }
 
+const buildDefaultMultipleChoiceAnswerConfig = () => ({
+  options: [
+    { id: uuidv4(), text: "", is_correct: false },
+    { id: uuidv4(), text: "", is_correct: false },
+  ],
+  allow_multiple: false,
+  randomize_options: false,
+});
+
 const CourseBuilder: React.FC = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const location = useLocation();
@@ -718,11 +727,37 @@ const CourseBuilder: React.FC = () => {
         const { data: questionsData } = await supabase
           .from("quiz_questions").select("*").eq("quiz_id", quizId).order("position", { ascending: true });
 
+        let resolvedQuestions = questionsData || [];
+
+        if (resolvedQuestions.length === 0) {
+          const defaultQuestion = {
+            quiz_id: quizId,
+            position: 0,
+            question_type: "multiple_choice",
+            question_content: [],
+            points: 1,
+            requires_manual_grading: false,
+            answer_config: buildDefaultMultipleChoiceAnswerConfig(),
+          };
+
+          const { data: insertedQuestion, error: insertError } = await supabase
+            .from("quiz_questions")
+            .insert(defaultQuestion)
+            .select("*")
+            .single();
+
+          if (insertError) {
+            console.error("Error creating default question:", insertError);
+          } else if (insertedQuestion) {
+            resolvedQuestions = [insertedQuestion as QuizQuestion];
+          }
+        }
+
         setEditingQuiz({
           moduleId,
           lessonId,
           quiz: quizData as Quiz,
-          questions: questionsData || [],
+          questions: resolvedQuestions,
         });
       } catch (err) {
         console.error("Error opening quiz editor:", err);

@@ -1,10 +1,13 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Upload, Video, X, AlertCircle, CheckCircle, Play } from 'lucide-react';
+import type { ContentBlock } from '../../types/quiz';
+import QuestionPrompt from './QuestionPrompt';
 
 interface QuestionVideoSubmissionProps {
   question: {
     id: string;
     questionText: string;
+    questionContent?: ContentBlock[];
     answerConfig?: {
       max_duration_minutes?: number;
       max_file_size_mb?: number;
@@ -165,9 +168,10 @@ const QuestionVideoSubmission: React.FC<QuestionVideoSubmissionProps> = ({
     <div className="space-y-6">
       {/* Question Text */}
       <div>
-        <h3 className="text-xl font-semibold text-slate-900 mb-2">
-          {question.questionText}
-        </h3>
+        <QuestionPrompt
+          questionText={question.questionText}
+          questionContent={question.questionContent}
+        />
         {question.answerConfig?.instructions && (
           <p className="text-sm text-slate-600 mt-2">{question.answerConfig.instructions}</p>
         )}

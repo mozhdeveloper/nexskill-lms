@@ -5,6 +5,38 @@ interface ContentBlockDisplayProps {
     block: ContentBlock;
 }
 
+const getExternalVideoEmbedUrl = (url: string): string | null => {
+    const trimmedUrl = url.trim();
+
+    if (!trimmedUrl) {
+        return null;
+    }
+
+    try {
+        const parsedUrl = new URL(trimmedUrl);
+        const hostname = parsedUrl.hostname.replace(/^www\./, '');
+
+        if (hostname === 'youtube.com' || hostname === 'm.youtube.com') {
+            const videoId = parsedUrl.searchParams.get('v');
+            return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+        }
+
+        if (hostname === 'youtu.be') {
+            const videoId = parsedUrl.pathname.replace(/^\//, '');
+            return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+        }
+
+        if (hostname === 'vimeo.com') {
+            const videoId = parsedUrl.pathname.replace(/^\//, '');
+            return videoId ? `https://player.vimeo.com/video/${videoId}` : null;
+        }
+    } catch {
+        return null;
+    }
+
+    return null;
+};
+
 /**
  * Renders a content block in display/preview mode
  * Used in quiz preview and student-facing views
@@ -59,13 +91,16 @@ const ContentBlockDisplay: React.FC<ContentBlockDisplayProps> = ({ block }) => {
 
         case "video": {
             const videoUrl = block.attributes?.external_url || block.content;
+            const externalEmbedUrl = block.attributes?.is_external
+                ? videoUrl
+                : getExternalVideoEmbedUrl(videoUrl);
 
-            if (block.attributes?.is_external) {
+            if (externalEmbedUrl) {
                 // Handle external videos (YouTube, Vimeo, etc.)
                 return (
                     <div className="my-4 aspect-video">
                         <iframe
-                            src={videoUrl}
+                            src={externalEmbedUrl}
                             className="w-full h-full rounded-lg"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                             allowFullScreen

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { Plus, X, Eye } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import QuizHeader from "./QuizHeader";
@@ -34,6 +34,14 @@ const getDefaultAnswerConfig = (type: QuestionType): AnswerConfig => {
                 allow_multiple: false,
                 randomize_options: false,
             };
+        case "dropdown":
+            return {
+                options: [
+                    { id: generateId(), text: "", is_correct: false },
+                    { id: generateId(), text: "", is_correct: false },
+                ],
+                randomize_options: false,
+            };
         case "true_false":
             return { correct_answer: true };
         case "short_answer":
@@ -41,6 +49,11 @@ const getDefaultAnswerConfig = (type: QuestionType): AnswerConfig => {
                 max_length: 500,
                 accepted_answers: [],
                 case_sensitive: false,
+            };
+        case "paragraph":
+            return {
+                max_length: 2000,
+                placeholder: "Type your answer...",
             };
         case "essay":
             return { min_words: 100, max_words: 1000, rubric: "" };
@@ -88,6 +101,64 @@ const QuizEditorPanel: React.FC<QuizEditorPanelProps> = React.memo(({
     const [localInstructions, setLocalInstructions] = useState(
         quiz.instructions || ""
     );
+    const [missingCorrectAnswerQuestionIds, setMissingCorrectAnswerQuestionIds] = useState<string[]>([]);
+    const [saveValidationError, setSaveValidationError] = useState<string | null>(null);
+
+    const hasCorrectAnswerSelected = useCallback((question: QuizQuestion): boolean => {
+        const type = question.question_type;
+
+        if (type !== "multiple_choice" && type !== "dropdown") {
+            return true;
+        }
+
+        const config = question.answer_config as { options?: Array<{ is_correct?: boolean }> };
+        const options = Array.isArray(config?.options) ? config.options : [];
+        return options.some((option) => option?.is_correct === true);
+    }, []);
+
+    const validateBeforeSaveAndClose = useCallback((): boolean => {
+        if (quiz.quiz_type !== "standard") {
+            setMissingCorrectAnswerQuestionIds([]);
+            setSaveValidationError(null);
+            return true;
+        }
+
+        const invalidQuestionIds = questions
+            .filter((question) => question.id && !hasCorrectAnswerSelected(question))
+            .map((question) => question.id as string);
+
+        setMissingCorrectAnswerQuestionIds(invalidQuestionIds);
+
+        if (invalidQuestionIds.length > 0) {
+            setSaveValidationError("All questions must have a correct answer selected.");
+            return false;
+        }
+
+        setSaveValidationError(null);
+        return true;
+    }, [quiz.quiz_type, questions, hasCorrectAnswerSelected]);
+
+    const handleSaveAndClose = useCallback(() => {
+        if (!validateBeforeSaveAndClose()) return;
+        onClose();
+    }, [validateBeforeSaveAndClose, onClose]);
+
+    useEffect(() => {
+        if (missingCorrectAnswerQuestionIds.length === 0) return;
+
+        const stillInvalid = missingCorrectAnswerQuestionIds.filter((id) => {
+            const question = questions.find((q) => q.id === id);
+            return question ? !hasCorrectAnswerSelected(question) : false;
+        });
+
+        if (stillInvalid.length !== missingCorrectAnswerQuestionIds.length) {
+            setMissingCorrectAnswerQuestionIds(stillInvalid);
+        }
+
+        if (stillInvalid.length === 0) {
+            setSaveValidationError(null);
+        }
+    }, [questions, missingCorrectAnswerQuestionIds, hasCorrectAnswerSelected]);
 
     // Memoize the total points calculation
     const totalPoints = useMemo(() => {
@@ -211,14 +282,14 @@ const QuizEditorPanel: React.FC<QuizEditorPanelProps> = React.memo(({
                     </button>
 
                     <button
-                        onClick={onClose}
+                        onClick={handleSaveAndClose}
                         className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                     >
                         Save & Close
                     </button>
 
                     <button
-                        onClick={onClose}
+                        onClick={handleSaveAndClose}
                         className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                     >
                         <X className="w-5 h-5" />
@@ -255,6 +326,14 @@ const QuizEditorPanel: React.FC<QuizEditorPanelProps> = React.memo(({
 
                     {/* Questions */}
                     <div className="space-y-4">
+                        {saveValidationError && (
+                            <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                                <p className="text-sm font-medium text-red-700 dark:text-red-300">
+                                    {saveValidationError}
+                                </p>
+                            </div>
+                        )}
+
                         <div className="flex items-center justify-between">
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                                 Questions
@@ -279,6 +358,7 @@ const QuizEditorPanel: React.FC<QuizEditorPanelProps> = React.memo(({
                                             question={question}
                                             position={index}
                                             totalQuestions={questions.length}
+                                            showMissingCorrectAnswerWarning={missingCorrectAnswerQuestionIds.includes(question.id!)}
                                             onChange={(updated) =>
                                                 updateQuestion(
                                                     question.id!,

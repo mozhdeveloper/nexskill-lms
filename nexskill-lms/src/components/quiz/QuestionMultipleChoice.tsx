@@ -1,32 +1,41 @@
 import React from 'react';
+import type { ContentBlock } from '../../types/quiz';
+import QuestionPrompt from './QuestionPrompt';
 
 interface Option {
   id: string;
   label: string;
   helperText?: string;
+  isOther?: boolean;
 }
 
 interface QuestionMultipleChoiceProps {
   question: {
     id: string;
     questionText: string;
+    questionContent?: ContentBlock[];
     options: Option[];
   };
   selectedOptionId?: string;
+  selectedOtherText?: string;
   onSelect: (optionId: string) => void;
+  onOtherTextChange: (text: string) => void;
 }
 
 const QuestionMultipleChoice: React.FC<QuestionMultipleChoiceProps> = ({
   question,
   selectedOptionId,
+  selectedOtherText,
   onSelect,
+  onOtherTextChange,
 }) => {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-xl font-semibold text-slate-900 mb-2">
-          {question.questionText}
-        </h3>
+        <QuestionPrompt
+          questionText={question.questionText}
+          questionContent={question.questionContent}
+        />
       </div>
 
       <div className="space-y-3">
@@ -70,6 +79,15 @@ const QuestionMultipleChoice: React.FC<QuestionMultipleChoiceProps> = ({
                     <div className="text-sm text-slate-600 mt-1">
                       {option.helperText}
                     </div>
+                  )}
+                  {isSelected && option.isOther && (
+                    <input
+                      type="text"
+                      value={selectedOtherText || ''}
+                      onChange={(e) => onOtherTextChange(e.target.value)}
+                      placeholder="Type your answer"
+                      className="mt-3 w-full rounded-xl p-3 bg-white border border-slate-300 focus:border-[#304DB5] focus:outline-none text-slate-900"
+                    />
                   )}
                 </div>
               </div>

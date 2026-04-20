@@ -11,6 +11,7 @@ import { supabase } from '../lib/supabaseClient';
 
 export const THUMBNAIL_BUCKET = 'course-thumbnails';
 export const VIDEO_BUCKET = 'course-previews';
+export const QUESTION_IMAGE_BUCKET = 'quiz-question-images';
 
 export interface UploadProgress {
     loaded: number;
@@ -131,6 +132,31 @@ export class SupabaseStorageUploadService {
         const path = `courses/${courseId}/preview.${ext}`;
 
         return this._uploadToStorage(VIDEO_BUCKET, path, file, onProgress);
+    }
+
+    /**
+     * Upload a quiz question image to Supabase Storage.
+     *
+     * @param file - The image file to upload
+     * @param ownerId - Optional owner key (coach/user id) used in storage path
+     * @param onProgress - Optional progress callback
+     */
+    static async uploadQuestionImage(
+        file: File,
+        ownerId: string = 'anonymous',
+        onProgress?: (progress: UploadProgress) => void
+    ): Promise<StorageUploadResponse> {
+        const validation = this.validateImageFile(file);
+        if (!validation.valid) {
+            throw new Error(validation.error || 'Invalid image file');
+        }
+
+        const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+        const safeOwnerId = ownerId.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        const path = `questions/${safeOwnerId}/${uniqueSuffix}.${ext}`;
+
+        return this._uploadToStorage(QUESTION_IMAGE_BUCKET, path, file, onProgress);
     }
 
     /**

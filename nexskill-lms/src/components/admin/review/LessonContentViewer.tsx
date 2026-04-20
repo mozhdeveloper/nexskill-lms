@@ -6,7 +6,7 @@ interface QuizQuestionData {
     id: string;
     quiz_id: string;
     position: number;
-    question_type: 'multiple_choice' | 'true_false' | 'short_answer' | 'essay' | 'file_upload' | 'video_submission';
+    question_type: 'multiple_choice' | 'dropdown' | 'true_false' | 'short_answer' | 'paragraph' | 'essay' | 'file_upload' | 'video_submission';
     question_content: any[];
     points: number;
     answer_config: any;
@@ -229,7 +229,7 @@ const LessonContentViewer: React.FC<LessonContentViewerProps> = ({
     const renderAnswerConfig = (q: QuizQuestionData) => {
         const { question_type, answer_config } = q;
 
-        if (question_type === 'multiple_choice' && answer_config?.options) {
+        if ((question_type === 'multiple_choice' || question_type === 'dropdown') && answer_config?.options) {
             return (
                 <div className="ml-6 space-y-1.5">
                     {answer_config.options.map((opt: any) => (
@@ -288,6 +288,15 @@ const LessonContentViewer: React.FC<LessonContentViewerProps> = ({
                 <div className="ml-6 text-sm text-gray-500 flex items-center gap-1">
                     <BookOpen size={14} />
                     <span>Essay response — manually graded</span>
+                </div>
+            );
+        }
+
+        if (question_type === 'paragraph') {
+            return (
+                <div className="ml-6 text-sm text-gray-500 flex items-center gap-1">
+                    <BookOpen size={14} />
+                    <span>Paragraph response — manually graded</span>
                 </div>
             );
         }

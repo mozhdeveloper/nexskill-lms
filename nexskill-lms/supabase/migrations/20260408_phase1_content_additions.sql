@@ -121,15 +121,8 @@ BEGIN
 
   IF v_current_status = 'approved' THEN
     IF v_is_new_record AND v_is_published = false THEN
-      -- NEW lesson added → course stays approved (new content is hidden)
       RAISE NOTICE 'Phase 1: Course % stays approved - new lesson added (is_published=%)', v_course_id, v_is_published;
-    ELSIF TG_OP = 'UPDATE' THEN
-      -- PHASE 1 FIX: Do NOT reset course for lesson updates (content_blocks, metadata, descriptions, etc.)
-      -- Coaches need to be able to edit lessons without taking the whole course offline.
-      -- Phase 2 will handle structural changes and deletions properly.
-      RAISE NOTICE 'Phase 1: Course % stays approved - lesson updated (content_blocks/metadata changed)', v_course_id;
     ELSE
-      -- DELETE → mark as pending review (will be improved in Phase 2 with soft-delete)
       UPDATE courses
       SET
         verification_status = 'pending_review',
@@ -137,7 +130,7 @@ BEGIN
       WHERE id = v_course_id
         AND verification_status = 'approved';
 
-      RAISE NOTICE 'Phase 1: Course % marked as pending_review (lesson deleted)', v_course_id;
+      RAISE NOTICE 'Phase 1: Course % marked as pending_review (op=%, is_published=%)', v_course_id, TG_OP, v_is_published;
     END IF;
   END IF;
 

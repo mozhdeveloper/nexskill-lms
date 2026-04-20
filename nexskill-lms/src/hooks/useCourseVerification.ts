@@ -6,7 +6,7 @@ interface QuizQuestionData {
     id: string;
     quiz_id: string;
     position: number;
-    question_type: 'multiple_choice' | 'true_false' | 'short_answer' | 'essay' | 'file_upload' | 'video_submission';
+    question_type: 'multiple_choice' | 'dropdown' | 'true_false' | 'short_answer' | 'paragraph' | 'essay' | 'file_upload' | 'video_submission';
     question_content: any[];
     points: number;
     answer_config: any;

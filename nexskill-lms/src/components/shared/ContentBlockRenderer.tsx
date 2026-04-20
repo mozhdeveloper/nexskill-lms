@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import {
     Type,
     Heading1,
@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import ReactQuillEditor from "./ReactQuillEditor";
 import type { ContentBlock } from "../../types/quiz";
+import { supabase } from "../../lib/supabaseClient";
+import { SupabaseStorageUploadService } from "../../services/supabaseStorageUpload.service";
 
 interface ContentBlockRendererProps {
     block: ContentBlock;
@@ -34,6 +36,9 @@ const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = React.memo(({
     onMove,
     onRemove,
 }) => {
+    const [isUploadingImage, setIsUploadingImage] = useState(false);
+    const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+
     const config: Record<
         string,
         { icon: React.ElementType; label: string; color: string }
@@ -100,6 +105,31 @@ const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = React.memo(({
 
     const handleCodeChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
         onContentUpdate(e.target.value, block.id);
+    }, [onContentUpdate, block.id]);
+
+    const handleImageUrlChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        onContentUpdate(e.target.value, block.id);
+    }, [onContentUpdate, block.id]);
+
+    const handleImageFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setImageUploadError(null);
+        setIsUploadingImage(true);
+
+        try {
+            const { data } = await supabase.auth.getUser();
+            const ownerId = data.user?.id || "anonymous";
+            const uploaded = await SupabaseStorageUploadService.uploadQuestionImage(file, ownerId);
+            onContentUpdate(uploaded.url, block.id);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Image upload failed";
+            setImageUploadError(message);
+        } finally {
+            setIsUploadingImage(false);
+            e.target.value = "";
+        }
     }, [onContentUpdate, block.id]);
 
     return (
@@ -179,9 +209,47 @@ const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = React.memo(({
 
                 {block.type === "image" && (
                     <div className="space-y-3">
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                            <p>Image upload has been disabled. Please use external image URLs.</p>
+                        <div className="flex flex-col gap-2">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Upload image
+                            </label>
+                            <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/jpg,image/webp"
+                                onChange={handleImageFileUpload}
+                                disabled={isUploadingImage}
+                                className="block w-full text-sm text-gray-700 dark:text-gray-300 file:mr-3 file:px-3 file:py-2 file:rounded-md file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700 disabled:opacity-60"
+                            />
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                Supported formats: JPG, PNG, WebP (max 2MB)
+                            </p>
                         </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Or use image URL
+                            </label>
+                            <input
+                                type="text"
+                                value={block.content || ""}
+                                onChange={handleImageUrlChange}
+                                placeholder="https://example.com/question-image.jpg"
+                                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                            />
+                        </div>
+
+                        {isUploadingImage && (
+                            <p className="text-sm text-blue-700 dark:text-blue-300">
+                                Uploading image...
+                            </p>
+                        )}
+
+                        {imageUploadError && (
+                            <p className="text-sm text-red-600 dark:text-red-400">
+                                {imageUploadError}
+                            </p>
+                        )}
+
                         {block.content && (
                             <div className="space-y-2">
                                 <img

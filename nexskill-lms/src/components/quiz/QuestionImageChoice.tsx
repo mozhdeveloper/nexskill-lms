@@ -1,4 +1,6 @@
 import React from 'react';
+import type { ContentBlock } from '../../types/quiz';
+import QuestionPrompt from './QuestionPrompt';
 
 interface ImageOption {
   id: string;
@@ -10,6 +12,7 @@ interface QuestionImageChoiceProps {
   question: {
     id: string;
     questionText: string;
+    questionContent?: ContentBlock[];
     options: ImageOption[];
   };
   selectedOptionId?: string;
@@ -24,10 +27,11 @@ const QuestionImageChoice: React.FC<QuestionImageChoiceProps> = ({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-xl font-semibold text-slate-900 mb-2">
-          {question.questionText}
-        </h3>
-        <p className="text-slate-600">Select the correct image.</p>
+        <QuestionPrompt
+          questionText={question.questionText}
+          questionContent={question.questionContent}
+          subtitle="Select the correct image."
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-4">

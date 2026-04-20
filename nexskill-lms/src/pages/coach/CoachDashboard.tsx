@@ -4,12 +4,23 @@ import CoachAppLayout from '../../layouts/CoachAppLayout';
 import { useUser } from '../../context/UserContext';
 import { supabase } from '../../lib/supabaseClient';
 
-interface RevenueData {
-  currentMonth: number;
-  totalAllTime: number;
-  monthOverMonth: number;
-  lastSixMonths: { month: string; amount: number }[];
-}
+// Revenue placeholder — no earnings table exists yet
+const revenueData = {
+  currentMonth: 0,
+  totalAllTime: 0,
+  monthOverMonth: 0,
+  lastSixMonths: [
+    { month: 'Jul', amount: 0 },
+    { month: 'Aug', amount: 0 },
+    { month: 'Sep', amount: 0 },
+    { month: 'Oct', amount: 0 },
+    { month: 'Nov', amount: 0 },
+    { month: 'Dec', amount: 0 },
+  ],
+};
+
+
+
 
 interface CoursePerf {
   id: string;
@@ -35,12 +46,6 @@ const CoachDashboard: React.FC = () => {
   const [coursePerfs, setCoursePerfs] = useState<CoursePerf[]>([]);
   const [avgRating, setAvgRating] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [revenueData, setRevenueData] = useState<RevenueData>({
-    currentMonth: 0,
-    totalAllTime: 0,
-    monthOverMonth: 0,
-    lastSixMonths: [],
-  });
 
   useEffect(() => {
     if (!currentUser) return;
@@ -60,86 +65,6 @@ const CoachDashboard: React.FC = () => {
         setActiveCoursesCount(courseCount || 0);
 
         const courseIds = coursesData?.map(c => c.id) || [];
-
-        // 2. Fetch Revenue Data from transactions
-        console.log('📊 Fetching revenue data for coach:', currentUser.id);
-        const { data: transactionsData, error: txError } = await supabase
-          .from('transactions')
-          .select('*')
-          .eq('coach_id', currentUser.id)
-          .in('type', ['sale', 'payout'])
-          .order('created_at', { ascending: false });
-
-        if (txError) {
-          console.error('❌ Error fetching transactions:', txError);
-        } else {
-          console.log('✅ Transactions fetched:', transactionsData?.length || 0);
-          
-          // Calculate revenue metrics
-          const now = new Date();
-          const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-          const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-          const lastMonthEnd = currentMonthStart;
-
-          let currentMonthRevenue = 0;
-          let lastMonthRevenue = 0;
-          let totalAllTime = 0;
-          const monthlyRevenue: Record<string, number> = {};
-
-          transactionsData?.forEach((tx: any) => {
-            if (tx.type === 'sale' && tx.status !== 'failed') {
-              const netAmount = tx.net_amount || tx.amount || 0;
-              const txDate = new Date(tx.created_at);
-
-              // All-time revenue
-              totalAllTime += netAmount;
-
-              // Current month revenue
-              if (txDate >= currentMonthStart) {
-                currentMonthRevenue += netAmount;
-              }
-
-              // Last month revenue
-              if (txDate >= lastMonthStart && txDate < lastMonthEnd) {
-                lastMonthRevenue += netAmount;
-              }
-
-              // Monthly revenue for chart
-              const monthKey = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}`;
-              monthlyRevenue[monthKey] = (monthlyRevenue[monthKey] || 0) + netAmount;
-            }
-          });
-
-          // Build last 6 months data
-          const lastSixMonths = [];
-          for (let i = 5; i >= 0; i--) {
-            const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-            const monthName = date.toLocaleString('en-US', { month: 'short' });
-            lastSixMonths.push({
-              month: monthName,
-              amount: monthlyRevenue[monthKey] || 0,
-            });
-          }
-
-          // Calculate month-over-month growth
-          const momGrowth = lastMonthRevenue > 0
-            ? Math.round(((currentMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100)
-            : currentMonthRevenue > 0 ? 100 : 0;
-
-          setRevenueData({
-            currentMonth: currentMonthRevenue,
-            totalAllTime: totalAllTime,
-            monthOverMonth: momGrowth,
-            lastSixMonths,
-          });
-
-          console.log('💰 Revenue data calculated:', {
-            currentMonth: currentMonthRevenue,
-            totalAllTime,
-            momGrowth,
-          });
-        }
 
         // Build course performance data
         if (courseIds.length > 0) {
@@ -176,40 +101,41 @@ const CoachDashboard: React.FC = () => {
             ratingsByCourse[r.course_id].push(r.rating);
           });
 
-          // Build course performance array
-          const perfData: CoursePerf[] = coursesData.map((c: any) => ({
-            id: c.id,
-            name: c.title,
-            enrolledStudents: enrollmentsByCourse[c.id] || 0,
-            rating: ratingsByCourse[c.id]?.length
-              ? Math.round((ratingsByCourse[c.id].reduce((a, b) => a + b, 0) / ratingsByCourse[c.id].length) * 10) / 10
-              : 0,
-          }));
-
-          setCoursePerfs(perfData);
-
-          // Calculate overall average rating
-          const allRatings = Object.values(ratingsByCourse).flat();
+          const allRatings = (reviews || []).map((r: { rating: number }) => r.rating);
           const overallAvg = allRatings.length > 0
-            ? Math.round((allRatings.reduce((a, b) => a + b, 0) / allRatings.length) * 10) / 10
+            ? Math.round((allRatings.reduce((s: number, v: number) => s + v, 0) / allRatings.length) * 10) / 10
             : 0;
           setAvgRating(overallAvg);
+
+          const perfs: CoursePerf[] = (coursesData || []).map((c: { id: string; title: string }) => {
+            const courseRatings = ratingsByCourse[c.id] || [];
+            const avg = courseRatings.length > 0
+              ? Math.round((courseRatings.reduce((s, v) => s + v, 0) / courseRatings.length) * 10) / 10
+              : 0;
+            return {
+              id: c.id,
+              name: c.title,
+              enrolledStudents: enrollmentsByCourse[c.id] || 0,
+              rating: avg,
+            };
+          });
+          setCoursePerfs(perfs);
         }
 
-        // 3. Upcoming Live Sessions
-        const { data: sessionsData } = await supabase
+        // 4. Upcoming Sessions
+        const { data: sessions, error: sessionError } = await supabase
           .from('live_sessions')
-          .select('*, courses(title)')
+          .select('*')
           .eq('coach_id', currentUser.id)
-          .in('status', ['scheduled', 'live'])
           .gte('scheduled_at', new Date().toISOString())
           .order('scheduled_at', { ascending: true })
           .limit(5);
 
-        setUpcomingSessions(sessionsData || []);
+        if (sessionError) throw sessionError;
+        setUpcomingSessions(sessions || []);
 
       } catch (error) {
-        console.error('❌ Error fetching dashboard data:', error);
+        console.error('Error fetching dashboard data:', error);
       } finally {
         setLoading(false);
       }
@@ -218,29 +144,43 @@ const CoachDashboard: React.FC = () => {
     fetchDashboardData();
   }, [currentUser]);
 
-  const maxRevenue = revenueData.lastSixMonths.length > 0
-    ? Math.max(...revenueData.lastSixMonths.map((m) => m.amount), 1)
-    : 1;
+  const handleCourseClick = (courseId: string) => {
+    navigate(`/coach/courses/${courseId}`);
+  };
+
+  const handleSessionClick = (_sessionId: string) => {
+    navigate('/coach/coaching-tools');
+  };
+
+  const handleAIShortcut = (_label: string) => {
+    navigate('/coach/ai-tools');
+  };
+
+  const maxRevenue = Math.max(...revenueData.lastSixMonths.map((m) => m.amount));
 
   return (
     <CoachAppLayout>
-      <div className="space-y-8 p-10">
+      <div className="flex-1 overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-4xl font-bold text-[color:var(--text-primary)]">
-              Welcome back, {currentUser?.firstName || 'Coach'}! 👋
-            </h1>
-            <p className="text-[color:var(--text-secondary)] mt-1">
-              Here's what's happening with your courses today.
-            </p>
+        <div className="bg-[color:var(--bg-secondary)] border-b border-[color:var(--border-base)] px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-[color:var(--text-primary)] mb-2">Welcome back, {currentUser?.firstName || 'Coach'}</h1>
+              <p className="text-[color:var(--text-secondary)]">Here's an overview of your teaching performance</p>
+            </div>
+            <div className="flex gap-3">
+              <div className="px-4 py-2 bg-[color:var(--color-brand-electric)]/10 rounded-full border border-[color:var(--color-brand-electric)]/20">
+                <span className="text-sm font-semibold text-[color:var(--color-brand-electric)]">
+                  Active courses: {loading ? '...' : activeCoursesCount}
+                </span>
+              </div>
+              <div className="px-4 py-2 bg-purple-500/10 rounded-full border border-purple-500/20">
+                <span className="text-sm font-semibold text-purple-500">
+                  Active students: {loading ? '...' : activeStudentsCount}
+                </span>
+              </div>
+            </div>
           </div>
-          <button
-            onClick={() => navigate('/coach/courses/new')}
-            className="px-6 py-3 bg-gradient-to-r from-[color:var(--color-brand-electric)] to-[color:var(--color-brand-neon)] text-black font-bold rounded-full hover:shadow-[0_0_20px_rgba(34,197,94,0.4)] transition-all"
-          >
-            + Create Course
-          </button>
         </div>
 
         {/* Main Content */}
@@ -250,6 +190,11 @@ const CoachDashboard: React.FC = () => {
             {/* Revenue Overview - Spans 2 columns */}
             <div className="lg:col-span-2 glass-card rounded-[24px] p-8">
               <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-6">Revenue</h2>
+
+              {/* Payment integration notice */}
+              <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl">
+                <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">💳 Payment integration coming soon. Revenue tracking will be available once payments are enabled.</p>
+              </div>
 
               {/* Main KPI */}
               <div className="mb-6">
@@ -333,79 +278,106 @@ const CoachDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Row 2: Course Performance + AI Quick Actions */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Course Performance */}
-            <div className="glass-card rounded-[24px] p-8">
-              <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-6">Course Performance</h2>
-              {coursePerfs.length === 0 ? (
-                <p className="text-[color:var(--text-secondary)]">No courses yet. Create your first course to see performance metrics.</p>
-              ) : (
-                <div className="space-y-4">
-                  {coursePerfs.slice(0, 5).map((course) => (
-                    <div key={course.id} className="flex items-center justify-between p-4 bg-[color:var(--bg-secondary)] rounded-xl border border-[color:var(--border-base)]">
-                      <div>
-                        <p className="font-semibold text-[color:var(--text-primary)]">{course.name}</p>
-                        <p className="text-sm text-[color:var(--text-secondary)]">{course.enrolledStudents} students</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl">⭐</span>
-                        <span className="text-lg font-bold text-[color:var(--text-primary)]">{course.rating || '—'}</span>
+          {/* Row 2: Course Performance */}
+          <div className="glass-card rounded-[24px] p-6">
+            <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-6">Course performance</h2>
+            <div className="space-y-4">
+              {coursePerfs.length > 0 ? coursePerfs.map((course) => (
+                <div
+                  key={course.id}
+                  onClick={() => handleCourseClick(course.id)}
+                  className="p-4 bg-[color:var(--bg-secondary)] rounded-xl hover:bg-[color:var(--bg-glass-hover)] border border-[color:var(--border-base)] transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-[color:var(--text-primary)] mb-1 group-hover:text-[color:var(--color-brand-electric)] transition-colors">{course.name}</h3>
+                      <div className="flex items-center gap-4 text-sm text-[color:var(--text-secondary)]">
+                        <span>👥 {course.enrolledStudents} students</span>
+                        {course.rating > 0 && <span>⭐ {course.rating}</span>}
                       </div>
                     </div>
-                  ))}
+                  </div>
                 </div>
+              )) : (
+                <p className="text-center text-[color:var(--text-secondary)] py-8">No approved courses yet. Create your first course!</p>
               )}
-            </div>
-
-            {/* AI Quick Actions */}
-            <div className="glass-card rounded-[24px] p-8">
-              <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-6">AI Quick Actions</h2>
-              <div className="grid grid-cols-2 gap-4">
-                {aiShortcuts.map((action) => (
-                  <button
-                    key={action.id}
-                    className="p-4 bg-[color:var(--bg-secondary)] rounded-xl border border-[color:var(--border-base)] hover:border-[color:var(--color-brand-neon)] transition-all group"
-                  >
-                    <div className="text-3xl mb-2 group-hover:scale-110 transition-transform">{action.icon}</div>
-                    <p className="text-sm font-medium text-[color:var(--text-primary)]">{action.label}</p>
-                  </button>
-                ))}
-              </div>
             </div>
           </div>
 
-          {/* Row 3: Upcoming Sessions */}
-          <div className="glass-card rounded-[24px] p-8">
-            <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-6">Upcoming Live Sessions</h2>
-            {upcomingSessions.length === 0 ? (
-              <p className="text-[color:var(--text-secondary)]">No upcoming sessions scheduled.</p>
-            ) : (
-              <div className="space-y-3">
-                {upcomingSessions.map((session) => (
-                  <div key={session.id} className="flex items-center justify-between p-4 bg-[color:var(--bg-secondary)] rounded-xl border border-[color:var(--border-base)]">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-full bg-[color:var(--color-brand-electric)]/20 flex items-center justify-center text-[color:var(--color-brand-electric)] text-xl">
-                        🎥
+          {/* Row 3: Upcoming Sessions + AI Shortcuts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Upcoming Coaching Sessions */}
+            <div className="glass-card rounded-[24px] p-6">
+              <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-6">Upcoming coaching sessions</h2>
+              <div className="space-y-4">
+                {upcomingSessions.length > 0 ? (
+                  upcomingSessions.map((session) => (
+                    <div
+                      key={session.id}
+                      className="p-4 border border-[color:var(--border-base)] rounded-xl hover:border-[color:var(--color-brand-electric)] hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all bg-[color:var(--bg-secondary)]"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <p className="text-sm font-semibold text-[color:var(--color-brand-electric)] mb-1">
+                            {new Date(session.scheduled_at).toLocaleDateString()} {new Date(session.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                          <p className="text-lg font-semibold text-[color:var(--text-primary)]">{session.title}</p>
+                          <p className="text-sm text-[color:var(--text-secondary)]">{session.description || 'No description'}</p>
+                        </div>
+                        <span
+                          className={`px-3 py-1 text-xs font-bold rounded-full ${session.status === 'scheduled' || session.status === 'live'
+                            ? 'bg-[color:var(--color-brand-neon)]/10 text-[color:var(--color-brand-neon)]'
+                            : 'bg-orange-500/10 text-orange-500'
+                            }`}
+                        >
+                          {session.status}
+                        </span>
                       </div>
-                      <div>
-                        <p className="font-semibold text-[color:var(--text-primary)]">{session.title}</p>
-                        <p className="text-sm text-[color:var(--text-secondary)]">
-                          {session.courses?.title || 'Course'} • {new Date(session.scheduled_at).toLocaleDateString()}
-                        </p>
-                      </div>
+                      <button
+                        onClick={() => handleSessionClick(session.id)}
+                        className="text-sm font-medium text-[color:var(--color-brand-electric)] hover:text-[color:var(--color-brand-neon)] transition-colors"
+                      >
+                        View details →
+                      </button>
                     </div>
-                    <span className={`px-4 py-2 rounded-full text-sm font-semibold ${
-                      session.status === 'live' 
-                        ? 'bg-red-500/20 text-red-500' 
-                        : 'bg-[color:var(--color-brand-neon)]/20 text-[color:var(--color-brand-neon)]'
-                    }`}>
-                      {session.status === 'live' ? '🔴 LIVE' : 'Scheduled'}
-                    </span>
+                  ))
+                ) : (
+                  <div className="p-8 text-center text-[color:var(--text-secondary)] bg-[color:var(--bg-secondary)] rounded-xl border border-[color:var(--border-base)]">
+                    <p>No upcoming sessions scheduled.</p>
                   </div>
+                )}
+              </div>
+            </div>
+
+            {/* AI Tool Shortcuts */}
+            <div className="glass-card rounded-[24px] p-6">
+              <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-6">AI tool shortcuts</h2>
+              <div className="grid grid-cols-2 gap-4">
+                {aiShortcuts.map((shortcut) => (
+                  <button
+                    key={shortcut.id}
+                    onClick={() => handleAIShortcut(shortcut.label)}
+                    className="p-5 bg-gradient-to-br from-[color:var(--bg-secondary)] to-[color:var(--bg-primary)] rounded-2xl border border-[color:var(--border-base)] hover:border-[color:var(--color-brand-electric)] hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all group"
+                  >
+                    <div className="text-3xl mb-3 group-hover:scale-110 transition-transform filter drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">
+                      {shortcut.icon}
+                    </div>
+                    <p className="text-sm font-semibold text-[color:var(--text-primary)] leading-tight">
+                      {shortcut.label}
+                    </p>
+                  </button>
                 ))}
               </div>
-            )}
+              <div className="mt-6 p-4 bg-[color:var(--bg-secondary)] rounded-xl border border-[color:var(--border-base)]">
+                <div className="flex items-start gap-2">
+                  <span className="text-lg">✨</span>
+                  <p className="text-xs text-[color:var(--text-secondary)]">
+                    AI-powered tools to help you create better content, analyze student performance, and
+                    optimize your teaching.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

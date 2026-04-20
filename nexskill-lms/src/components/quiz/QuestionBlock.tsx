@@ -4,7 +4,7 @@ import ContentBlockRenderer from "../shared/ContentBlockRenderer";
 import AddContentBlockButton from "../shared/AddContentBlockButton";
 import QuestionTypeSelector from "./QuestionTypeSelector";
 import AnswerConfigEditor from "./AnswerConfigEditor";
-import { ChevronUp, ChevronDown, Trash2 } from "lucide-react";
+import { ChevronUp, ChevronDown, Trash2, AlertTriangle } from "lucide-react";
 import type {
     QuizQuestion,
     QuestionType,
@@ -16,6 +16,7 @@ interface QuestionBlockProps {
     question: QuizQuestion;
     position: number;
     totalQuestions: number;
+    showMissingCorrectAnswerWarning?: boolean;
     onChange: (updated: Partial<QuizQuestion>) => void;
     onMove: (direction: "up" | "down") => void;
     onRemove: () => void;
@@ -35,6 +36,14 @@ const getDefaultAnswerConfig = (type: QuestionType): AnswerConfig => {
                 allow_multiple: false,
                 randomize_options: false,
             };
+        case "dropdown":
+            return {
+                options: [
+                    { id: generateId(), text: "", is_correct: false },
+                    { id: generateId(), text: "", is_correct: false },
+                ],
+                randomize_options: false,
+            };
         case "true_false":
             return { correct_answer: true };
         case "short_answer":
@@ -42,6 +51,11 @@ const getDefaultAnswerConfig = (type: QuestionType): AnswerConfig => {
                 max_length: 500,
                 accepted_answers: [],
                 case_sensitive: false,
+            };
+        case "paragraph":
+            return {
+                max_length: 2000,
+                placeholder: "Type your answer...",
             };
         case "essay":
             return { min_words: 100, max_words: 1000, rubric: "" };
@@ -66,6 +80,7 @@ const QuestionBlock: React.FC<QuestionBlockProps> = React.memo(({
     question,
     position,
     totalQuestions,
+    showMissingCorrectAnswerWarning = false,
     onChange,
     onMove,
     onRemove,
@@ -94,6 +109,12 @@ const QuestionBlock: React.FC<QuestionBlockProps> = React.memo(({
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                             Question {position + 1}
                         </h3>
+                        {showMissingCorrectAnswerWarning && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                                <AlertTriangle className="w-3.5 h-3.5" />
+                                Missing correct answer
+                            </span>
+                        )}
                     </div>
                 </div>
 

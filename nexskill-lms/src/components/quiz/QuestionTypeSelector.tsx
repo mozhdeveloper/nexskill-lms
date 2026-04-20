@@ -21,6 +21,11 @@ const QuestionTypeSelector: React.FC<QuestionTypeSelectorProps> = ({
                 description: "Students select one or more options",
             },
             {
+                value: "dropdown",
+                label: "Dropdown",
+                description: "Students pick one option from a dropdown list",
+            },
+            {
                 value: "true_false",
                 label: "True/False",
                 description: "Simple true or false question",
@@ -29,6 +34,11 @@ const QuestionTypeSelector: React.FC<QuestionTypeSelectorProps> = ({
                 value: "short_answer",
                 label: "Short Answer",
                 description: "Brief text response",
+            },
+            {
+                value: "paragraph",
+                label: "Paragraph",
+                description: "Open-ended long text response",
             },
             {
                 value: "essay",

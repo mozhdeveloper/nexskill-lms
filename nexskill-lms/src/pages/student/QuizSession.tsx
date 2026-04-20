@@ -7,8 +7,11 @@ import QuestionTrueFalse from '../../components/quiz/QuestionTrueFalse';
 import QuestionImageChoice from '../../components/quiz/QuestionImageChoice';
 import QuestionFileUpload from '../../components/quiz/QuestionFileUpload';
 import QuestionVideoSubmission from '../../components/quiz/QuestionVideoSubmission';
+import QuestionDropdown from '../../components/quiz/QuestionDropdown';
+import QuestionParagraph from '../../components/quiz/QuestionParagraph';
 import QuizAttemptHistory, { type PreviousAttempt } from '../../components/quiz/QuizAttemptHistory';
 import QuizStatusBanner from '../../components/quiz/QuizStatusBanner';
+import type { ContentBlock } from '../../types/quiz';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 import { useQuizSubmission, checkQuizAttemptPermission } from '../../hooks/useQuizSubmission';
@@ -31,9 +34,10 @@ import {
 
 interface QuizQuestion {
   id: string;
-  type: 'multiple-choice' | 'true-false' | 'image-choice' | 'file-upload' | 'video-submission';
+  type: 'multiple-choice' | 'dropdown' | 'paragraph' | 'true-false' | 'image-choice' | 'file-upload' | 'video-submission';
   questionText: string;
-  options?: { id: string; label: string; helperText?: string; imageUrl?: string }[];
+  questionContent: ContentBlock[];
+  options?: { id: string; label: string; helperText?: string; imageUrl?: string; isOther?: boolean }[];
   correctOptionId?: string;
   correctAnswer?: boolean;
   explanation: string;
@@ -119,8 +123,10 @@ type QuizSessionState =
 // Helper Functions (outside component for perf)
 // ============================================
 
-const mapQuestionType = (dbType: string): 'multiple-choice' | 'true-false' | 'image-choice' | 'file-upload' | 'video-submission' => {
+const mapQuestionType = (dbType: string): 'multiple-choice' | 'dropdown' | 'paragraph' | 'true-false' | 'image-choice' | 'file-upload' | 'video-submission' => {
   switch (dbType) {
+    case 'dropdown': return 'dropdown';
+    case 'paragraph': return 'paragraph';
     case 'true_false': return 'true-false';
     case 'image_choice': return 'image-choice';
     case 'file_upload': return 'file-upload';
@@ -146,15 +152,31 @@ const stripHtml = (html: string): string => {
     .trim();
 };
 
-const extractQuestionText = (content: any): string => {
-  if (!content) return 'Untitled Question';
-  const contentBlock = Array.isArray(content) ? (content[0] ?? {}) : (content ?? {});
-  return contentBlock?.text || contentBlock?.content || 'Untitled Question';
+const normalizeQuestionContent = (content: unknown): ContentBlock[] => {
+  if (!Array.isArray(content)) return [];
+
+  return content.filter(
+    (block): block is ContentBlock =>
+      Boolean(block) &&
+      typeof block === 'object' &&
+      typeof (block as ContentBlock).id === 'string' &&
+      typeof (block as ContentBlock).type === 'string' &&
+      typeof (block as ContentBlock).content === 'string'
+  );
+};
+
+const extractQuestionText = (content: ContentBlock[]): string => {
+  const firstTextBlock = content.find(
+    (block) => block.type === 'text' || block.type === 'heading'
+  );
+
+  return firstTextBlock?.content || 'Untitled Question';
 };
 
 const mapQuizQuestions = (rows: Record<string, unknown>[]): QuizQuestion[] => {
   return rows.map((r) => {
     const rawContent = r.question_content;
+    const questionContent = normalizeQuestionContent(rawContent);
     const contentBlock: Record<string, unknown> = Array.isArray(rawContent)
       ? ((rawContent[0] as Record<string, unknown>) ?? {})
       : ((rawContent as Record<string, unknown>) ?? {});
@@ -174,6 +196,7 @@ const mapQuizQuestions = (rows: Record<string, unknown>[]): QuizQuestion[] => {
       options = (answerConfig!.options as any[]).map((o: any) => ({
         id: o.id as string,
         label: (o.text || o.label || '') as string,
+        isOther: Boolean(o.is_other),
       }));
     }
 
@@ -190,7 +213,8 @@ const mapQuizQuestions = (rows: Record<string, unknown>[]): QuizQuestion[] => {
     return {
       id: r.id as string,
       type,
-      questionText: stripHtml(rawQuestionText),
+      questionText: stripHtml(rawQuestionText) || extractQuestionText(questionContent),
+      questionContent,
       options,
       correctOptionId,
       correctAnswer,
@@ -233,6 +257,7 @@ const QuizSession: React.FC = () => {
 
   // Quiz taking state
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string | boolean>>({});
+  const [otherOptionResponses, setOtherOptionResponses] = useState<Record<string, string>>({});
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [isLateSubmission, setIsLateSubmission] = useState(false);
@@ -621,7 +646,7 @@ const QuizSession: React.FC = () => {
 
         if (q.type === 'true-false') {
           isCorrect = userAnswer === q.correctAnswer;
-        } else if (q.type === 'multiple-choice' || q.type === 'image-choice') {
+        } else if (q.type === 'multiple-choice' || q.type === 'image-choice' || q.type === 'dropdown') {
           isCorrect = userAnswer === q.correctOptionId;
         } else {
           // File upload and video submission are not auto-graded
@@ -644,6 +669,7 @@ const QuizSession: React.FC = () => {
 
       const scorePercent = totalPoints > 0 ? Math.round((finalScore / totalPoints) * 100) : 0;
       const passed = scorePercent >= quizMeta.passing_score;
+      const isCoachReviewed = quizMeta.requires_coach_approval;
 
       await supabase
         .from('quiz_attempts')
@@ -662,7 +688,7 @@ const QuizSession: React.FC = () => {
 
         if (q.type === 'true-false') {
           isCorrect = userAnswer === q.correctAnswer;
-        } else if (q.type === 'multiple-choice' || q.type === 'image-choice') {
+        } else if (q.type === 'multiple-choice' || q.type === 'image-choice' || q.type === 'dropdown') {
           isCorrect = userAnswer === q.correctOptionId;
         } else if (q.type === 'file-upload' || q.type === 'video-submission') {
           isCorrect = false;
@@ -676,7 +702,8 @@ const QuizSession: React.FC = () => {
 
         const responseData: any = {
           answer: userAnswer ?? null,
-          uploaded_files: uploadedFileUrls[q.id] || null,
+          uploaded_files: null,
+          other_text: otherOptionResponses[q.id] || null,
         };
 
         return {
@@ -761,7 +788,7 @@ const QuizSession: React.FC = () => {
         const { data: checkSubmission, error: checkError } = await supabase
           .from('quiz_submissions')
           .select('*')
-          .eq('quiz_attempt_id', currentAttempt.id)
+          .eq('quiz_attempt_id', attempt.id)
           .single();
 
         if (checkError) {
@@ -789,7 +816,7 @@ const QuizSession: React.FC = () => {
           questions,
           userAnswers: selectedAnswers,
           passed,
-          attemptNumber: currentAttempt.attempt_number,
+          attemptNumber: attempt.attempt_number,
           penalizedScore: penalizedScore !== undefined ? Math.round((penalizedScore / totalPoints) * 100) : undefined,
           attemptsRemaining: quizMeta.max_attempts === null
             ? null
@@ -1193,7 +1220,7 @@ const QuizSession: React.FC = () => {
       console.error('Error submitting quiz:', err);
       setSubmitting(false);
     }
-  }, [quizMeta, user, currentAttempt, sessionState, questions, selectedAnswers, courseId, quizId, navigate, isLateSubmission]);
+  }, [quizMeta, user, currentAttempt, sessionState, questions, selectedAnswers, otherOptionResponses, courseId, quizId, navigate, isLateSubmission]);
 
   // ============================================
   // Navigation Handlers
@@ -1712,9 +1739,44 @@ const QuizSession: React.FC = () => {
             <div className="glass-card rounded-3xl p-8 mb-6 mt-6">
               {currentQuestion.type === 'multiple-choice' && (
                 <QuestionMultipleChoice
-                  question={{ ...currentQuestion, options: currentQuestion.options || [] }}
+                  question={{
+                    ...currentQuestion,
+                    options: (currentQuestion.options || []).map((o) => ({
+                      ...o,
+                      isOther: Boolean(o.isOther),
+                    })),
+                  }}
                   selectedOptionId={selectedAnswers[currentQuestion.id] as string}
+                  selectedOtherText={otherOptionResponses[currentQuestion.id] || ''}
                   onSelect={handleAnswerSelect}
+                  onOtherTextChange={(text) =>
+                    setOtherOptionResponses((prev) => ({ ...prev, [currentQuestion.id]: text }))
+                  }
+                />
+              )}
+              {currentQuestion.type === 'dropdown' && (
+                <QuestionDropdown
+                  question={{
+                    ...currentQuestion,
+                    options: (currentQuestion.options || []).map((o) => ({
+                      ...o,
+                      isOther: Boolean(o.isOther),
+                    })),
+                  }}
+                  selectedOptionId={selectedAnswers[currentQuestion.id] as string}
+                  selectedOtherText={otherOptionResponses[currentQuestion.id] || ''}
+                  onSelect={handleAnswerSelect}
+                  onOtherTextChange={(text) =>
+                    setOtherOptionResponses((prev) => ({ ...prev, [currentQuestion.id]: text }))
+                  }
+                />
+              )}
+              {currentQuestion.type === 'paragraph' && (
+                <QuestionParagraph
+                  question={currentQuestion}
+                  value={selectedAnswers[currentQuestion.id] as string}
+                  onChange={(text) => handleAnswerSelect(text)}
+                  placeholder="Type your response..."
                 />
               )}
               {currentQuestion.type === 'true-false' && (
