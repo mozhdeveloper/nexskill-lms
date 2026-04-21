@@ -111,6 +111,9 @@ export interface LiveSession {
     is_live: boolean;
     status: SessionStatus;
     recording_url?: string;
+    max_participants?: number;
+    price?: number;
+    format?: 'Online' | 'In-person';
     created_at: string;
     updated_at: string;
     // Joined fields

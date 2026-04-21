@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import uploadRoutes from './routes/upload.js';
+import googleMeetRoutes from './routes/googleMeet.js';
 
 dotenv.config();
 
@@ -24,6 +25,7 @@ app.use((req, res, next) => {
 
 // Routes
 app.use('/api/upload', uploadRoutes);
+app.use('/api/google', googleMeetRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -38,7 +40,7 @@ app.get('/api/health', (req, res) => {
 app.use((err, req, res, next) => {
   console.error('Error:', err);
   
-  // Multer error handling
+  // Multer error handling (check for code or name since multer might not be imported in this scope)
   if (err.code === 'LIMIT_FILE_SIZE') {
     return res.status(400).json({
       success: false,
@@ -46,7 +48,7 @@ app.use((err, req, res, next) => {
     });
   }
   
-  if (err instanceof multer.MulterError) {
+  if (err.name === 'MulterError') {
     return res.status(400).json({
       success: false,
       error: err.message

@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../../lib/supabaseClient';
+// Only need id and title for dropdown
+type CourseDropdown = { id: string; title: string; student_count?: number };
 
 interface BookingType {
   id: string;
@@ -8,6 +11,9 @@ interface BookingType {
   price: number;
   maxParticipants: number;
   status: 'Active' | 'Hidden';
+  course_id?: string;
+  session_date?: string;
+  session_time?: string;
 }
 
 interface BookingTypesPanelProps {
@@ -18,6 +24,100 @@ interface BookingTypesPanelProps {
 const BookingTypesPanel: React.FC<BookingTypesPanelProps> = ({ bookingTypes, onChange }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<BookingType>>({});
+  const [courses, setCourses] = useState<CourseDropdown[]>([]);
+  const [coursesLoading, setCoursesLoading] = useState(false);
+  const [coursesError, setCoursesError] = useState<string | null>(null);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+
+  // Fetch courses on mount
+  useEffect(() => {
+    const fetchCourses = async () => {
+      setCoursesLoading(true);
+      setCoursesError(null);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data, error } = await supabase
+          .from('courses')
+          .select('id, title')
+          .eq('coach_id', user.id);
+        
+        if (error) throw error;
+        
+        const coursesRaw = data || [];
+        const { data: enrollmentsData, error: enrollmentsError } = await supabase
+          .from('enrollments')
+          .select('course_id');
+        
+        const counts: Record<string, number> = {};
+        if (!enrollmentsError && enrollmentsData) {
+          enrollmentsData.forEach((e: any) => {
+            counts[e.course_id] = (counts[e.course_id] || 0) + 1;
+          });
+        }
+
+        setCourses(coursesRaw.map(c => ({
+          ...c,
+          student_count: counts[c.id] || 0
+        })));
+      } catch (err: any) {
+        setCoursesError(err.message);
+      } finally {
+        setCoursesLoading(false);
+      }
+    };
+    fetchCourses();
+  }, []);
+
+  // Fetch live sessions from database on mount
+  useEffect(() => {
+    const fetchSessions = async () => {
+      setSessionsLoading(true);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data, error } = await supabase
+          .from('live_sessions')
+          .select('*')
+          .eq('coach_id', user.id);
+
+        if (error) throw error;
+
+        const mapped: BookingType[] = (data || []).map(s => {
+          const scheduledDate = new Date(s.scheduled_at);
+          return {
+            id: s.id,
+            name: s.title,
+            duration: s.duration_minutes,
+            format: (s.format as any) || 'Online',
+            price: s.price || 0,
+            maxParticipants: s.max_participants || 1,
+            status: s.status === 'cancelled' ? 'Hidden' : 'Active',
+            course_id: s.course_id,
+            session_date: scheduledDate.toISOString().split('T')[0],
+            session_time: scheduledDate.toTimeString().split(' ')[0].substring(0, 5)
+          };
+        });
+        onChange(mapped);
+      } catch (err) {
+        console.error('Error fetching sessions:', err);
+      } finally {
+        setSessionsLoading(false);
+      }
+    };
+    fetchSessions();
+  }, []);
+
+  // Auto-fill max participants when course changes
+  useEffect(() => {
+    if (!editForm.course_id) return;
+    const selectedCourse = courses.find(c => c.id === editForm.course_id);
+    if (selectedCourse && typeof selectedCourse.student_count === 'number') {
+      setEditForm((prev) => ({ ...prev, maxParticipants: selectedCourse.student_count }));
+    }
+  }, [editForm.course_id, courses]);
 
   const startEdit = (bookingType: BookingType) => {
     setEditingId(bookingType.id);
@@ -29,13 +129,67 @@ const BookingTypesPanel: React.FC<BookingTypesPanelProps> = ({ bookingTypes, onC
     setEditForm({});
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editingId) return;
-    const updated = bookingTypes.map((bt) =>
-      bt.id === editingId ? { ...bt, ...editForm } as BookingType : bt
-    );
-    onChange(updated);
-    cancelEdit();
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      if (!editForm.course_id || !editForm.session_date || !editForm.session_time) {
+        alert('Please fill in Course, Date, and Time');
+        return;
+      }
+
+      const scheduledAt = new Date(`${editForm.session_date}T${editForm.session_time}`).toISOString();
+
+      const sessionData = {
+        title: editForm.name || 'New Session',
+        course_id: editForm.course_id,
+        coach_id: user.id,
+        scheduled_at: scheduledAt,
+        duration_minutes: editForm.duration || 30,
+        format: editForm.format || 'Online',
+        price: editForm.price || 0,
+        max_participants: editForm.maxParticipants || 1,
+        status: editForm.status === 'Active' ? 'scheduled' : 'cancelled',
+        updated_at: new Date().toISOString()
+      };
+
+      let result;
+      if (editingId.startsWith('booking-')) {
+        // New record
+        result = await supabase.from('live_sessions').insert([sessionData]).select();
+      } else {
+        // Update record
+        result = await supabase.from('live_sessions').update(sessionData).eq('id', editingId).select();
+      }
+
+      if (result.error) throw result.error;
+
+      const savedSession = result.data[0];
+      const updatedItem: BookingType = {
+        id: savedSession.id,
+        name: savedSession.title,
+        duration: savedSession.duration_minutes,
+        format: savedSession.format,
+        price: savedSession.price,
+        maxParticipants: savedSession.max_participants,
+        status: savedSession.status === 'cancelled' ? 'Hidden' : 'Active',
+        course_id: savedSession.course_id,
+        session_date: editForm.session_date,
+        session_time: editForm.session_time
+      };
+
+      const updated = editingId.startsWith('booking-') 
+        ? [...bookingTypes.filter(bt => bt.id !== editingId), updatedItem]
+        : bookingTypes.map((bt) => bt.id === editingId ? updatedItem : bt);
+      
+      onChange(updated);
+      cancelEdit();
+    } catch (err: any) {
+      alert(`Error saving session: ${err.message}`);
+    }
   };
 
   const duplicateBookingType = (bookingType: BookingType) => {
@@ -45,13 +199,30 @@ const BookingTypesPanel: React.FC<BookingTypesPanelProps> = ({ bookingTypes, onC
       name: `${bookingType.name} (Copy)`,
     };
     onChange([...bookingTypes, newBookingType]);
+    startEdit(newBookingType);
   };
 
-  const archiveBookingType = (id: string) => {
-    const updated = bookingTypes.map((bt) =>
-      bt.id === id ? { ...bt, status: 'Hidden' as const } : bt
-    );
-    onChange(updated);
+  const archiveBookingType = async (id: string) => {
+    if (id.startsWith('booking-')) {
+      onChange(bookingTypes.filter(bt => bt.id !== id));
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('live_sessions')
+        .update({ status: 'cancelled' })
+        .eq('id', id);
+      
+      if (error) throw error;
+
+      const updated = bookingTypes.map((bt) =>
+        bt.id === id ? { ...bt, status: 'Hidden' as const } : bt
+      );
+      onChange(updated);
+    } catch (err: any) {
+      alert(`Error archiving session: ${err.message}`);
+    }
   };
 
   const addNewBookingType = () => {
@@ -109,6 +280,42 @@ const BookingTypesPanel: React.FC<BookingTypesPanelProps> = ({ bookingTypes, onC
               /* Edit Mode */
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Course Selector */}
+                  <div>
+                    <label className="block text-sm font-medium text-[#111827] mb-2">Course</label>
+                    <select
+                      value={editForm.course_id || ''}
+                      onChange={e => setEditForm({ ...editForm, course_id: e.target.value })}
+                      className="w-full px-4 py-2 rounded-xl border border-[#EDF0FB] focus:outline-none focus:ring-2 focus:ring-[#304DB5]"
+                      disabled={coursesLoading}
+                    >
+                      <option value="" disabled>Select course</option>
+                      {courses.map(course => (
+                        <option key={course.id} value={course.id}>{course.title}</option>
+                      ))}
+                    </select>
+                    {coursesError && <div className="text-xs text-red-500 mt-1">{coursesError}</div>}
+                  </div>
+                  {/* Date Picker */}
+                  <div>
+                    <label className="block text-sm font-medium text-[#111827] mb-2">Session Date</label>
+                    <input
+                      type="date"
+                      value={editForm.session_date || ''}
+                      onChange={e => setEditForm({ ...editForm, session_date: e.target.value })}
+                      className="w-full px-4 py-2 rounded-xl border border-[#EDF0FB] focus:outline-none focus:ring-2 focus:ring-[#304DB5]"
+                    />
+                  </div>
+                  {/* Time Picker */}
+                  <div>
+                    <label className="block text-sm font-medium text-[#111827] mb-2">Session Time</label>
+                    <input
+                      type="time"
+                      value={editForm.session_time || ''}
+                      onChange={e => setEditForm({ ...editForm, session_time: e.target.value })}
+                      className="w-full px-4 py-2 rounded-xl border border-[#EDF0FB] focus:outline-none focus:ring-2 focus:ring-[#304DB5]"
+                    />
+                  </div>
                   <div>
                     <label className="block text-sm font-medium text-[#111827] mb-2">Name</label>
                     <input
@@ -133,16 +340,12 @@ const BookingTypesPanel: React.FC<BookingTypesPanelProps> = ({ bookingTypes, onC
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-[#111827] mb-2">Format</label>
-                    <select
-                      value={editForm.format || 'Online'}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, format: e.target.value as 'Online' | 'In-person' })
-                      }
-                      className="w-full px-4 py-2 rounded-xl border border-[#EDF0FB] focus:outline-none focus:ring-2 focus:ring-[#304DB5]"
-                    >
-                      <option value="Online">Online</option>
-                      <option value="In-person">In-person</option>
-                    </select>
+                    <input
+                      type="text"
+                      value="Online"
+                      disabled
+                      className="w-full px-4 py-2 rounded-xl border border-[#EDF0FB] bg-gray-100 text-gray-500 cursor-not-allowed"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-[#111827] mb-2">

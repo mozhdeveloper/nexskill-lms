@@ -62,9 +62,15 @@ export const useLiveSessions = (courseId?: string) => {
                 throw sessionError;
             }
 
-            // 3. Sanitize data (hide link if not live)
+            // 3. Sanitize data (hide link if not live or not starting soon)
             const sanitizedData = data.map((session: any) => {
-                const showLink = session.is_live || session.status === 'in_progress' || session.status === 'live';
+                const scheduledTime = new Date(session.scheduled_at).getTime();
+                const now = Date.now();
+                const startingSoon = (scheduledTime - now) <= 30 * 60 * 1000; // 30 minutes before
+                const isPast = now > (scheduledTime + (session.duration_minutes * 60000)); // Session is over
+
+                const showLink = (session.is_live || session.status === 'in_progress' || session.status === 'live' || startingSoon) && !isPast;
+                
                 return {
                     ...session,
                     meeting_link: showLink ? session.meeting_link : undefined

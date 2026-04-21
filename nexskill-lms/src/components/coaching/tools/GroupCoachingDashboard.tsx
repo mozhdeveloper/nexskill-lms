@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../../lib/supabaseClient';
 
 interface GroupSession {
   id: string;
@@ -10,60 +11,241 @@ interface GroupSession {
   enrolled: number;
   price: number;
   status: 'Scheduled' | 'In Progress' | 'Completed';
+  course_id?: string;
+  meeting_link?: string;
 }
 
-const GroupCoachingDashboard: React.FC = () => {
-  const [groupSessions] = useState<GroupSession[]>([
-    {
-      id: 'group-1',
-      title: 'Advanced Marketing Strategy Workshop',
-      date: '2024-01-22',
-      time: '02:00 PM',
-      duration: 120,
-      maxParticipants: 20,
-      enrolled: 18,
-      price: 149,
-      status: 'Scheduled',
-    },
-    {
-      id: 'group-2',
-      title: 'SEO Masterclass',
-      date: '2024-01-25',
-      time: '10:00 AM',
-      duration: 90,
-      maxParticipants: 15,
-      enrolled: 12,
-      price: 99,
-      status: 'Scheduled',
-    },
-    {
-      id: 'group-3',
-      title: 'Content Creation Bootcamp',
-      date: '2024-01-18',
-      time: '03:00 PM',
-      duration: 150,
-      maxParticipants: 25,
-      enrolled: 25,
-      price: 199,
-      status: 'Completed',
-    },
-  ]);
+type CourseDropdown = { id: string; title: string; student_count: number };
 
+const GroupCoachingDashboard: React.FC = () => {
+  const [groupSessions, setGroupSessions] = useState<GroupSession[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [courses, setCourses] = useState<CourseDropdown[]>([]);
+  const [coursesLoading, setCoursesLoading] = useState(false);
+  const [googleTokens, setGoogleTokens] = useState<any>(null);
+
+  // Form State
+  const [formData, setFormData] = useState({
+    title: '',
+    course_id: '',
+    date: '',
+    time: '',
+    duration: 60,
+    maxParticipants: 1,
+    price: 0
+  });
+
+  useEffect(() => {
+    // Check if we have tokens in local storage
+    const savedTokens = localStorage.getItem('google_calendar_tokens');
+    if (savedTokens) setGoogleTokens(JSON.parse(savedTokens));
+
+    // Handle OAuth callback if present in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    if (code && !googleTokens) {
+      fetch('http://127.0.0.1:5000/api/google/callback?code=' + code)
+        .then(res => res.json())
+        .then(data => {
+          if (data.tokens) {
+            setGoogleTokens(data.tokens);
+            localStorage.setItem('google_calendar_tokens', JSON.stringify(data.tokens));
+            // Clear URL params
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        });
+    }
+  }, []);
+
+  const authorizeGoogle = async () => {
+    try {
+      const res = await fetch('http://127.0.0.1:5000/api/google/auth');
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+    } catch (err) {
+      alert('Failed to initiate Google authorization');
+    }
+  };
+
+  // Fetch courses and their enrollment counts
+  const fetchCourses = async () => {
+    setCoursesLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: coursesData, error: coursesError } = await supabase
+        .from('courses')
+        .select('id, title')
+        .eq('coach_id', user.id);
+      
+      if (coursesError) throw coursesError;
+
+      const { data: enrollmentsData, error: enrollmentsError } = await supabase
+        .from('enrollments')
+        .select('course_id');
+      
+      const counts: Record<string, number> = {};
+      if (!enrollmentsError && enrollmentsData) {
+        enrollmentsData.forEach((e: any) => {
+          counts[e.course_id] = (counts[e.course_id] || 0) + 1;
+        });
+      }
+
+      setCourses((coursesData || []).map(c => ({
+        id: c.id,
+        title: c.title,
+        student_count: counts[c.id] || 0
+      })));
+    } catch (err) {
+      console.error('Error fetching courses:', err);
+    } finally {
+      setCoursesLoading(false);
+    }
+  };
+
+  const fetchSessions = async () => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('live_sessions')
+        .select('*')
+        .eq('coach_id', user.id);
+
+      if (error) throw error;
+
+      // Also get enrollment counts for current sessions
+      const { data: enrollmentsData } = await supabase.from('enrollments').select('course_id');
+      const counts: Record<string, number> = {};
+      (enrollmentsData || []).forEach((e: any) => {
+        counts[e.course_id] = (counts[e.course_id] || 0) + 1;
+      });
+
+      const mapped: GroupSession[] = (data || []).map(s => {
+        const scheduledDate = new Date(s.scheduled_at);
+        let status: GroupSession['status'] = 'Scheduled';
+        if (s.status === 'completed') status = 'Completed';
+        else if (s.status === 'in_progress' || s.status === 'live') status = 'In Progress';
+
+        return {
+          id: s.id,
+          title: s.title,
+          date: scheduledDate.toISOString().split('T')[0],
+          time: scheduledDate.toTimeString().split(' ')[0].substring(0, 5),
+          duration: s.duration_minutes,
+          maxParticipants: s.max_participants || 1,
+          enrolled: counts[s.course_id] || 0,
+          price: s.price || 0,
+          status,
+          course_id: s.course_id,
+          meeting_link: s.meeting_link
+        };
+      });
+      setGroupSessions(mapped);
+    } catch (err) {
+      console.error('Error fetching sessions:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSessions();
+    fetchCourses();
+  }, []);
+
+  // Auto-fill max participants when course changes
+  useEffect(() => {
+    if (!formData.course_id) return;
+    const selectedCourse = courses.find(c => c.id === formData.course_id);
+    if (selectedCourse) {
+      setFormData(prev => ({ ...prev, maxParticipants: selectedCourse.student_count }));
+    }
+  }, [formData.course_id, courses]);
 
   const totalEnrolled = groupSessions.reduce((sum, session) => sum + session.enrolled, 0);
   const totalRevenue = groupSessions.reduce(
-    (sum, session) => sum + session.enrolled * session.price,
+    (sum, session) => sum + (session.enrolled * session.price),
     0
   );
   const avgAttendance =
     groupSessions.length > 0
       ? Math.round(
-          (groupSessions.reduce((sum, s) => sum + (s.enrolled / s.maxParticipants) * 100, 0) /
+          (groupSessions.reduce((sum, s) => sum + (s.maxParticipants > 0 ? (s.enrolled / s.maxParticipants) * 100 : 0), 0) /
             groupSessions.length)
         )
       : 0;
-  const upcomingSessions = groupSessions.filter((s) => s.status === 'Scheduled').length;
+  const upcomingSessionsCount = groupSessions.filter((s) => s.status === 'Scheduled').length;
+
+  const handleCreateSession = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      if (!formData.course_id || !formData.date || !formData.time || !formData.title) {
+        alert('Please fill in all required fields (Title, Course, Date, Time)');
+        return;
+      }
+
+      let meetingLink = '';
+
+      // Create Google Meet Link if authorized
+      if (googleTokens) {
+        const scheduledAt = new Date(`${formData.date}T${formData.time}`).toISOString();
+        const meetRes = await fetch('http://127.0.0.1:5000/api/google/create-meeting', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tokens: googleTokens,
+            title: formData.title,
+            startTime: scheduledAt,
+            durationMinutes: formData.duration
+          })
+        });
+        const meetData = await meetRes.json();
+        if (meetData.meetingLink) {
+          meetingLink = meetData.meetingLink;
+        } else {
+          console.warn('Meeting link generation failed, continuing without link');
+        }
+      }
+
+      const scheduledAt = new Date(`${formData.date}T${formData.time}`).toISOString();
+
+      const { error } = await supabase.from('live_sessions').insert([{
+        title: formData.title,
+        course_id: formData.course_id,
+        coach_id: user.id,
+        scheduled_at: scheduledAt,
+        duration_minutes: formData.duration,
+        max_participants: formData.maxParticipants,
+        price: formData.price,
+        status: 'scheduled',
+        is_live: false,
+        meeting_link: meetingLink
+      }]);
+
+      if (error) throw error;
+
+      setShowCreateModal(false);
+      setFormData({
+        title: '',
+        course_id: '',
+        date: '',
+        time: '',
+        duration: 60,
+        maxParticipants: 1,
+        price: 0
+      });
+      fetchSessions();
+    } catch (err: any) {
+      alert(`Error creating session: ${err.message}`);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -79,6 +261,7 @@ const GroupCoachingDashboard: React.FC = () => {
   };
 
   const getEnrollmentColor = (enrolled: number, max: number) => {
+    if (max === 0) return 'text-[#9CA3B5]';
     const percentage = (enrolled / max) * 100;
     if (percentage >= 90) return 'text-[#22C55E]';
     if (percentage >= 50) return 'text-[#F97316]';
@@ -101,7 +284,6 @@ const GroupCoachingDashboard: React.FC = () => {
   };
 
   const createNewSession = () => {
-    console.log('Creating new group session');
     setShowCreateModal(true);
   };
 
@@ -115,20 +297,35 @@ const GroupCoachingDashboard: React.FC = () => {
             Manage group sessions, participants, and revenue
           </p>
         </div>
-        <button
-          onClick={createNewSession}
-          className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white font-semibold rounded-full hover:shadow-lg transition-all"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
-          Create Session
-        </button>
+        <div className="flex items-center gap-3">
+          {!googleTokens ? (
+            <button
+              onClick={authorizeGoogle}
+              className="flex items-center gap-2 px-6 py-3 bg-white border border-[#EDF0FB] text-[#111827] font-semibold rounded-full hover:bg-gray-50 transition-all"
+            >
+              <img src="https://www.google.com/favicon.ico" className="w-4 h-4" alt="Google" />
+              Authorize Google
+            </button>
+          ) : (
+            <span className="text-xs text-[#22C55E] font-medium flex items-center gap-1">
+              ✅ Google Calendar Connected
+            </span>
+          )}
+          <button
+            onClick={createNewSession}
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white font-semibold rounded-full hover:shadow-lg transition-all"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+            Create Session
+          </button>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -213,7 +410,7 @@ const GroupCoachingDashboard: React.FC = () => {
               />
             </svg>
           </div>
-          <p className="text-4xl font-bold text-[#111827]">{upcomingSessions}</p>
+          <p className="text-4xl font-bold text-[#111827]">{upcomingSessionsCount}</p>
           <p className="text-xs text-[#9CA3B5] mt-1">Scheduled</p>
         </div>
       </div>
@@ -270,6 +467,15 @@ const GroupCoachingDashboard: React.FC = () => {
 
                 {/* Actions */}
                 <div className="flex items-center gap-2">
+                  {session.meeting_link && (
+                    <button
+                      onClick={() => window.open(session.meeting_link, '_blank')}
+                      className="px-4 py-2 text-sm font-semibold text-white bg-[#22C55E] hover:bg-[#16a34a] rounded-lg transition-colors flex items-center gap-1"
+                    >
+                      <span>🎥</span>
+                      Join Meeting
+                    </button>
+                  )}
                   <button
                     onClick={() => viewParticipants(session.id)}
                     className="px-4 py-2 text-sm font-medium text-[#304DB5] hover:bg-blue-50 rounded-lg transition-colors"
@@ -349,15 +555,40 @@ const GroupCoachingDashboard: React.FC = () => {
                 </label>
                 <input
                   type="text"
+                  value={formData.title}
+                  onChange={e => setFormData({ ...formData, title: e.target.value })}
                   placeholder="e.g., Advanced Marketing Workshop"
                   className="w-full px-4 py-3 rounded-xl border border-[#EDF0FB] focus:outline-none focus:ring-2 focus:ring-[#304DB5]"
                 />
               </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-[#111827] mb-2">Course</label>
+                <select
+                  value={formData.course_id}
+                  onChange={e => setFormData({ ...formData, course_id: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border border-[#EDF0FB] focus:outline-none focus:ring-2 focus:ring-[#304DB5]"
+                  disabled={coursesLoading}
+                >
+                  <option value="">Select course</option>
+                  {courses.map(course => (
+                    <option key={course.id} value={course.id}>{course.title} ({course.student_count} students)</option>
+                  ))}
+                </select>
+                {formData.course_id && (
+                  <p className="text-xs text-[#304DB5] mt-1 italic">
+                    Students enrolled in this course will see this session in their Live Classes.
+                  </p>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-[#111827] mb-2">Date</label>
                   <input
                     type="date"
+                    value={formData.date}
+                    onChange={e => setFormData({ ...formData, date: e.target.value })}
                     className="w-full px-4 py-3 rounded-xl border border-[#EDF0FB] focus:outline-none focus:ring-2 focus:ring-[#304DB5]"
                   />
                 </div>
@@ -365,6 +596,8 @@ const GroupCoachingDashboard: React.FC = () => {
                   <label className="block text-sm font-medium text-[#111827] mb-2">Time</label>
                   <input
                     type="time"
+                    value={formData.time}
+                    onChange={e => setFormData({ ...formData, time: e.target.value })}
                     className="w-full px-4 py-3 rounded-xl border border-[#EDF0FB] focus:outline-none focus:ring-2 focus:ring-[#304DB5]"
                   />
                 </div>
@@ -376,6 +609,8 @@ const GroupCoachingDashboard: React.FC = () => {
                   </label>
                   <input
                     type="number"
+                    value={formData.duration}
+                    onChange={e => setFormData({ ...formData, duration: parseInt(e.target.value) || 0 })}
                     placeholder="90"
                     className="w-full px-4 py-3 rounded-xl border border-[#EDF0FB] focus:outline-none focus:ring-2 focus:ring-[#304DB5]"
                   />
@@ -386,6 +621,8 @@ const GroupCoachingDashboard: React.FC = () => {
                   </label>
                   <input
                     type="number"
+                    value={formData.maxParticipants}
+                    onChange={e => setFormData({ ...formData, maxParticipants: parseInt(e.target.value) || 0 })}
                     placeholder="20"
                     className="w-full px-4 py-3 rounded-xl border border-[#EDF0FB] focus:outline-none focus:ring-2 focus:ring-[#304DB5]"
                   />
@@ -396,6 +633,8 @@ const GroupCoachingDashboard: React.FC = () => {
                   </label>
                   <input
                     type="number"
+                    value={formData.price}
+                    onChange={e => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
                     placeholder="149"
                     className="w-full px-4 py-3 rounded-xl border border-[#EDF0FB] focus:outline-none focus:ring-2 focus:ring-[#304DB5]"
                   />
@@ -403,11 +642,7 @@ const GroupCoachingDashboard: React.FC = () => {
               </div>
               <div className="flex items-center gap-3 pt-4">
                 <button
-                  onClick={() => {
-                    console.log('Creating group session');
-                    setShowCreateModal(false);
-                    alert('Group session created!');
-                  }}
+                  onClick={handleCreateSession}
                   className="flex-1 px-6 py-3 bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white font-semibold rounded-full hover:shadow-lg transition-all"
                 >
                   Create Session

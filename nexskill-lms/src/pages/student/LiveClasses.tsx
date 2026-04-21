@@ -12,6 +12,9 @@ const LiveClasses: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('upcoming');
   const { upcomingSessions, completedSessions, recordedSessions, loading, error } = useLiveSessions();
   const [enrollmentCounts, setEnrollmentCounts] = useState<Record<string, number>>({});
+  // Add state for selected course and max participants for demonstration
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [maxParticipants, setMaxParticipants] = useState<number>(0);
 
   useEffect(() => {
     const allSessions = [...upcomingSessions, ...completedSessions, ...recordedSessions];
@@ -19,16 +22,27 @@ const LiveClasses: React.FC = () => {
     if (courseIds.length === 0) return;
     supabase
       .from('enrollments')
-      .select('course_id')
+      .select('course_id, profile_id')
       .in('course_id', courseIds)
       .then(({ data }) => {
+        console.log('[LiveClasses] Raw enrollments fetched:', data);
         const counts: Record<string, number> = {};
         (data || []).forEach((e: any) => {
           counts[e.course_id] = (counts[e.course_id] || 0) + 1;
         });
+        console.log('[LiveClasses] Enrollment counts:', counts);
         setEnrollmentCounts(counts);
       });
   }, [upcomingSessions, completedSessions, recordedSessions]);
+
+  // Update maxParticipants whenever selectedCourseId or enrollmentCounts changes
+  useEffect(() => {
+    if (!selectedCourseId) {
+      setMaxParticipants(0);
+      return;
+    }
+    setMaxParticipants(enrollmentCounts[selectedCourseId] ?? 0);
+  }, [selectedCourseId, enrollmentCounts]);
 
   const getInstructorName = (session: LiveSession) => {
     if (session.coach) {
@@ -62,6 +76,7 @@ const LiveClasses: React.FC = () => {
     return new Date(dateStr).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   };
 
+  // Integrate max participants logic into the main UI
   return (
     <div className="min-h-screen bg-[color:var(--bg-primary)]">
       {/* Back Button */}
@@ -91,6 +106,28 @@ const LiveClasses: React.FC = () => {
 
       <div className="flex-1 overflow-y-auto p-8">
         <div className="max-w-1xl">
+          {/* If you have a Booking Types panel or course selection UI, integrate here: */}
+          <div className="mb-8">
+            <label htmlFor="course-select" className="block mb-2 font-medium">Course</label>
+            <select
+              id="course-select"
+              className="border rounded px-3 py-2 w-full mb-2"
+              value={selectedCourseId || ''}
+              onChange={e => setSelectedCourseId(e.target.value)}
+            >
+              <option value="">-- Select Course --</option>
+              {[...new Set([...upcomingSessions, ...completedSessions, ...recordedSessions].map(s => s.course_id))].map(cid => (
+                <option key={cid} value={cid}>{cid}</option>
+              ))}
+            </select>
+            <label className="block mb-2 font-medium">Max Participants</label>
+            <input
+              type="number"
+              className="border rounded px-3 py-2 w-full mb-2"
+              value={maxParticipants}
+              readOnly
+            />
+          </div>
 
           {loading && (
             <div className="flex justify-center p-12">
@@ -212,7 +249,13 @@ const LiveClasses: React.FC = () => {
                               <div className="flex items-center gap-3 mt-4">
                                 {(liveClass.is_live || isStartingSoon) ? (
                                   <button
-                                    onClick={() => navigate(`/student/live-class/${liveClass.id}`)}
+                                    onClick={() => {
+                                      if (liveClass.meeting_link) {
+                                        window.open(liveClass.meeting_link, '_blank');
+                                      } else {
+                                        navigate(`/student/live-class/${liveClass.id}`);
+                                      }
+                                    }}
                                     className="px-6 py-2.5 bg-gradient-to-r from-brand-primary to-brand-primary-light text-white text-sm font-semibold rounded-full hover:shadow-lg hover:scale-[1.02] transition-all"
                                   >
                                     Join Now
