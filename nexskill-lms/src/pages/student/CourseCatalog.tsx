@@ -222,17 +222,7 @@ const CourseCatalog: React.FC = () => {
   return (
     <StudentAppLayout>
       <div className="min-h-screen bg-[color:var(--bg-primary)]">
-        {/* Header with Welcome */}
-        <div className="bg-gradient-to-r from-[color:var(--color-brand-neon)] via-[color:var(--color-brand-electric)] to-[color:var(--color-brand-primary)] text-white">
-          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <h1 className="text-4xl font-bold mb-2">
-              Welcome back, {currentUser?.firstName || 'Student'}! 👋
-            </h1>
-            <p className="text-xl text-white/90">
-              Explore {courses.length} courses and find the perfect one for you
-            </p>
-          </div>
-        </div>
+        
 
         {/* Filters Bar */}
         <div className="bg-[color:var(--bg-secondary)] border-b border-[color:var(--border-base)] sticky top-0 z-30">
