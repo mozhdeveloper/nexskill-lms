@@ -165,6 +165,50 @@ export function useQuizFeedback(submissionId: string | undefined) {
   return { feedback, loading, error, refetch: fetchFeedback };
 }
 
+export function useAllQuizFeedback(quizId: string | undefined) {
+  const { user } = useAuth();
+  const [feedback, setFeedback] = useState<QuizFeedback[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchFeedback = useCallback(async () => {
+    if (!quizId || !user) {
+      setFeedback([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch all feedback for this quiz by this user by joining with quiz_submissions
+      const { data, error } = await supabase
+        .from('quiz_feedback')
+        .select('*, quiz_submissions!inner(user_id, quiz_id)')
+        .eq('quiz_submissions.user_id', user.id)
+        .eq('quiz_submissions.quiz_id', quizId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      setFeedback(data || []);
+    } catch (err: any) {
+      console.error('Error fetching all quiz feedback:', err);
+      setError(err.message);
+      setFeedback([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [quizId, user]);
+
+  useEffect(() => {
+    fetchFeedback();
+  }, [fetchFeedback]);
+
+  return { feedback, loading, error, refetch: fetchFeedback };
+}
+
 // ============================================
 // Coach Quiz Submissions Hook (for coach dashboard)
 // ============================================

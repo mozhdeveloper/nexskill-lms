@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import StudentAppLayout from '../../layouts/StudentAppLayout';
-import { useQuizSubmission, useQuizFeedback } from '../../hooks/useQuizSubmission';
+import { useQuizSubmission, useAllQuizFeedback } from '../../hooks/useQuizSubmission';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -15,7 +15,7 @@ import {
   Video,
   AlertCircle,
   MessageSquare,
-  ExternalLink,
+  History,
 } from 'lucide-react';
 import type { QuizFeedbackMedia } from '../../types/quiz';
 
@@ -34,13 +34,11 @@ const QuizFeedbackView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedMedia, setSelectedMedia] = useState<QuizFeedbackMedia | null>(null);
 
-  // Fetch submission status
+  // Fetch submission status (latest)
   const { submission, loading: submissionLoading } = useQuizSubmission(quizId);
   
-  // Fetch feedback if submission exists
-  const { feedback, loading: feedbackLoading } = useQuizFeedback(
-    submission?.submission_id
-  );
+  // Fetch ALL feedback for this quiz (history)
+  const { feedback, loading: feedbackLoading } = useAllQuizFeedback(quizId);
 
   useEffect(() => {
     const fetchQuizData = async () => {
@@ -105,31 +103,21 @@ const QuizFeedbackView: React.FC = () => {
     switch (media.type) {
       case 'image':
         return (
-          <div className="relative group cursor-pointer" onClick={() => setSelectedMedia(media)}>
-            <img
-              src={media.url}
-              alt={media.filename}
-              className="w-full h-40 object-cover rounded-lg border border-gray-200"
-            />
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center rounded-lg">
-              <ImageIcon className="text-white opacity-0 group-hover:opacity-100 w-8 h-8" />
-            </div>
-            <p className="text-[10px] text-text-secondary mt-1 truncate">{media.filename}</p>
-          </div>
+          <img
+            src={media.url}
+            alt={media.filename}
+            className="w-full h-auto rounded-lg"
+            onClick={() => setSelectedMedia(media)}
+          />
         );
       case 'video':
         return (
-          <div className="relative group cursor-pointer" onClick={() => setSelectedMedia(media)}>
-            <video
-              src={media.url}
-              className="w-full h-40 object-cover rounded-lg border border-gray-200"
-              muted
-            />
-            <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors rounded-lg">
-              <Play className="w-10 h-10 text-white" />
-            </div>
-            <p className="text-[10px] text-text-secondary mt-1 truncate">{media.filename}</p>
-          </div>
+          <video
+            src={media.url}
+            controls
+            className="w-full rounded-lg"
+            style={{ maxHeight: '400px' }}
+          />
         );
       case 'document':
         return (
@@ -137,13 +125,15 @@ const QuizFeedbackView: React.FC = () => {
             href={media.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex flex-col items-center justify-center h-40 bg-gray-50 rounded-lg border border-gray-200 hover:border-brand-primary hover:bg-white transition-all group"
+            className="flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 transition-colors"
           >
-            <FileText className="w-12 h-12 text-gray-400 group-hover:text-brand-primary mb-2 transition-colors" />
-            <p className="text-xs font-medium text-text-primary px-3 text-center line-clamp-2">{media.filename}</p>
-            <p className="text-[10px] text-text-secondary mt-1">
-              {media.size ? `${(media.size / 1024).toFixed(1)} KB` : 'Open file'}
-            </p>
+            <FileText className="w-8 h-8 text-blue-600" />
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-gray-900 truncate">{media.filename}</p>
+              <p className="text-sm text-gray-500">
+                {media.size ? `${(media.size / 1024).toFixed(1)} KB` : 'Open file'}
+              </p>
+            </div>
           </a>
         );
       default:
@@ -296,82 +286,97 @@ const QuizFeedbackView: React.FC = () => {
             </div>
           )}
 
-          {/* Coach Feedback */}
-          {feedbackLoading ? (
-            <div className="glass-card rounded-2xl p-6 text-center">
-              <div className="w-8 h-8 border-4 border-brand-primary border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-              <p className="text-text-secondary">Loading feedback...</p>
-            </div>
-          ) : feedback.length > 0 ? (
-            <div className="space-y-6 mb-6">
-              <h2 className="text-2xl font-bold text-text-primary flex items-center gap-2">
-                <MessageSquare className="w-6 h-6" />
-                Coach Feedback ({feedback.length})
-              </h2>
+          {/* Coach Feedback History */}
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-text-primary flex items-center gap-2 mb-6">
+              <History className="w-6 h-6" />
+              Feedback History {feedback.length > 0 && `(${feedback.length})`}
+            </h2>
 
-              {feedback.map((fb, index) => (
-                <div key={fb.id} className="glass-card rounded-2xl p-6">
-                  {/* Feedback Header */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-r from-brand-neon to-brand-electric flex items-center justify-center text-white font-bold">
-                        C
+            {feedbackLoading ? (
+              <div className="glass-card rounded-2xl p-6 text-center">
+                <div className="w-8 h-8 border-4 border-brand-primary border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+                <p className="text-text-secondary">Loading feedback...</p>
+              </div>
+            ) : feedback.length > 0 ? (
+              <div className="space-y-6">
+                {feedback.map((fb, index) => (
+                  <div 
+                    key={fb.id} 
+                    className={`glass-card rounded-2xl p-6 relative ${
+                      index === 0 ? 'border-l-4 border-brand-neon' : ''
+                    }`}
+                  >
+                    {index === 0 && (
+                      <div className="absolute -top-3 left-6 px-3 py-1 rounded-full bg-brand-neon text-white text-[10px] font-bold uppercase tracking-wider">
+                        Latest Feedback
                       </div>
-                      <div>
-                        <p className="font-semibold text-text-primary">Your Coach</p>
-                        <p className="text-sm text-text-secondary">
-                          {new Date(fb.created_at).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                          })}
-                        </p>
+                    )}
+                    
+                    {/* Feedback Header */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-r from-brand-neon to-brand-electric flex items-center justify-center text-white font-bold">
+                          C
+                        </div>
+                        <div>
+                          <p className="font-semibold text-text-primary">Your Coach</p>
+                          <p className="text-sm text-text-secondary">
+                            {new Date(fb.created_at).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                      {fb.is_resubmission_feedback && (
+                        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">
+                          Resubmission Feedback
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Comment */}
+                    <div className="prose prose-sm max-w-none mb-6">
+                      <div className="bg-white/50 rounded-xl p-4 border border-gray-100">
+                        <p className="text-text-primary whitespace-pre-wrap leading-relaxed">{fb.comment}</p>
                       </div>
                     </div>
-                    {fb.is_resubmission_feedback && (
-                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">
-                        Resubmission Feedback
-                      </span>
+
+                    {/* Media Attachments */}
+                    {fb.media_urls && fb.media_urls.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold text-text-primary mb-3 flex items-center gap-2 text-sm">
+                          <FileText className="w-4 h-4" />
+                          Attachments ({fb.media_urls.length})
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {fb.media_urls.map((media, mediaIndex) => (
+                            <div key={mediaIndex} className="bg-white rounded-xl p-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                              {renderMediaPreview(media)}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
-
-                  {/* Comment */}
-                  <div className="prose prose-sm max-w-none mb-6">
-                    <div className="bg-white rounded-lg p-4 border border-gray-200">
-                      <p className="text-text-primary whitespace-pre-wrap">{fb.comment}</p>
-                    </div>
-                  </div>
-
-                  {/* Media Attachments */}
-                  {fb.media_urls && fb.media_urls.length > 0 && (
-                    <div>
-                      <h4 className="font-semibold text-text-primary mb-3 flex items-center gap-2">
-                        <FileText className="w-4 h-4" />
-                        Attachments ({fb.media_urls.length})
-                      </h4>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {fb.media_urls.map((media, mediaIndex) => (
-                          <div key={mediaIndex}>
-                            {renderMediaPreview(media)}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="glass-card rounded-2xl p-8 mb-6 text-center">
-              <MessageSquare className="w-12 h-12 text-text-secondary mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-text-primary mb-2">No Feedback Yet</h3>
-              <p className="text-text-secondary">
-                {isPending
-                  ? 'Your coach hasn\'t provided feedback yet. Check back later.'
-                  : 'No detailed feedback has been provided for this submission.'}
-              </p>
-            </div>
-          )}
+                ))}
+              </div>
+            ) : (
+              <div className="glass-card rounded-2xl p-8 text-center">
+                <MessageSquare className="w-12 h-12 text-text-secondary mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-text-primary mb-2">No Feedback Yet</h3>
+                <p className="text-text-secondary">
+                  {isPending
+                    ? 'Your coach hasn\'t provided feedback yet. Check back later.'
+                    : 'No detailed feedback has been provided for this submission.'}
+                </p>
+              </div>
+            )}
+          </div>
 
           
 
@@ -411,50 +416,22 @@ const QuizFeedbackView: React.FC = () => {
       </div>
 
       {/* Media Preview Modal */}
-      {selectedMedia && (
+      {selectedMedia && selectedMedia.type === 'image' && (
         <div
-          className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4"
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
           onClick={() => setSelectedMedia(null)}
         >
-          <div className="relative max-w-5xl max-h-full" onClick={(e) => e.stopPropagation()}>
-            {selectedMedia.type === 'image' && (
-              <img
-                src={selectedMedia.url}
-                alt={selectedMedia.filename}
-                className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
-              />
-            )}
-            {selectedMedia.type === 'video' && (
-              <video
-                src={selectedMedia.url}
-                controls
-                autoPlay
-                className="max-w-full max-h-[90vh] rounded-lg shadow-2xl"
-              />
-            )}
-            {selectedMedia.type === 'document' && (
-              <div className="bg-white p-8 rounded-xl shadow-2xl flex flex-col items-center">
-                <FileText className="w-24 h-24 text-brand-primary mb-4" />
-                <h3 className="text-xl font-bold text-text-primary mb-2">{selectedMedia.filename}</h3>
-                <p className="text-text-secondary mb-6">
-                  {selectedMedia.size ? `${(selectedMedia.size / 1024 / 1024).toFixed(2)} MB` : 'Size unknown'}
-                </p>
-                <a
-                  href={selectedMedia.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold bg-brand-primary text-white hover:bg-brand-primary-dark transition-all"
-                >
-                  <ExternalLink className="w-5 h-5" />
-                  Open Document
-                </a>
-              </div>
-            )}
+          <div className="relative max-w-5xl max-h-full">
+            <img
+              src={selectedMedia.url}
+              alt={selectedMedia.filename}
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+            />
             <button
               onClick={() => setSelectedMedia(null)}
-              className="absolute -top-4 -right-4 w-10 h-10 rounded-full bg-white text-black flex items-center justify-center hover:bg-gray-100 transition-colors shadow-xl"
+              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/90 flex items-center justify-center hover:bg-white transition-colors"
             >
-              <XCircle className="w-6 h-6" />
+              <XCircle className="w-6 h-6 text-gray-900" />
             </button>
           </div>
         </div>
