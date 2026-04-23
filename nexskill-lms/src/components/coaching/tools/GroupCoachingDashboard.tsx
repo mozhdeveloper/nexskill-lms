@@ -24,6 +24,8 @@ const GroupCoachingDashboard: React.FC = () => {
   const [courses, setCourses] = useState<CourseDropdown[]>([]);
   const [coursesLoading, setCoursesLoading] = useState(false);
   const [googleTokens, setGoogleTokens] = useState<any>(null);
+  // Used to resume session creation after OAuth
+  const [pendingSession, setPendingSession] = useState<any>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -36,29 +38,52 @@ const GroupCoachingDashboard: React.FC = () => {
     price: 0
   });
 
-  useEffect(() => {
-    // Check if we have tokens in local storage
-    const savedTokens = localStorage.getItem('google_calendar_tokens');
-    if (savedTokens) setGoogleTokens(JSON.parse(savedTokens));
 
-    // Handle OAuth callback if present in URL
+  useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    if (code && !googleTokens) {
-      fetch('http://127.0.0.1:5000/api/google/callback?code=' + code)
-        .then(res => res.json())
-        .then(data => {
-          if (data.tokens) {
-            setGoogleTokens(data.tokens);
-            localStorage.setItem('google_calendar_tokens', JSON.stringify(data.tokens));
-            // Clear URL params
-            window.history.replaceState({}, document.title, window.location.pathname);
-          }
-        });
+    const googleTokensParam = urlParams.get('google_tokens');
+    const savedTokens = localStorage.getItem('google_calendar_tokens');
+    const pending = localStorage.getItem('pending_session_form');
+    if (googleTokensParam) {
+      const tokens = JSON.parse(decodeURIComponent(googleTokensParam));
+      localStorage.setItem('google_calendar_tokens', JSON.stringify(tokens));
+      setGoogleTokens(tokens);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      console.log('[OAuth Debug] Tokens saved from redirect param');
+    } else if (savedTokens) {
+      setGoogleTokens(JSON.parse(savedTokens));
+      console.log('[OAuth Debug] Set googleTokens from localStorage');
+    }
+    if ((googleTokensParam || savedTokens) && pending) {
+      setPendingSession(JSON.parse(pending));
+      localStorage.removeItem('pending_session_form');
+      console.log('[OAuth Debug] Set pendingSession from localStorage');
     }
   }, []);
 
+  // Helper to check if Google tokens are valid and match current user
+  const isGoogleAuthorized = async () => {
+    const savedTokens = localStorage.getItem('google_calendar_tokens');
+    if (!savedTokens) return false;
+    try {
+      const tokens = JSON.parse(savedTokens);
+      // Optionally, check expiry here if available
+      // Check if tokens.email matches current user email
+      const { data: sessionData } = await supabase.auth.getSession();
+      const user = sessionData?.session?.user;
+      if (!user) return false;
+      // If tokens contain email, check match
+      if (tokens.email && user.email && tokens.email !== user.email) return false;
+      // Optionally, ping backend to check token validity
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const authorizeGoogle = async () => {
+    // Only re-authorize if not already authorized for this user
+    if (await isGoogleAuthorized()) return;
     try {
       const res = await fetch('http://127.0.0.1:5000/api/google/auth');
       const data = await res.json();
@@ -72,8 +97,14 @@ const GroupCoachingDashboard: React.FC = () => {
   const fetchCourses = async () => {
     setCoursesLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      // Use getSession for reliable user context
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      const user = sessionData?.session?.user;
+      if (!user) {
+        setCourses([]);
+        return;
+      }
 
       const { data: coursesData, error: coursesError } = await supabase
         .from('courses')
@@ -100,6 +131,7 @@ const GroupCoachingDashboard: React.FC = () => {
       })));
     } catch (err) {
       console.error('Error fetching courses:', err);
+      setCourses([]);
     } finally {
       setCoursesLoading(false);
     }
@@ -108,18 +140,26 @@ const GroupCoachingDashboard: React.FC = () => {
   const fetchSessions = async () => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      // Use getSession for reliable user context
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      const user = sessionData?.session?.user;
+      console.log('Current user:', user);
+      if (!user) {
+        setGroupSessions([]);
+        return;
+      }
 
       const { data, error } = await supabase
         .from('live_sessions')
         .select('*')
         .eq('coach_id', user.id);
-
+      console.log('live_sessions data:', data);
       if (error) throw error;
 
       // Also get enrollment counts for current sessions
       const { data: enrollmentsData } = await supabase.from('enrollments').select('course_id');
+      console.log('enrollments data:', enrollmentsData);
       const counts: Record<string, number> = {};
       (enrollmentsData || []).forEach((e: any) => {
         counts[e.course_id] = (counts[e.course_id] || 0) + 1;
@@ -145,9 +185,11 @@ const GroupCoachingDashboard: React.FC = () => {
           meeting_link: s.meeting_link
         };
       });
+      console.log('Mapped sessions:', mapped);
       setGroupSessions(mapped);
     } catch (err) {
       console.error('Error fetching sessions:', err);
+      setGroupSessions([]);
     } finally {
       setLoading(false);
     }
@@ -181,49 +223,67 @@ const GroupCoachingDashboard: React.FC = () => {
       : 0;
   const upcomingSessionsCount = groupSessions.filter((s) => s.status === 'Scheduled').length;
 
-  const handleCreateSession = async () => {
+  // Helper to create session (used for both normal and resumed flow)
+  const createSession = async (sessionForm: any) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      // Use getSession for reliable user context (same as fetchSessions)
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      const user = sessionData?.session?.user;
       if (!user) throw new Error('Not authenticated');
 
-      if (!formData.course_id || !formData.date || !formData.time || !formData.title) {
+      if (!sessionForm.course_id || !sessionForm.date || !sessionForm.time || !sessionForm.title) {
         alert('Please fill in all required fields (Title, Course, Date, Time)');
         return;
       }
 
-      let meetingLink = '';
+      // Always read tokens directly from localStorage to avoid race conditions
+      let tokens = null;
+      const savedTokens = localStorage.getItem('google_calendar_tokens');
+      if (savedTokens) {
+        try {
+          tokens = JSON.parse(savedTokens);
+        } catch {}
+      }
 
-      // Create Google Meet Link if authorized
-      if (googleTokens) {
-        const scheduledAt = new Date(`${formData.date}T${formData.time}`).toISOString();
-        const meetRes = await fetch('http://127.0.0.1:5000/api/google/create-meeting', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tokens: googleTokens,
-            title: formData.title,
-            startTime: scheduledAt,
-            durationMinutes: formData.duration
-          })
-        });
-        const meetData = await meetRes.json();
-        if (meetData.meetingLink) {
-          meetingLink = meetData.meetingLink;
-        } else {
-          console.warn('Meeting link generation failed, continuing without link');
+      let meetingLink = '';
+      console.log('Google tokens before meeting creation:', tokens);
+      if (tokens) {
+        const scheduledAt = new Date(`${sessionForm.date}T${sessionForm.time}`).toISOString();
+        console.log('Attempting to create Google Meet:', { tokens, scheduledAt, title: sessionForm.title });
+        try {
+          const meetRes = await fetch('http://127.0.0.1:5000/api/google/create-meeting', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tokens,
+              title: sessionForm.title,
+              startTime: scheduledAt,
+              durationMinutes: sessionForm.duration
+            })
+          });
+          const meetData = await meetRes.json();
+          console.log('Google Meet API response:', meetData);
+          if (meetData.meetingLink) {
+            meetingLink = meetData.meetingLink;
+          } else {
+            console.warn('Meeting link generation failed, continuing without link');
+          }
+        } catch (err) {
+          console.error('Error calling Google Meet API:', err);
         }
       }
 
-      const scheduledAt = new Date(`${formData.date}T${formData.time}`).toISOString();
+      const scheduledAt = new Date(`${sessionForm.date}T${sessionForm.time}`).toISOString();
 
       const { error } = await supabase.from('live_sessions').insert([{
-        title: formData.title,
-        course_id: formData.course_id,
+        title: sessionForm.title,
+        course_id: sessionForm.course_id,
         coach_id: user.id,
         scheduled_at: scheduledAt,
-        duration_minutes: formData.duration,
-        max_participants: formData.maxParticipants,
-        price: formData.price,
+        duration_minutes: sessionForm.duration,
+        max_participants: sessionForm.maxParticipants,
+        price: sessionForm.price,
         status: 'scheduled',
         is_live: false,
         meeting_link: meetingLink
@@ -246,6 +306,27 @@ const GroupCoachingDashboard: React.FC = () => {
       alert(`Error creating session: ${err.message}`);
     }
   };
+
+  // Main handler
+  const handleCreateSession = async () => {
+    // If not authorized, persist form and trigger OAuth
+    if (!(await isGoogleAuthorized())) {
+      localStorage.setItem('pending_session_form', JSON.stringify(formData));
+      await authorizeGoogle();
+      return;
+    }
+    await createSession(formData);
+  };
+
+  // Resume session creation after OAuth if needed
+  useEffect(() => {
+    if (pendingSession && googleTokens) {
+      console.log('Resuming session creation:', { pendingSession, googleTokens });
+      createSession(pendingSession);
+      setPendingSession(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingSession, googleTokens]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -298,19 +379,6 @@ const GroupCoachingDashboard: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {!googleTokens ? (
-            <button
-              onClick={authorizeGoogle}
-              className="flex items-center gap-2 px-6 py-3 bg-white border border-[#EDF0FB] text-[#111827] font-semibold rounded-full hover:bg-gray-50 transition-all"
-            >
-              <img src="https://www.google.com/favicon.ico" className="w-4 h-4" alt="Google" />
-              Authorize Google
-            </button>
-          ) : (
-            <span className="text-xs text-[#22C55E] font-medium flex items-center gap-1">
-              ✅ Google Calendar Connected
-            </span>
-          )}
           <button
             onClick={createNewSession}
             className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white font-semibold rounded-full hover:shadow-lg transition-all"
@@ -467,15 +535,23 @@ const GroupCoachingDashboard: React.FC = () => {
 
                 {/* Actions */}
                 <div className="flex items-center gap-2">
-                  {session.meeting_link && (
-                    <button
-                      onClick={() => window.open(session.meeting_link, '_blank')}
-                      className="px-4 py-2 text-sm font-semibold text-white bg-[#22C55E] hover:bg-[#16a34a] rounded-lg transition-colors flex items-center gap-1"
-                    >
-                      <span>🎥</span>
-                      Join Meeting
-                    </button>
-                  )}
+                  {(() => {
+                    if (!session.meeting_link) return null;
+                    // Calculate if session is still joinable (not past end time)
+                    const scheduledDate = new Date(`${session.date}T${session.time}`);
+                    const endTime = new Date(scheduledDate.getTime() + session.duration * 60000);
+                    const now = new Date();
+                    if (now > endTime) return null;
+                    return (
+                      <button
+                        onClick={() => window.open(session.meeting_link, '_blank')}
+                        className="px-4 py-2 text-sm font-semibold text-white bg-[#22C55E] hover:bg-[#16a34a] rounded-lg transition-colors flex items-center gap-1"
+                      >
+                        <span>🎥</span>
+                        Join Meeting
+                      </button>
+                    );
+                  })()}
                   <button
                     onClick={() => viewParticipants(session.id)}
                     className="px-4 py-2 text-sm font-medium text-[#304DB5] hover:bg-blue-50 rounded-lg transition-colors"

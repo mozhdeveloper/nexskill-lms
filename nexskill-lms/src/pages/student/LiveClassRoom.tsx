@@ -11,8 +11,6 @@ const LiveClassRoom: React.FC = () => {
   const handleJoinClass = () => {
     if (classData?.meeting_link) {
       window.open(classData.meeting_link, '_blank');
-    } else {
-      alert("The session hasn't started yet. Please wait for the coach.");
     }
   };
 
@@ -105,13 +103,13 @@ const LiveClassRoom: React.FC = () => {
                 {isLive ? 'Click the button to join the live class session' : `This session is scheduled for ${startTime.toLocaleString()}`}
               </p>
 
-              {isLive && classData.meeting_link ? (
+              {classData.meeting_link ? (
                 <div className="flex gap-3">
                   <button
                     onClick={handleJoinClass}
                     className="px-6 py-3 bg-white text-brand-primary font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center gap-2">
                     <span>🎥</span>
-                    <span>Join Live Class</span>
+                    <span>{isLive ? 'Join Live Class' : 'Join Session'}</span>
                   </button>
                   <button
                     onClick={handleCopyMeetingLink}

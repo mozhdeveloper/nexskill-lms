@@ -12,9 +12,6 @@ const LiveClasses: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('upcoming');
   const { upcomingSessions, completedSessions, recordedSessions, loading, error } = useLiveSessions();
   const [enrollmentCounts, setEnrollmentCounts] = useState<Record<string, number>>({});
-  // Add state for selected course and max participants for demonstration
-  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
-  const [maxParticipants, setMaxParticipants] = useState<number>(0);
 
   useEffect(() => {
     const allSessions = [...upcomingSessions, ...completedSessions, ...recordedSessions];
@@ -25,24 +22,13 @@ const LiveClasses: React.FC = () => {
       .select('course_id, profile_id')
       .in('course_id', courseIds)
       .then(({ data }) => {
-        console.log('[LiveClasses] Raw enrollments fetched:', data);
         const counts: Record<string, number> = {};
         (data || []).forEach((e: any) => {
           counts[e.course_id] = (counts[e.course_id] || 0) + 1;
         });
-        console.log('[LiveClasses] Enrollment counts:', counts);
         setEnrollmentCounts(counts);
       });
   }, [upcomingSessions, completedSessions, recordedSessions]);
-
-  // Update maxParticipants whenever selectedCourseId or enrollmentCounts changes
-  useEffect(() => {
-    if (!selectedCourseId) {
-      setMaxParticipants(0);
-      return;
-    }
-    setMaxParticipants(enrollmentCounts[selectedCourseId] ?? 0);
-  }, [selectedCourseId, enrollmentCounts]);
 
   const getInstructorName = (session: LiveSession) => {
     if (session.coach) {
@@ -64,19 +50,15 @@ const LiveClasses: React.FC = () => {
     for (let i = 0; i < id.length; i++) {
       hash = id.charCodeAt(i) + ((hash << 5) - hash);
     }
-    const index = Math.abs(hash) % gradients.length;
-    return gradients[index];
+    return gradients[Math.abs(hash) % gradients.length];
   };
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  };
+  const formatDate = (dateStr: string) =>
+    new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
-  const formatTime = (dateStr: string) => {
-    return new Date(dateStr).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  };
+  const formatTime = (dateStr: string) =>
+    new Date(dateStr).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 
-  // Integrate max participants logic into the main UI
   return (
     <div className="min-h-screen bg-[color:var(--bg-primary)]">
       {/* Back Button */}
@@ -98,37 +80,11 @@ const LiveClasses: React.FC = () => {
               Join interactive sessions with expert instructors
             </p>
           </div>
-          <button className="px-4 py-2 text-sm font-medium rounded-lg transition-colors">
-            🔍 Filter
-          </button>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-8">
         <div className="max-w-1xl">
-          {/* If you have a Booking Types panel or course selection UI, integrate here: */}
-          <div className="mb-8">
-            <label htmlFor="course-select" className="block mb-2 font-medium">Course</label>
-            <select
-              id="course-select"
-              className="border rounded px-3 py-2 w-full mb-2"
-              value={selectedCourseId || ''}
-              onChange={e => setSelectedCourseId(e.target.value)}
-            >
-              <option value="">-- Select Course --</option>
-              {[...new Set([...upcomingSessions, ...completedSessions, ...recordedSessions].map(s => s.course_id))].map(cid => (
-                <option key={cid} value={cid}>{cid}</option>
-              ))}
-            </select>
-            <label className="block mb-2 font-medium">Max Participants</label>
-            <input
-              type="number"
-              className="border rounded px-3 py-2 w-full mb-2"
-              value={maxParticipants}
-              readOnly
-            />
-          </div>
-
           {loading && (
             <div className="flex justify-center p-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary"></div>
@@ -151,7 +107,7 @@ const LiveClasses: React.FC = () => {
                     className={`flex-1 px-6 py-4 text-sm font-medium transition-all ${activeTab === 'upcoming'
                       ? 'text-brand-primary dark:text-blue-400 border-b-2 border-brand-primary dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20'
                       : 'text-text-secondary dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700'
-                      }`}
+                    }`}
                   >
                     🎥 Upcoming ({upcomingSessions.length})
                   </button>
@@ -160,7 +116,7 @@ const LiveClasses: React.FC = () => {
                     className={`flex-1 px-6 py-4 text-sm font-medium transition-all ${activeTab === 'completed'
                       ? 'text-brand-primary dark:text-blue-400 border-b-2 border-brand-primary dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20'
                       : 'text-text-secondary dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700'
-                      }`}
+                    }`}
                   >
                     ✅ Completed ({completedSessions.length})
                   </button>
@@ -169,7 +125,7 @@ const LiveClasses: React.FC = () => {
                     className={`flex-1 px-6 py-4 text-sm font-medium transition-all ${activeTab === 'recorded'
                       ? 'text-brand-primary dark:text-blue-400 border-b-2 border-brand-primary dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20'
                       : 'text-text-secondary dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700'
-                      }`}
+                    }`}
                   >
                     📹 Recorded ({recordedSessions.length})
                   </button>
@@ -192,6 +148,8 @@ const LiveClasses: React.FC = () => {
                           new Date(liveClass.scheduled_at).getTime() > Date.now());
 
                       const participants = enrollmentCounts[liveClass.course_id] || 0;
+                      const maxParticipants = liveClass.max_participants || 100;
+                      const fillPct = Math.min((participants / maxParticipants) * 100, 100);
 
                       return (
                         <div
@@ -235,11 +193,11 @@ const LiveClasses: React.FC = () => {
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2 text-sm text-text-secondary dark:text-dark-text-secondary">
-                                    <span>👥 {participants}/100 registered</span>
+                                    <span>👥 {participants}/{maxParticipants} Joined</span>
                                     <div className="w-32 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                                       <div
                                         className="h-full bg-brand-primary rounded-full"
-                                        style={{ width: `${(participants / 100) * 100}%` }}
+                                        style={{ width: `${fillPct}%` }}
                                       />
                                     </div>
                                   </div>
@@ -268,12 +226,6 @@ const LiveClasses: React.FC = () => {
                                     📅 View Details
                                   </button>
                                 )}
-                                <button
-                                  onClick={() => navigate(`/student/live-class/${liveClass.id}`)}
-                                  className="px-6 py-2.5 text-sm font-medium text-text-secondary hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-                                >
-                                  View Details
-                                </button>
                               </div>
                             </div>
                           </div>
@@ -310,7 +262,6 @@ const LiveClasses: React.FC = () => {
                               <span>📅 {formatDate(liveClass.scheduled_at)}</span>
                               <span>⏱️ {liveClass.duration_minutes}m</span>
                             </div>
-
                             <div className="flex items-center gap-3">
                               {liveClass.recording_url ? (
                                 <button
@@ -322,7 +273,6 @@ const LiveClasses: React.FC = () => {
                               ) : (
                                 <span className="text-xs text-gray-500 italic">No recording available</span>
                               )}
-
                               <button
                                 className="px-6 py-2 text-sm font-medium text-text-secondary rounded-full opacity-50 cursor-not-allowed"
                                 disabled
@@ -333,7 +283,8 @@ const LiveClasses: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                    )))}
+                    ))
+                  )}
                 </div>
               )}
 
@@ -367,19 +318,17 @@ const LiveClasses: React.FC = () => {
                           <div className="flex items-center justify-between text-xs text-text-secondary dark:text-dark-text-secondary">
                             <span>⏱️ {recording.duration_minutes}m</span>
                           </div>
-                          <button
-                            className="w-full mt-3 px-4 py-2 bg-brand-primary text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                          >
+                          <button className="w-full mt-3 px-4 py-2 bg-brand-primary text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
                             ▶️ Watch Now
                           </button>
                         </div>
                       </div>
-                    )))}
+                    ))
+                  )}
                 </div>
               )}
             </>
           )}
-
         </div>
       </div>
     </div>

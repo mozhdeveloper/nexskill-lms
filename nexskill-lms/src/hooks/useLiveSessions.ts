@@ -193,7 +193,11 @@ export const useLiveSession = (sessionId?: string) => {
                 if (sessionError) throw sessionError;
 
                 // Sanitize
-                const showLink = data.is_live || data.status === 'in_progress' || data.status === 'live';
+                const scheduledTime = new Date(data.scheduled_at).getTime();
+                const now = Date.now();
+                const startingSoon = (scheduledTime - now) <= 30 * 60 * 1000;
+                const isPast = now > (scheduledTime + (data.duration_minutes * 60000));
+                const showLink = (data.is_live || data.status === 'in_progress' || data.status === 'live' || startingSoon) && !isPast;
                 const sanitized = {
                     ...data,
                     meeting_link: showLink ? data.meeting_link : undefined
