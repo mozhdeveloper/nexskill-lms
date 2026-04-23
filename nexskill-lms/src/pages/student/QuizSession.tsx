@@ -1365,7 +1365,7 @@ const QuizSession: React.FC = () => {
           {submission?.review_notes && (
             <button
               onClick={() => navigate(`/student/courses/${courseId}/quizzes/${quizId}/feedback`)}
-              className="w-full mb-6 p-4 bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 rounded-xl transition-all text-left group"
+              className="w-full mb-6 p-4 bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 rounded-xl transition-all text-left group relative"
             >
               <div className="flex items-center gap-3">
                 <MessageSquare className="w-5 h-5 text-blue-600" />
@@ -1373,6 +1373,11 @@ const QuizSession: React.FC = () => {
                   <h3 className="text-sm font-bold text-blue-900">Coach's Previous Feedback</h3>
                   <p className="text-xs text-blue-700 mt-0.5 line-clamp-1">{submission.review_notes}</p>
                 </div>
+                {submission && !submission.student_read_at && submission.status !== 'pending_review' && (
+                  <span className="absolute -top-2 -right-2 px-2 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full animate-bounce shadow-lg">
+                    NEW
+                  </span>
+                )}
                 <span className="text-blue-600 text-sm font-medium group-hover:translate-x-1 transition-transform">View →</span>
               </div>
             </button>

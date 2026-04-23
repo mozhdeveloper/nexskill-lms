@@ -20,6 +20,7 @@ import {
   MessageSquare,
   ExternalLink,
   Play,
+  RefreshCw,
 } from 'lucide-react';
 import type { QuizFeedbackMedia } from '../../types/quiz';
 
@@ -268,7 +269,7 @@ const QuizReviewDetail: React.FC = () => {
     setMediaFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleReviewSubmit = useCallback(async (status: 'passed' | 'failed') => {
+  const handleReviewSubmit = useCallback(async (status: 'passed' | 'failed' | 'resubmission_required') => {
     if (!user || !submission) return;
 
     if (uploadingFiles.size > 0) {
@@ -289,6 +290,7 @@ const QuizReviewDetail: React.FC = () => {
           review_notes: feedbackComment || submission.review_notes,
           reviewed_at: new Date().toISOString(),
           reviewed_by: user.id,
+          student_read_at: null, // Reset read status for NEW notification
           updated_at: new Date().toISOString(),
         })
         .eq('id', submission.id);
@@ -327,11 +329,12 @@ const QuizReviewDetail: React.FC = () => {
         if (feedbackError) throw feedbackError;
       }
 
-      setSuccess(
-        status === 'passed'
-          ? 'Quiz approved! The next lesson has been unlocked for the student.'
-          : 'Feedback sent. The student can now review and resubmit.'
-      );
+      let successMsg = '';
+      if (status === 'passed') successMsg = 'Quiz approved! The next lesson has been unlocked for the student.';
+      else if (status === 'resubmission_required') successMsg = 'Resubmission requested. The student will be notified.';
+      else successMsg = 'Quiz marked as failed. Feedback has been sent.';
+
+      setSuccess(successMsg);
 
       // Navigate back after delay
       setTimeout(() => {
@@ -626,13 +629,23 @@ const QuizReviewDetail: React.FC = () => {
                     <CheckCircle className="w-5 h-5" />
                     {submitting ? 'Processing...' : 'Approve & Unlock Next Lesson'}
                   </button>
+                  
                   <button
-                    onClick={() => handleReviewSubmit('failed')}
+                    onClick={() => handleReviewSubmit('resubmission_required')}
                     disabled={submitting}
                     className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-lg font-semibold bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <XCircle className="w-5 h-5" />
+                    <RefreshCw className="w-5 h-5" />
                     {submitting ? 'Processing...' : 'Request Resubmission'}
+                  </button>
+
+                  <button
+                    onClick={() => handleReviewSubmit('failed')}
+                    disabled={submitting}
+                    className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-lg font-semibold bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <XCircle className="w-5 h-5" />
+                    {submitting ? 'Processing...' : 'Mark as Failed'}
                   </button>
                 </div>
               </div>

@@ -153,10 +153,12 @@ const VideoItem: React.FC<{
   lessonId: string;
   onComplete?: () => void;
 }> = ({ item, index, lessonId, onComplete }) => {
+  const videoUrl = item.metadata?.url || item.metadata?.cloudinary_secure_url;
+  
   return (
     <VideoContent
       contentItemId={item.id}
-      videoUrl={item.metadata?.url}
+      videoUrl={videoUrl}
       videoType={item.metadata?.video_type}
       lessonId={lessonId}
       title={item.metadata?.title || `Video ${index + 1}`}

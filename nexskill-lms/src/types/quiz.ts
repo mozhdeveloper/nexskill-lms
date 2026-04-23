@@ -272,6 +272,7 @@ export interface QuizSubmission {
     reviewed_at?: string;
     reviewed_by?: string;
     review_notes?: string;
+    student_read_at?: string;
     created_at: string;
     updated_at: string;
 }
@@ -308,6 +309,7 @@ export interface QuizSubmissionStatusResult {
     submitted_at: string;
     reviewed_at?: string;
     review_notes?: string;
+    student_read_at?: string;
     has_feedback: boolean;
 }
 

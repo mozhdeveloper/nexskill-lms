@@ -1,136 +1,117 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, FileText, Trash2, CheckCheck, Check, X, UserPlus, UserMinus } from 'lucide-react';
-import { useUser } from '../../context/UserContext';
+import { Bell, FileText, Trash2, CheckCheck, Check, X, Award, AlertCircle, RefreshCw } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 
 interface Notification {
   id: string;
-  type: 'quiz_review' | 'enrollment' | 'student_left';
+  quizId: string; // Added quizId
+  type: 'quiz_result';
   title: string;
   message: string;
   timestamp: string;
   read: boolean;
+  status: string;
   actionUrl: string;
 }
 
-const NotificationBell: React.FC = () => {
-  const { profile } = useUser();
+const NotificationBellStudent: React.FC = () => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  
-  const isCoach = profile?.role?.toUpperCase() === 'COACH';
+  const [userId, setUserId] = useState<string | null>(null);
 
-  const fetchNotifications = useCallback(async () => {
-    if (!isCoach || !profile?.id) return;
-
+  const fetchNotifications = useCallback(async (uid: string) => {
     try {
-      const { data, error } = await supabase.rpc('get_coach_all_notifications', {
-        p_coach_id: profile.id
+      const { data, error } = await supabase.rpc('get_student_quiz_notifications', {
+        p_student_id: uid
       });
 
       if (error) throw error;
 
       const mapped: Notification[] = (data || []).map((n: any) => {
-        let title = '';
+        let title = 'Quiz Result';
         let message = '';
-        let url = '';
-
-        if (n.notif_type === 'quiz_review') {
-          title = n.status === 'pending_review' ? 'New Submission' : 'Quiz Reviewed';
-          message = `${n.student_name || 'Student'} submitted "${n.content_title}" in ${n.course_title}.`;
-          url = `/coach/courses/${n.course_id}/quiz-reviews/${n.extra_id}`;
-        } else if (n.notif_type === 'enrollment') {
-          title = 'New Enrollment! 🎉';
-          message = `${n.student_name || 'A student'} just enrolled in "${n.course_title}".`;
-          url = `/coach/courses/${n.course_id}/students`;
-        } else if (n.notif_type === 'student_left') {
-          title = 'Student Left Course ⚠️';
-          message = `${n.student_name || 'A student'} unenrolled from "${n.course_title}".`;
-          url = `/coach/courses/${n.course_id}/students`;
+        
+        if (n.status === 'passed') {
+          title = '🎉 Quiz Passed!';
+          message = `Congratulations! You passed "${n.quiz_title}" in ${n.course_title}.`;
+        } else if (n.status === 'failed') {
+          title = '❌ Quiz Not Passed';
+          message = `You didn't pass "${n.quiz_title}" in ${n.course_title}. Keep trying!`;
+        } else if (n.status === 'resubmission_required') {
+          title = '📝 Resubmission Required';
+          message = `Your coach requested a resubmission for "${n.quiz_title}" in ${n.course_title}.`;
         }
 
         return {
-          id: n.notif_id,
-          type: n.notif_type,
+          id: n.submission_id,
+          quizId: n.quiz_id, // Use the real quiz_id from DB
+          type: 'quiz_result',
           title,
           message,
-          timestamp: new Date(n.created_at).toLocaleString(),
+          timestamp: new Date(n.reviewed_at).toLocaleString(),
           read: n.is_read,
-          actionUrl: url
+          status: n.status,
+          actionUrl: `/student/courses/${n.course_id}/quizzes/${n.quiz_id}/feedback`
         };
       });
 
       setNotifications(mapped);
     } catch (err) {
-      console.error('🔔 Notification fetch error:', err);
+      console.error('🔔 Student notification fetch error:', err);
     }
-  }, [isCoach, profile?.id]);
+  }, []);
 
   useEffect(() => {
-    if (isCoach && profile?.id) {
-      fetchNotifications();
-      
-      const quizChannel = supabase
-        .channel('coach-quiz-notifs')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'quiz_submissions' }, () => fetchNotifications())
-        .subscribe();
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+        fetchNotifications(user.id);
 
-      const enrollChannel = supabase
-        .channel('coach-enroll-notifs')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'enrollments' }, () => fetchNotifications())
-        .subscribe();
-        
-      const leaveChannel = supabase
-        .channel('coach-leave-notifs')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'course_leaves' }, () => fetchNotifications())
-        .subscribe();
+        const channel = supabase
+          .channel('student-notifs')
+          .on('postgres_changes', { 
+            event: '*', // Listen for all events (INSERT/UPDATE)
+            schema: 'public', 
+            table: 'quiz_submissions',
+            filter: `user_id=eq.${user.id}`
+          }, () => {
+            console.log('🔄 Student notification update detected');
+            fetchNotifications(user.id);
+          })
+          .subscribe();
 
-      return () => { 
-        supabase.removeChannel(quizChannel);
-        supabase.removeChannel(enrollChannel);
-        supabase.removeChannel(leaveChannel);
-      };
-    }
-  }, [isCoach, profile?.id, fetchNotifications]);
+        return () => { supabase.removeChannel(channel); };
+      }
+    };
+    getUser();
+  }, [fetchNotifications]);
 
-  const getTableForType = (type: string) => {
-    switch (type) {
-      case 'quiz_review': return 'quiz_submissions';
-      case 'enrollment': return 'enrollments';
-      case 'student_left': return 'course_leaves';
-      default: return 'quiz_submissions';
-    }
-  };
-
-  const markAsRead = async (e: React.MouseEvent, n: Notification) => {
+  const markAsRead = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     try {
-      const table = getTableForType(n.type);
-      const { error } = await supabase.from(table).update({ coach_read_at: new Date().toISOString() }).eq('id', n.id);
+      const { error } = await supabase.from('quiz_submissions').update({ student_read_at: new Date().toISOString() }).eq('id', id);
       if (error) throw error;
-      setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, read: true } : item));
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
     } catch (err) { console.error('Error marking as read:', err); }
   };
 
-  const removeNotification = async (e: React.MouseEvent, n: Notification) => {
+  const removeNotification = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     try {
-      const { error } = await supabase.rpc('clear_specific_coach_notification', {
-        p_notif_id: n.id,
-        p_notif_type: n.type
-      });
+      const { error } = await supabase.from('quiz_submissions').update({ student_cleared_at: new Date().toISOString() }).eq('id', id);
       if (error) throw error;
-      setNotifications(prev => prev.filter(item => item.id !== n.id));
+      setNotifications(prev => prev.filter(n => n.id !== id));
     } catch (err) { console.error('Error removing notification:', err); }
   };
 
   const markAllAsRead = async () => {
-    if (!profile?.id || notifications.length === 0) return;
+    if (!userId || notifications.length === 0) return;
     try {
-      const { error } = await supabase.rpc('mark_all_coach_notifications_read', {
-        p_coach_id: profile.id
+      const { error } = await supabase.rpc('mark_all_student_quiz_notifications_read', {
+        p_student_id: userId
       });
       if (error) throw error;
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
@@ -138,11 +119,10 @@ const NotificationBell: React.FC = () => {
   };
 
   const clearAll = async () => {
-    if (!profile?.id || notifications.length === 0 || !window.confirm("Clear all notifications?")) return;
+    if (notifications.length === 0 || !window.confirm("Clear all notifications?")) return;
     try {
-      const { error } = await supabase.rpc('clear_all_coach_notifications', {
-        p_coach_id: profile.id
-      });
+      const ids = notifications.map(n => n.id);
+      const { error } = await supabase.from('quiz_submissions').update({ student_cleared_at: new Date().toISOString() }).in('id', ids);
       if (error) throw error;
       setNotifications([]);
     } catch (err) { console.error('Error clearing all:', err); }
@@ -157,7 +137,23 @@ const NotificationBell: React.FC = () => {
     return () => document.removeEventListener('mousedown', clickOut);
   }, []);
 
-  if (!isCoach) return null;
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'passed': return <Award className="w-5 h-5 text-green-600" />;
+      case 'failed': return <AlertCircle className="w-5 h-5 text-red-600" />;
+      case 'resubmission_required': return <RefreshCw className="w-5 h-5 text-orange-600" />;
+      default: return <FileText className="w-5 h-5 text-blue-600" />;
+    }
+  };
+
+  const getStatusBg = (status: string) => {
+    switch (status) {
+      case 'passed': return 'bg-green-100';
+      case 'failed': return 'bg-red-100';
+      case 'resubmission_required': return 'bg-orange-100';
+      default: return 'bg-blue-100';
+    }
+  };
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -176,8 +172,8 @@ const NotificationBell: React.FC = () => {
                   <button onClick={markAllAsRead} className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded hover:bg-blue-100 flex items-center gap-1 transition-colors">
                     <CheckCheck className="w-3.5 h-3.5" /> Mark all read
                   </button>
-                  <button onClick={clearAll} className="text-[11px] font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded hover:bg-gray-200 flex items-center gap-1 transition-colors">
-                     Clear all
+                  <button onClick={clearAll} className="text-[11px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded hover:bg-red-100 flex items-center gap-1 transition-colors">
+                    Clear
                   </button>
                 </>
               )}
@@ -186,9 +182,9 @@ const NotificationBell: React.FC = () => {
           <div className="max-h-[400px] overflow-y-auto">
             {notifications.length > 0 ? (
               notifications.map(n => (
-                <div key={`${n.type}-${n.id}`} onClick={() => { navigate(n.actionUrl); setIsOpen(false); }} className={`px-4 py-4 border-b border-slate-100 hover:bg-slate-50 transition-all cursor-pointer relative group ${!n.read ? 'bg-blue-50/50' : ''}`}>
+                <div key={n.id} onClick={() => { navigate(n.actionUrl); setIsOpen(false); }} className={`px-4 py-4 border-b border-slate-100 hover:bg-slate-50 transition-all cursor-pointer relative group ${!n.read ? 'bg-blue-50/30' : ''}`}>
                   <button 
-                    onClick={(e) => removeNotification(e, n)}
+                    onClick={(e) => removeNotification(e, n.id)}
                     className="absolute top-2 right-2 p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full opacity-0 group-hover:opacity-100 transition-all z-20"
                     title="Remove notification"
                   >
@@ -196,13 +192,8 @@ const NotificationBell: React.FC = () => {
                   </button>
 
                   <div className="flex gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                      n.type === 'enrollment' ? 'bg-green-100' : 
-                      n.type === 'student_left' ? 'bg-red-100' : 'bg-purple-100'
-                    }`}>
-                      {n.type === 'enrollment' ? <UserPlus className="w-5 h-5 text-green-600" /> : 
-                       n.type === 'student_left' ? <UserMinus className="w-5 h-5 text-red-600" /> :
-                       <FileText className="w-5 h-5 text-purple-600" />}
+                    <div className={`w-10 h-10 rounded-xl ${getStatusBg(n.status)} flex items-center justify-center flex-shrink-0`}>
+                      {getStatusIcon(n.status)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2 pr-4">
@@ -214,7 +205,7 @@ const NotificationBell: React.FC = () => {
                          <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
                           {!n.read && (
                             <button 
-                              onClick={(e) => markAsRead(e, n)}
+                              onClick={(e) => markAsRead(e, n.id)}
                               className=" p-1 px-2 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors z-10 text-[10px] font-bold"
                               title="Mark as read"
                             >
@@ -240,4 +231,4 @@ const NotificationBell: React.FC = () => {
   );
 };
 
-export default NotificationBell;
+export default NotificationBellStudent;

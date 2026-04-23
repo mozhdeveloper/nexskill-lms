@@ -82,7 +82,8 @@ export function useVideoProtection(containerRef: React.RefObject<HTMLElement | n
       }
     };
 
-    // --- 2. DevTools detection ---
+    // --- 2. DevTools detection (Disabled as it may cause accidental blackouts) ---
+    /*
     let devToolsOpen = false;
     const checkDevTools = () => {
       const widthThreshold = window.outerWidth - window.innerWidth > 160;
@@ -98,6 +99,7 @@ export function useVideoProtection(containerRef: React.RefObject<HTMLElement | n
       }
     };
     const devtoolsInterval = setInterval(checkDevTools, 1000);
+    */
 
     // --- 3. Disable right-click ---
     const handleContextMenu = (e: MouseEvent) => {
@@ -146,7 +148,7 @@ export function useVideoProtection(containerRef: React.RefObject<HTMLElement | n
       document.removeEventListener('keyup', handleKeyUp);
       container.removeEventListener('contextmenu', handleContextMenu);
       container.removeEventListener('dragstart', handleDragStart);
-      clearInterval(devtoolsInterval);
+      // clearInterval(devtoolsInterval); // Disabled along with detection
       mediaStreamCleanup?.();
       if (focusListenerRef.current) {
         window.removeEventListener('focus', focusListenerRef.current);

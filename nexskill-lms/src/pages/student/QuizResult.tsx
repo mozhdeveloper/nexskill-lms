@@ -253,10 +253,15 @@ const QuizResult: React.FC = () => {
               <div className="mb-6 text-center">
                 <button
                   onClick={handleViewFeedback}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-all"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-all relative"
                 >
                   <MessageSquare className="w-5 h-5" />
                   View Detailed Coach Feedback
+                  {submission && !submission.student_read_at && (
+                    <span className="absolute -top-2 -right-2 px-2 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full animate-bounce shadow-lg">
+                      NEW
+                    </span>
+                  )}
                 </button>
               </div>
             )}
@@ -290,9 +295,14 @@ const QuizResult: React.FC = () => {
                   {submission?.has_feedback && (
                     <button
                       onClick={handleViewFeedback}
-                      className="inline-flex items-center gap-2 px-8 py-3 rounded-full font-semibold bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-all"
+                      className="inline-flex items-center gap-2 px-8 py-3 rounded-full font-semibold bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-all relative"
                     >
                       View Coach Feedback
+                      {submission && !submission.student_read_at && (
+                        <span className="absolute -top-2 -right-2 px-2 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full animate-bounce shadow-lg">
+                          NEW
+                        </span>
+                      )}
                     </button>
                   )}
                   <button
