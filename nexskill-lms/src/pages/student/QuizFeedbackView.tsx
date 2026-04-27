@@ -41,6 +41,25 @@ const QuizFeedbackView: React.FC = () => {
   const { feedback, loading: feedbackLoading } = useAllQuizFeedback(quizId);
 
   useEffect(() => {
+    const markAsRead = async () => {
+      if (submission && !submission.student_read_at && submission.status !== 'pending_review') {
+        try {
+          await supabase
+            .from('quiz_submissions')
+            .update({ student_read_at: new Date().toISOString() })
+            .eq('id', submission.submission_id);
+        } catch (err) {
+          console.error('Error marking submission as read:', err);
+        }
+      }
+    };
+
+    if (!submissionLoading) {
+      markAsRead();
+    }
+  }, [submission, submissionLoading]);
+
+  useEffect(() => {
     const fetchQuizData = async () => {
       if (!quizId) return;
       

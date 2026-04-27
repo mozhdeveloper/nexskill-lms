@@ -18,6 +18,7 @@ interface EnrolledCourse {
   price?: number;
   rating?: number;
   num_reviews?: number;
+  has_unread_feedback?: boolean;
 }
 
 const MyCoursesPage: React.FC = () => {
@@ -86,6 +87,30 @@ const MyCoursesPage: React.FC = () => {
           setLoading(false);
           return;
         }
+
+        // Fetch unread quiz feedback
+        const { data: unreadSubmissions } = await supabase
+          .from('quiz_submissions')
+          .select('quiz_id, id')
+          .eq('user_id', user.id)
+          .is('student_read_at', null)
+          .neq('status', 'pending_review');
+
+        const unreadQuizIds = unreadSubmissions?.map(s => s.quiz_id) || [];
+        
+        // Map quiz IDs to course IDs
+        const { data: quizCourseMapping } = await supabase
+          .from('module_content_items')
+          .select('content_id, module_id, modules(course_id)')
+          .in('content_id', unreadQuizIds)
+          .eq('content_type', 'quiz');
+
+        const coursesWithUnreadFeedback = new Set<string>();
+        quizCourseMapping?.forEach((item: any) => {
+          if (item.modules?.course_id) {
+            coursesWithUnreadFeedback.add(item.modules.course_id);
+          }
+        });
 
         // Fetch instructor names
         const coachIds = courses.map(c => c.coach_id).filter(Boolean);
@@ -202,6 +227,7 @@ const MyCoursesPage: React.FC = () => {
             progress: prog.total > 0 ? Math.round((prog.completed / prog.total) * 100) : 0,
             completed_lessons: prog.completed,
             total_lessons: prog.total,
+            has_unread_feedback: coursesWithUnreadFeedback.has(course.id),
           };
         });
 
@@ -440,6 +466,14 @@ const MyCoursesPage: React.FC = () => {
                         </span>
                       )}
                     </div>
+
+                    {/* Notification Dot */}
+                    {course.has_unread_feedback && (
+                      <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 bg-red-500 text-white text-[10px] font-bold rounded-full shadow-lg z-10 animate-pulse border border-white/20">
+                        <div className="w-1.5 h-1.5 bg-white rounded-full animate-ping" />
+                        NEW FEEDBACK
+                      </div>
+                    )}
 
                     {/* Play Overlay */}
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">

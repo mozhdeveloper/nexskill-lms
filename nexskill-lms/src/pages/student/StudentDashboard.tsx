@@ -25,6 +25,7 @@ interface EnrolledCourse {
   progress: number;
   completed_lessons: number;
   total_lessons: number;
+  has_unread_feedback?: boolean;
 }
 
 const StudentDashboard: React.FC = () => {
@@ -79,6 +80,30 @@ const StudentDashboard: React.FC = () => {
           setFeaturedCourses(courses);
         }
 
+        // Fetch unread quiz feedback
+        const { data: unreadSubmissions } = await supabase
+          .from('quiz_submissions')
+          .select('quiz_id, id')
+          .eq('user_id', currentUser.id)
+          .is('student_read_at', null)
+          .neq('status', 'pending_review');
+
+        const unreadQuizIds = unreadSubmissions?.map(s => s.quiz_id) || [];
+        
+        // Map quiz IDs to course IDs
+        const { data: quizCourseMapping } = await supabase
+          .from('module_content_items')
+          .select('content_id, module_id, modules(course_id)')
+          .in('content_id', unreadQuizIds)
+          .eq('content_type', 'quiz');
+
+        const coursesWithUnreadFeedback = new Set<string>();
+        quizCourseMapping?.forEach((item: any) => {
+          if (item.modules?.course_id) {
+            coursesWithUnreadFeedback.add(item.modules.course_id);
+          }
+        });
+
         // Fetch enrolled courses with progress
         const { data: enrollments } = await supabase
           .from('enrollments')
@@ -109,6 +134,7 @@ const StudentDashboard: React.FC = () => {
               progress: totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0,
               completed_lessons: completedLessons,
               total_lessons: totalLessons,
+              has_unread_feedback: coursesWithUnreadFeedback.has(enrollment.course_id),
             };
           });
 
@@ -248,6 +274,13 @@ const StudentDashboard: React.FC = () => {
                     <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
                       <PlayCircle className="w-12 h-12 text-white" />
                     </div>
+                    {/* Notification Badge */}
+                    {course.has_unread_feedback && (
+                      <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 bg-red-500 text-white text-[10px] font-bold rounded-full shadow-lg z-10 animate-pulse border border-white/20">
+                        <div className="w-1.5 h-1.5 bg-white rounded-full animate-ping" />
+                        NEW FEEDBACK
+                      </div>
+                    )}
                   </div>
                   <div className="p-5">
                     <h3 className="font-bold text-gray-900 mb-3 line-clamp-1">{course.title}</h3>

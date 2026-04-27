@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import BrandLogo from "../components/brand/BrandLogo";
-import { LogOut, Menu, X, ChevronDown, User, Settings, CreditCard, HelpCircle, Bell, Heart, ShoppingCart } from "lucide-react";
+import { LogOut, Menu, X, ChevronDown, User, Settings, CreditCard, HelpCircle, Heart, ShoppingCart } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
+import NotificationBellStudent from "../components/system/NotificationBellStudent";
 
 interface StudentAppLayoutProps {
   children: React.ReactNode;
@@ -111,10 +112,7 @@ const StudentAppLayout: React.FC<StudentAppLayoutProps> = ({
           </Link>
           
           
-          <button className="hidden sm:flex p-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-all relative">
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-          </button>
+          <NotificationBellStudent />
 
           <button className="hidden sm:flex p-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-all">
             <Heart className="w-5 h-5" />

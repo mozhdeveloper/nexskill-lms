@@ -397,20 +397,21 @@ const QuizReviewDashboard: React.FC = () => {
               {courses.map((course) => (
                 <div
                   key={course.id}
-                  className="glass-card rounded-xl p-6 hover:shadow-lg transition-all cursor-pointer border-2 border-transparent hover:border-brand-primary"
+                  className="relative glass-card rounded-xl p-6 hover:shadow-lg transition-all cursor-pointer border-2 border-transparent hover:border-brand-primary"
                   onClick={() => handleViewCourse(course.id)}
                 >
+                  {/* Notification Badge */}
+                  {course.totalPending > 0 && (
+                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-lg z-10">
+                      {course.totalPending}
+                    </div>
+                  )}
+
                   {/* Course Icon & Title */}
                   <div className="flex items-start justify-between mb-4">
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-brand-neon to-brand-electric flex items-center justify-center">
                       <BookOpen className="w-6 h-6 text-white" />
                     </div>
-                    {course.totalPending > 0 && (
-                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {course.totalPending} pending
-                      </span>
-                    )}
                   </div>
 
                   {/* Course Name */}
