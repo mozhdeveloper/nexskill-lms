@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, FileText, Trash2, CheckCheck, Check, X, UserPlus, UserMinus } from 'lucide-react';
+import { Bell, FileText, Trash2, CheckCheck, Check, X, UserPlus, UserMinus, Rocket, ShieldCheck } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 import { supabase } from '../../lib/supabaseClient';
 
 interface Notification {
   id: string;
-  type: 'quiz_review' | 'enrollment' | 'student_left';
+  type: 'quiz_review' | 'enrollment' | 'student_left' | 'course_approved' | 'update_approved';
   title: string;
   message: string;
   timestamp: string;
@@ -49,6 +49,14 @@ const NotificationBell: React.FC = () => {
           title = 'Student Left Course ⚠️';
           message = `${n.student_name || 'A student'} unenrolled from "${n.course_title}".`;
           url = `/coach/courses/${n.course_id}/students`;
+        } else if (n.notif_type === 'course_approved') {
+          title = 'Course Live! 🚀';
+          message = `Your course "${n.course_title}" has been approved and is now live.`;
+          url = `/coach/courses/${n.course_id}/edit`;
+        } else if (n.notif_type === 'update_approved') {
+          title = 'Update Approved ✅';
+          message = `Your pending changes for "${n.course_title}" are now approved and live.`;
+          url = `/coach/courses/${n.course_id}/edit`;
         }
 
         return {
@@ -87,10 +95,16 @@ const NotificationBell: React.FC = () => {
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'course_leaves' }, () => fetchNotifications())
         .subscribe();
 
+      const systemChannel = supabase
+        .channel('coach-system-notifs')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'coach_system_notifications' }, () => fetchNotifications())
+        .subscribe();
+
       return () => { 
         supabase.removeChannel(quizChannel);
         supabase.removeChannel(enrollChannel);
         supabase.removeChannel(leaveChannel);
+        supabase.removeChannel(systemChannel);
       };
     }
   }, [isCoach, profile?.id, fetchNotifications]);
@@ -100,6 +114,8 @@ const NotificationBell: React.FC = () => {
       case 'quiz_review': return 'quiz_submissions';
       case 'enrollment': return 'enrollments';
       case 'student_left': return 'course_leaves';
+      case 'course_approved': 
+      case 'update_approved': return 'coach_system_notifications';
       default: return 'quiz_submissions';
     }
   };
@@ -200,10 +216,14 @@ const NotificationBell: React.FC = () => {
                   <div className="flex gap-3">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
                       n.type === 'enrollment' ? 'bg-green-100' : 
-                      n.type === 'student_left' ? 'bg-red-100' : 'bg-purple-100'
+                      n.type === 'student_left' ? 'bg-red-100' : 
+                      n.type === 'course_approved' ? 'bg-blue-100' :
+                      n.type === 'update_approved' ? 'bg-teal-100' : 'bg-purple-100'
                     }`}>
                       {n.type === 'enrollment' ? <UserPlus className="w-5 h-5 text-green-600" /> : 
                        n.type === 'student_left' ? <UserMinus className="w-5 h-5 text-red-600" /> :
+                       n.type === 'course_approved' ? <Rocket className="w-5 h-5 text-blue-600" /> :
+                       n.type === 'update_approved' ? <ShieldCheck className="w-5 h-5 text-teal-600" /> :
                        <FileText className="w-5 h-5 text-purple-600" />}
                     </div>
                     <div className="flex-1 min-w-0">
