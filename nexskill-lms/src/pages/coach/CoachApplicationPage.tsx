@@ -77,6 +77,7 @@ const CoachApplicationPage: React.FC = () => {
         if (!hasAttemptedSubmit) return false;
 
         // Optional Fields
+        if (fieldName === 'middleName') return false;
         if (fieldName === 'nameExtension') return false;
         if (fieldName === 'linkedinUrl') return false;
         if (fieldName === 'portfolioUrl') return false;
@@ -94,7 +95,7 @@ const CoachApplicationPage: React.FC = () => {
         
         // Match required fields from original code
         if (step === 1) {
-             fieldsToCheck = ['firstName', 'middleName', 'lastName', 'username', 'email', 'password', 'confirmPassword'];
+             fieldsToCheck = ['firstName', 'lastName', 'username', 'email', 'password', 'confirmPassword'];
         } else if (step === 2) {
              fieldsToCheck = ['jobTitle', 'bio'];
         }
@@ -311,7 +312,7 @@ const CoachApplicationPage: React.FC = () => {
                                         <input name="firstName" value={formData.firstName} onChange={handleInputChange} placeholder="First Name" className={getInputClass('firstName')} />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Middle Name</label>
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Middle Name (Optional)</label>
                                         <input name="middleName" value={formData.middleName} onChange={handleInputChange} placeholder="Middle Name" className={getInputClass('middleName')} />
                                     </div>
                                 </div>

@@ -42,6 +42,7 @@ const SignUp: React.FC = () => {
     if (!hasAttemptedSubmit) return false;
 
     // Optional fields
+    if (fieldName === 'middleName') return false;
     if (fieldName === 'nameExtension') return false;
     if (fieldName === 'agreeToTerms') return false; // Handled separately or usually checkbox logic
 
@@ -67,7 +68,6 @@ const SignUp: React.FC = () => {
   const validateForm = () => {
     // Strict required check
     if (!formData.firstName.trim()) return false;
-    if (!formData.middleName.trim()) return false; // MIDDLE NAME REQUIRED
     if (!formData.lastName.trim()) return false;
     if (!formData.username.trim()) return false;
     if (!formData.email.trim()) return false;
@@ -217,7 +217,7 @@ const SignUp: React.FC = () => {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Middle Name</label>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Middle Name (Optional)</label>
                 <input
                   name="middleName"
                   value={formData.middleName}
