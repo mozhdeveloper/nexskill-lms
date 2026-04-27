@@ -146,11 +146,16 @@ const CoachApplicationPage: React.FC = () => {
         return `${baseClass} ${defaultBorder}`;
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
+        if (e) e.preventDefault();
         
-        // Ensure final step validation passes if not redundant
-        if (!validateStep(3) && false) { // Placeholder: Step 3 currently has no requirements
+        // Block submission if not on the final step
+        if (currentStep !== 3) {
+            return;
+        }
+        
+        // Ensure final step validation passes
+        if (!validateStep(3)) {
              return; 
         }
 
@@ -299,7 +304,7 @@ const CoachApplicationPage: React.FC = () => {
                         </div>
                     )}
 
-                    <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+                    <form onSubmit={(e) => e.preventDefault()} className="space-y-6" noValidate>
                         
                         {/* STEP 1: IDENTITY */}
                         {currentStep === 1 && (
@@ -354,7 +359,7 @@ const CoachApplicationPage: React.FC = () => {
                         {/* STEP 2: PROFILE */}
                         {currentStep === 2 && (
                             <div className="space-y-5 animate-fadeIn">
-                                <h3 className="text-[11px] font-bold text-brand-neon uppercase tracking-widest border-b border-white/10 pb-2">Expertise</h3>
+                                <h3 className="text-[11px] font-bold text-brand-neon uppercase tracking-widest border-b border-white/10 pb-2">Profile</h3>
 
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Job Title</label>
@@ -389,10 +394,10 @@ const CoachApplicationPage: React.FC = () => {
                             </div>
                         )}
                         
-                        {/* STEP 3: SKILLS */}
+                        {/* STEP 3: EXPERTISE */}
                         {currentStep === 3 && (
                             <div className="space-y-5 animate-fadeIn">
-                                <h3 className="text-[11px] font-bold text-brand-neon uppercase tracking-widest border-b border-white/10 pb-2">Skills & Content</h3>
+                                <h3 className="text-[11px] font-bold text-brand-neon uppercase tracking-widest border-b border-white/10 pb-2">Expertise</h3>
 
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Tools (Optional)</label>
@@ -441,7 +446,8 @@ const CoachApplicationPage: React.FC = () => {
                                 </button>
                             ) : (
                                 <button
-                                    type="submit"
+                                    type="button"
+                                    onClick={handleSubmit}
                                     disabled={isSubmitting}
                                     className="flex-[2] h-13 bg-gradient-to-r from-brand-neon to-brand-electric text-black font-extrabold text-base tracking-wide uppercase rounded-xl shadow-[0_0_20px_rgba(57,255,20,0.2)] hover:shadow-[0_0_35px_rgba(57,255,20,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
