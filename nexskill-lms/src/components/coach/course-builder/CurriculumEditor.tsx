@@ -616,28 +616,10 @@ const CurriculumEditor: React.FC<CurriculumEditorProps> = ({
             }
         }
 
-        // ALSO save to new lesson_content_items table
-        if (onAddContentItem && courseId) {
-            try {
-                // Fetch quiz title from database
-                let quizTitle = contentOptions.quizTitle || 'Quiz';
-                
-                await onAddContentItem(
-                    lessonId,
-                    moduleId,
-                    'quiz',
-                    {
-                        title: quizTitle,
-                    },
-                    quizId
-                );
-                // Refresh content items
-                if (onFetchContentItems) {
-                    await onFetchContentItems(lessonId);
-                }
-            } catch (error) {
-                console.error('Error creating content item:', error);
-            }
+        // RPC: onCreateQuiz now handles atomic creation of both quiz and lesson_content_item
+        // to prevent orphaned items. We only need to call onFetchContentItems.
+        if (onFetchContentItems) {
+            await onFetchContentItems(lessonId);
         }
 
         setContentOptions(null);

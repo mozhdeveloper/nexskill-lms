@@ -1,12 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, FileText, Trash2, CheckCheck, Check, X, Award, AlertCircle, RefreshCw } from 'lucide-react';
+import { Bell, FileText, Trash2, CheckCheck, Check, X, Award, AlertCircle, RefreshCw, BookOpen } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 
 interface Notification {
   id: string;
-  quizId: string; // Added quizId
-  type: 'quiz_result';
+  type: 'quiz_result' | 'system';
   title: string;
   message: string;
   timestamp: string;
@@ -23,37 +22,46 @@ const NotificationBellStudent: React.FC = () => {
 
   const fetchNotifications = useCallback(async (uid: string) => {
     try {
-      const { data, error } = await supabase.rpc('get_student_quiz_notifications', {
+      const { data, error } = await supabase.rpc('get_student_all_notifications', {
         p_student_id: uid
       });
 
       if (error) throw error;
 
       const mapped: Notification[] = (data || []).map((n: any) => {
-        let title = 'Quiz Result';
+        let title = n.quiz_title || 'Notification';
         let message = '';
-        
-        if (n.status === 'passed') {
-          title = '🎉 Quiz Passed!';
-          message = `Congratulations! You passed "${n.quiz_title}" in ${n.course_title}.`;
-        } else if (n.status === 'failed') {
-          title = '❌ Quiz Not Passed';
-          message = `You didn't pass "${n.quiz_title}" in ${n.course_title}. Keep trying!`;
-        } else if (n.status === 'resubmission_required') {
-          title = '📝 Resubmission Required';
-          message = `Your coach requested a resubmission for "${n.quiz_title}" in ${n.course_title}.`;
+        let url = `/student/courses/${n.course_id}`;
+
+        if (n.notif_type === 'quiz_result') {
+          if (n.status === 'passed') {
+            title = '🎉 Quiz Passed!';
+            message = `Congratulations! You passed "${n.quiz_title}" in ${n.course_title}.`;
+          } else if (n.status === 'failed') {
+            title = '❌ Quiz Not Passed';
+            message = `You didn't pass "${n.quiz_title}" in ${n.course_title}. Keep trying!`;
+          } else if (n.notif_type === 'resubmission_required') {
+            title = '📝 Resubmission Required';
+            message = `Your coach requested a resubmission for "${n.quiz_title}" in ${n.course_title}.`;
+          }
+          url = `/student/courses/${n.course_id}/quizzes/${n.extra_id}/feedback`;
+        } else if (n.notif_type === 'system') {
+          if (n.status === 'new_content') {
+            title = 'New Lesson Available! 📚';
+            message = `A new lesson has been added to "${n.course_title}". Check it out!`;
+          }
+          url = `/student/courses/${n.course_id}/curriculum`;
         }
 
         return {
-          id: n.submission_id,
-          quizId: n.quiz_id, // Use the real quiz_id from DB
-          type: 'quiz_result',
+          id: n.notif_id,
+          type: n.notif_type as 'quiz_result' | 'system',
           title,
           message,
-          timestamp: new Date(n.reviewed_at).toLocaleString(),
+          timestamp: new Date(n.created_at).toLocaleString(),
           read: n.is_read,
           status: n.status,
-          actionUrl: `/student/courses/${n.course_id}/quizzes/${n.quiz_id}/feedback`
+          actionUrl: url
         };
       });
 
@@ -70,47 +78,63 @@ const NotificationBellStudent: React.FC = () => {
         setUserId(user.id);
         fetchNotifications(user.id);
 
-        const channel = supabase
-          .channel('student-notifs')
+        const quizChannel = supabase
+          .channel('student-quiz-notifs')
           .on('postgres_changes', { 
-            event: '*', // Listen for all events (INSERT/UPDATE)
+            event: '*', 
             schema: 'public', 
             table: 'quiz_submissions',
             filter: `user_id=eq.${user.id}`
-          }, () => {
-            console.log('🔄 Student notification update detected');
-            fetchNotifications(user.id);
-          })
+          }, () => fetchNotifications(user.id))
           .subscribe();
 
-        return () => { supabase.removeChannel(channel); };
+        const systemChannel = supabase
+          .channel('student-system-notifs')
+          .on('postgres_changes', { 
+            event: '*', 
+            schema: 'public', 
+            table: 'student_system_notifications',
+            filter: `student_id=eq.${user.id}`
+          }, () => fetchNotifications(user.id))
+          .subscribe();
+
+        return () => { 
+          supabase.removeChannel(quizChannel); 
+          supabase.removeChannel(systemChannel);
+        };
       }
     };
     getUser();
   }, [fetchNotifications]);
 
-  const markAsRead = async (e: React.MouseEvent, id: string) => {
+  const markAsRead = async (e: React.MouseEvent, n: Notification) => {
     e.stopPropagation();
     try {
-      const { error } = await supabase.from('quiz_submissions').update({ student_read_at: new Date().toISOString() }).eq('id', id);
+      const { error } = await supabase.rpc('mark_specific_student_notification_read', {
+        p_notif_id: n.id,
+        p_notif_type: n.type
+      });
       if (error) throw error;
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+      setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, read: true } : item));
     } catch (err) { console.error('Error marking as read:', err); }
   };
 
-  const removeNotification = async (e: React.MouseEvent, id: string) => {
+  const removeNotification = async (e: React.MouseEvent, n: Notification) => {
     e.stopPropagation();
     try {
-      const { error } = await supabase.from('quiz_submissions').update({ student_cleared_at: new Date().toISOString() }).eq('id', id);
+      const { error } = await supabase.rpc('clear_specific_student_notification', {
+        p_notif_id: n.id,
+        p_notif_type: n.type
+      });
       if (error) throw error;
-      setNotifications(prev => prev.filter(n => n.id !== id));
+      setNotifications(prev => prev.filter(item => item.id !== n.id));
     } catch (err) { console.error('Error removing notification:', err); }
   };
 
   const markAllAsRead = async () => {
     if (!userId || notifications.length === 0) return;
     try {
-      const { error } = await supabase.rpc('mark_all_student_quiz_notifications_read', {
+      const { error } = await supabase.rpc('mark_all_student_notifications_read', {
         p_student_id: userId
       });
       if (error) throw error;
@@ -119,10 +143,11 @@ const NotificationBellStudent: React.FC = () => {
   };
 
   const clearAll = async () => {
-    if (notifications.length === 0 || !window.confirm("Clear all notifications?")) return;
+    if (!userId || notifications.length === 0 || !window.confirm("Clear all notifications?")) return;
     try {
-      const ids = notifications.map(n => n.id);
-      const { error } = await supabase.from('quiz_submissions').update({ student_cleared_at: new Date().toISOString() }).in('id', ids);
+      const { error } = await supabase.rpc('clear_all_student_notifications', {
+        p_student_id: userId
+      });
       if (error) throw error;
       setNotifications([]);
     } catch (err) { console.error('Error clearing all:', err); }
@@ -137,8 +162,10 @@ const NotificationBellStudent: React.FC = () => {
     return () => document.removeEventListener('mousedown', clickOut);
   }, []);
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
+  const getStatusIcon = (n: Notification) => {
+    if (n.type === 'system') return <BookOpen className="w-5 h-5 text-blue-600" />;
+    
+    switch (n.status) {
       case 'passed': return <Award className="w-5 h-5 text-green-600" />;
       case 'failed': return <AlertCircle className="w-5 h-5 text-red-600" />;
       case 'resubmission_required': return <RefreshCw className="w-5 h-5 text-orange-600" />;
@@ -146,8 +173,10 @@ const NotificationBellStudent: React.FC = () => {
     }
   };
 
-  const getStatusBg = (status: string) => {
-    switch (status) {
+  const getStatusBg = (n: Notification) => {
+    if (n.type === 'system') return 'bg-blue-100';
+
+    switch (n.status) {
       case 'passed': return 'bg-green-100';
       case 'failed': return 'bg-red-100';
       case 'resubmission_required': return 'bg-orange-100';
@@ -182,9 +211,9 @@ const NotificationBellStudent: React.FC = () => {
           <div className="max-h-[400px] overflow-y-auto">
             {notifications.length > 0 ? (
               notifications.map(n => (
-                <div key={n.id} onClick={() => { navigate(n.actionUrl); setIsOpen(false); }} className={`px-4 py-4 border-b border-slate-100 hover:bg-slate-50 transition-all cursor-pointer relative group ${!n.read ? 'bg-blue-50/30' : ''}`}>
+                <div key={`${n.type}-${n.id}`} onClick={() => { navigate(n.actionUrl); setIsOpen(false); }} className={`px-4 py-4 border-b border-slate-100 hover:bg-slate-50 transition-all cursor-pointer relative group ${!n.read ? 'bg-blue-50/30' : ''}`}>
                   <button 
-                    onClick={(e) => removeNotification(e, n.id)}
+                    onClick={(e) => removeNotification(e, n)}
                     className="absolute top-2 right-2 p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full opacity-0 group-hover:opacity-100 transition-all z-20"
                     title="Remove notification"
                   >
@@ -192,8 +221,8 @@ const NotificationBellStudent: React.FC = () => {
                   </button>
 
                   <div className="flex gap-3">
-                    <div className={`w-10 h-10 rounded-xl ${getStatusBg(n.status)} flex items-center justify-center flex-shrink-0`}>
-                      {getStatusIcon(n.status)}
+                    <div className={`w-10 h-10 rounded-xl ${getStatusBg(n)} flex items-center justify-center flex-shrink-0`}>
+                      {getStatusIcon(n)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2 pr-4">
@@ -205,7 +234,7 @@ const NotificationBellStudent: React.FC = () => {
                          <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
                           {!n.read && (
                             <button 
-                              onClick={(e) => markAsRead(e, n.id)}
+                              onClick={(e) => markAsRead(e, n)}
                               className=" p-1 px-2 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors z-10 text-[10px] font-bold"
                               title="Mark as read"
                             >
