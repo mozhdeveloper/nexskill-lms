@@ -107,8 +107,10 @@ const NotificationBell: React.FC = () => {
   const markAsRead = async (e: React.MouseEvent, n: Notification) => {
     e.stopPropagation();
     try {
-      const table = getTableForType(n.type);
-      const { error } = await supabase.from(table).update({ coach_read_at: new Date().toISOString() }).eq('id', n.id);
+      const { error } = await supabase.rpc('mark_specific_coach_notification_read', {
+        p_notif_id: n.id,
+        p_notif_type: n.type
+      });
       if (error) throw error;
       setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, read: true } : item));
     } catch (err) { console.error('Error marking as read:', err); }
