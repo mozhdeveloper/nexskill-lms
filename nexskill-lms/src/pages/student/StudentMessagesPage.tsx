@@ -4,8 +4,11 @@ import { Search, Send, Plus, AlertCircle, ArrowDown } from "lucide-react";
 import { useMessages, useConversations } from "../../hooks/useChat";
 import { isSupabaseConfigured, supabase } from "../../lib/supabaseClient";
 import type { Profile } from "../../types/db";
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 
 const StudentMessagesPage: React.FC = () => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRecipientId, setSelectedRecipientId] = useState<string | null>(
     null,
@@ -243,9 +246,16 @@ const StudentMessagesPage: React.FC = () => {
   }
 
   return (
-    <StudentAppLayout>
-      <div className="p-6 space-y-6">
+
+      <div className="p-8 px-50 space-y-10">
         {/* Header */}
+        <button
+          onClick={() => navigate('/student/my-courses')}
+          className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white mb-6 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          <span className="text-sm font-medium">Back to My Courses</span>
+        </button>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-slate-900 dark:text-dark-text-primary">
@@ -574,7 +584,7 @@ const StudentMessagesPage: React.FC = () => {
           </div>
         )}
       </div>
-    </StudentAppLayout>
+    
   );
 };
 

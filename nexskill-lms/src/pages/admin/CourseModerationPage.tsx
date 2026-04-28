@@ -27,6 +27,7 @@ interface Course {
   reportsCount: number;
   description?: string;
   pending_content?: boolean;
+  verification_status?: string;
   hasPendingContent?: boolean;
   hasPendingDeletions?: boolean;
   hasUnpublishedChanges?: boolean;
@@ -223,6 +224,7 @@ const CourseModerationPage: React.FC = () => {
             category: c.category?.name || 'General',
             status: uiStatus,
             hasPendingContent: c.pending_content === true,
+            verification_status: c.verification_status,
             hasPendingDeletions,
             submittedAt: c.created_at,
             qualityScore,
@@ -305,18 +307,11 @@ const CourseModerationPage: React.FC = () => {
 
         setCourses(prev => prev.map(c =>
           c.id === courseId
-            ? { ...c, status: 'approved' as const, hasPendingContent: false, hasPendingDeletions: false, hasUnpublishedChanges: false }
+            ? { ...c, hasPendingDeletions: false }
             : c
         ));
-
-        const { data: courseData } = await supabase
-          .from('courses')
-          .select('title')
-          .eq('id', courseId)
-          .single();
-
-        alert(`✅ Course Approved!\n\nCourse: ${courseData?.title || courseId}\n\nPending additions/deletions were approved and applied.`);
-        return;
+        
+        console.log('[Admin Approval] Pending deletions approved for course:', courseId);
       }
 
       // Step 1: Get all modules for this course
@@ -458,11 +453,38 @@ const CourseModerationPage: React.FC = () => {
 
         setCourses(prev => prev.map(c =>
           c.id === courseId
+            ? { ...c, hasPendingDeletions: false }
+            : c
+        ));
+        
+        console.log('[Admin Approval] Pending deletions rejected for course:', courseId);
+      }
+
+      const isAlreadyApproved = course?.verification_status === 'approved';
+
+      if (isAlreadyApproved) {
+        // For already approved courses, "Reject" means discard the pending updates
+        // Clear the pending_content flag
+        const { error: courseError } = await supabase
+          .from('courses')
+          .update({
+            pending_content: false,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', courseId);
+
+        if (courseError) throw courseError;
+
+        // Optionally: Revert pending_addition items to draft? 
+        // For now, clearing the flag is the priority to move it out of the queue.
+
+        setCourses(prev => prev.map(c =>
+          c.id === courseId
             ? { ...c, status: 'approved' as const, hasPendingContent: false, hasPendingDeletions: false, hasUnpublishedChanges: false }
             : c
         ));
 
-        alert(`Changes Rejected\n\nCourse ID: ${courseId}\n\nPending deletions were discarded and live content was kept unchanged.`);
+        alert(`✅ Update Rejected!\n\nCourse: ${course?.title || courseId}\n\nPending changes were discarded. The course remains live with its previous content.`);
         return;
       }
 

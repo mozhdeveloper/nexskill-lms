@@ -307,6 +307,7 @@ const MyCoursesPage: React.FC = () => {
                 </Link>
                 <Link
                   to="/student/ai-coach"
+                  // disabled={false}
                   className="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-lg hover:bg-white/20 transition-all text-white text-sm font-medium"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

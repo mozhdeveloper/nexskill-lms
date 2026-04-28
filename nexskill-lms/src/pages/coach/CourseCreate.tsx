@@ -51,6 +51,12 @@ const CourseCreate: React.FC = () => {
       return;
     }
 
+    // Validation: Title must contain characters other than spaces
+    if (!formData.title.trim()) {
+      window.alert('Please enter a valid course title with characters.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {

@@ -1246,22 +1246,31 @@ const CourseBuilder: React.FC = () => {
     try { resolvedModuleId = await resolveModuleId(moduleId); } catch (e) { throw new Error("Failed to resolve module"); }
 
     const quizId = uuidv4();
-    // Default to Type 2: Basic Quiz (no coach approval, has attempts)
-    // Coach can change to Type 1 in Quiz Settings
-    const newQuiz: Quiz = {
-      id: quizId, title: quizTitle, description: "", instructions: "",
-      passing_score: 70, time_limit_minutes: 30, max_attempts: 3,
-      requires_manual_grading: false, requires_coach_approval: false,
-      quiz_type: 'standard',
-      is_published: false,
-      late_submission_allowed: true, late_penalty_percent: 10,
-    };
+    
+    // Phase 1.5: Use RPC for atomic creation of quiz and content item link
+    // This prevents orphaned quizzes if the content item link fails to save
+    const { error: rpcError } = await supabase.rpc('create_quiz_with_content_item', {
+      p_quiz_id: quizId,
+      p_quiz_title: quizTitle,
+      p_course_id: courseId,
+      p_module_id: resolvedModuleId,
+      p_lesson_id: lessonId,
+      p_metadata: { title: quizTitle },
+      p_quiz_type: 'standard'
+    });
 
-    const { error: quizError } = await supabase.from("quizzes").insert([{
-      ...newQuiz,
-      lesson_id: lessonId,
-    }]);
-    if (quizError) throw new Error(quizError.message);
+    if (rpcError) {
+      console.error('Error creating quiz via RPC:', rpcError);
+      throw new Error(rpcError.message);
+    }
+
+    // Since RPC already created the content item, we should refresh the list
+    handleFetchContentItems(lessonId);
+    
+    // Mark course as having pending content if already approved
+    if (isCoursePublished) {
+      setPendingContent(true);
+    }
 
     return quizId;
   };
