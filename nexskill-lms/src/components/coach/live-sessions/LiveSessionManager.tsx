@@ -222,12 +222,24 @@ const LiveSessionManager: React.FC = () => {
                                 <div className="flex items-center gap-2 flex-wrap">
                                     {/* Action Buttons based on status */}
                                     {session.status === 'scheduled' && (
-                                        <button
-                                            onClick={() => handleStartSession(session)}
-                                            className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 font-medium"
-                                        >
-                                            Start Live
-                                        </button>
+                                        <>
+                                            <button
+                                                onClick={() => handleStartSession(session)}
+                                                className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 font-medium"
+                                            >
+                                                Start Live
+                                            </button>
+                                            <button
+                                                onClick={async () => {
+                                                    if (window.confirm('Are you sure you want to cancel this session?')) {
+                                                        await updateSession(session.id, { status: 'canceled' });
+                                                    }
+                                                }}
+                                                className="px-4 py-2 bg-red-100 text-red-600 text-sm rounded-lg hover:bg-red-200 font-medium border border-red-300 ml-2"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </>
                                     )}
                                     {session.status === 'live' && (
                                         <button

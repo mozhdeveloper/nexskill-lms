@@ -19,14 +19,17 @@ const revenueData = {
   ],
 };
 
-
-
-
 interface CoursePerf {
   id: string;
   name: string;
   enrolledStudents: number;
   rating: number;
+}
+
+interface Participant {
+  firstName: string;
+  lastName: string;
+  email: string;
 }
 
 const aiShortcuts = [
@@ -35,6 +38,18 @@ const aiShortcuts = [
   { id: 3, label: 'Draft course announcement', icon: '📢' },
   { id: 4, label: 'Suggest price optimization', icon: '💡' },
 ];
+
+function getSessionStatus(session: any): string {
+  const now = new Date();
+  const start = new Date(session.scheduled_at);
+  const durationMs = (session.duration_minutes || 60) * 60 * 1000;
+  const end = new Date(start.getTime() + durationMs);
+
+  if (session.status === 'cancelled') return 'Cancelled';
+  if (now >= start && now <= end) return 'Ongoing';
+  if (now > end) return 'Completed';
+  return 'Scheduled';
+}
 
 const CoachDashboard: React.FC = () => {
   const { profile: currentUser } = useUser();
@@ -46,6 +61,11 @@ const CoachDashboard: React.FC = () => {
   const [coursePerfs, setCoursePerfs] = useState<CoursePerf[]>([]);
   const [avgRating, setAvgRating] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  // Participants modal state
+  const [participantsModal, setParticipantsModal] = useState<{ open: boolean; sessionId: string | null }>({ open: false, sessionId: null });
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [participantsLoading, setParticipantsLoading] = useState(false);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -68,7 +88,6 @@ const CoachDashboard: React.FC = () => {
 
         // Build course performance data
         if (courseIds.length > 0) {
-          // Enrollment counts per course
           const { data: allEnrollments } = await supabase
             .from('enrollments')
             .select('course_id, profile_id, enrolled_at')
@@ -89,7 +108,6 @@ const CoachDashboard: React.FC = () => {
           setActiveStudentsCount(uniqueStudents.size);
           setNewEnrolleesCount(newCount);
 
-          // Ratings per course
           const { data: reviews } = await supabase
             .from('reviews')
             .select('course_id, rating')
@@ -156,6 +174,55 @@ const CoachDashboard: React.FC = () => {
     navigate('/coach/ai-tools');
   };
 
+  const [participantsCount, setParticipantsCount] = useState<number | null>(null);
+  // Cancel session logic
+  const handleCancelSession = async (sessionId: string) => {
+    const confirmed = window.confirm('Are you sure you want to cancel this session?');
+    if (!confirmed) return;
+    try {
+      const { error } = await supabase
+        .from('live_sessions')
+        .update({ status: 'cancelled' })
+        .eq('id', sessionId);
+      if (error) throw error;
+      // Refresh sessions list
+      setUpcomingSessions((prev) => prev.map(s => s.id === sessionId ? { ...s, status: 'cancelled' } : s));
+    } catch (err) {
+      alert('Failed to cancel session.');
+      console.error('Cancel session error:', err);
+    }
+  };
+
+  const openParticipantsModal = async (sessionId: string) => {
+    console.log('Opening modal for session:', sessionId);
+    setParticipantsModal({ open: true, sessionId });
+    setParticipantsLoading(true);
+    setParticipantsCount(null);
+    try {
+      // Find the session to get course_id
+      const session = upcomingSessions.find(s => s.id === sessionId);
+      if (!session) throw new Error('Session not found');
+      // Count enrollments for this course
+      const { count, error } = await supabase
+        .from('enrollments')
+        .select('profile_id', { count: 'exact', head: true })
+        .eq('course_id', session.course_id);
+      console.log('Enrollments count result:', { count, error });
+      if (error) throw error;
+      setParticipantsCount(count ?? 0);
+    } catch (err) {
+      console.error('Error fetching participants count:', err);
+      setParticipantsCount(0);
+    } finally {
+      setParticipantsLoading(false);
+    }
+  };
+
+  const closeParticipantsModal = () => {
+    setParticipantsModal({ open: false, sessionId: null });
+    setParticipants([]);
+  };
+
   const maxRevenue = Math.max(...revenueData.lastSixMonths.map((m) => m.amount));
 
   return (
@@ -191,12 +258,10 @@ const CoachDashboard: React.FC = () => {
             <div className="lg:col-span-2 glass-card rounded-[24px] p-8">
               <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-6">Revenue</h2>
 
-              {/* Payment integration notice */}
               <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl">
                 <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">💳 Payment integration coming soon. Revenue tracking will be available once payments are enabled.</p>
               </div>
 
-              {/* Main KPI */}
               <div className="mb-6">
                 <div className="text-5xl font-bold text-gradient mb-2 inline-block">
                   ${revenueData.currentMonth.toLocaleString()}
@@ -204,7 +269,6 @@ const CoachDashboard: React.FC = () => {
                 <p className="text-lg text-[color:var(--text-secondary)]">This month</p>
               </div>
 
-              {/* Secondary KPIs */}
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="p-4 bg-[color:var(--bg-secondary)] rounded-xl border border-[color:var(--border-base)]">
                   <p className="text-sm text-[color:var(--text-secondary)] mb-1">Total all-time</p>
@@ -218,7 +282,6 @@ const CoachDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Simple Bar Chart */}
               <div>
                 <p className="text-sm font-semibold text-[color:var(--text-primary)] mb-3">Last 6 months</p>
                 <div className="flex items-end justify-between gap-2 h-32">
@@ -227,7 +290,7 @@ const CoachDashboard: React.FC = () => {
                       <div className="w-full flex items-end justify-center h-24">
                         <div
                           className="w-full bg-gradient-to-t from-[color:var(--color-brand-electric)] to-[color:var(--color-brand-neon)] rounded-t-lg transition-all hover:opacity-80 shadow-[0_0_10px_rgba(34,197,94,0.3)]"
-                          style={{ height: `${(item.amount / maxRevenue) * 100}%` }}
+                          style={{ height: `${maxRevenue > 0 ? (item.amount / maxRevenue) * 100 : 0}%` }}
                           title={`$${item.amount}`}
                         />
                       </div>
@@ -311,36 +374,83 @@ const CoachDashboard: React.FC = () => {
               <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-6">Upcoming coaching sessions</h2>
               <div className="space-y-4">
                 {upcomingSessions.length > 0 ? (
-                  upcomingSessions.map((session) => (
-                    <div
-                      key={session.id}
-                      className="p-4 border border-[color:var(--border-base)] rounded-xl hover:border-[color:var(--color-brand-electric)] hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all bg-[color:var(--bg-secondary)]"
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <p className="text-sm font-semibold text-[color:var(--color-brand-electric)] mb-1">
-                            {new Date(session.scheduled_at).toLocaleDateString()} {new Date(session.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                          <p className="text-lg font-semibold text-[color:var(--text-primary)]">{session.title}</p>
-                          <p className="text-sm text-[color:var(--text-secondary)]">{session.description || 'No description'}</p>
-                        </div>
-                        <span
-                          className={`px-3 py-1 text-xs font-bold rounded-full ${session.status === 'scheduled' || session.status === 'live'
-                            ? 'bg-[color:var(--color-brand-neon)]/10 text-[color:var(--color-brand-neon)]'
-                            : 'bg-orange-500/10 text-orange-500'
-                            }`}
-                        >
-                          {session.status}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => handleSessionClick(session.id)}
-                        className="text-sm font-medium text-[color:var(--color-brand-electric)] hover:text-[color:var(--color-brand-neon)] transition-colors"
+                  upcomingSessions.map((session) => {
+                    const status = getSessionStatus(session);
+                    let badgeClass = '';
+                    switch (status) {
+                      case 'Ongoing':
+                        badgeClass = 'bg-[color:var(--color-brand-neon)]/10 text-[color:var(--color-brand-neon)]';
+                        break;
+                      case 'Scheduled':
+                        badgeClass = 'bg-[color:var(--color-brand-electric)]/10 text-[color:var(--color-brand-electric)]';
+                        break;
+                      case 'Completed':
+                        badgeClass = 'bg-gray-400/10 text-gray-400';
+                        break;
+                      case 'Cancelled':
+                        badgeClass = 'bg-orange-500/10 text-orange-500';
+                        break;
+                      default:
+                        badgeClass = 'bg-gray-200 text-gray-500';
+                    }
+                    // Debug log for session status and meeting link
+                    console.log('[Session Card]', {
+                      id: session.id,
+                      status: session.status,
+                      meeting_link: session.meeting_link,
+                      displayStatus: status
+                    });
+                    return (
+                      <div
+                        key={session.id}
+                        className="p-4 border border-[color:var(--border-base)] rounded-xl hover:border-[color:var(--color-brand-electric)] hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all bg-[color:var(--bg-secondary)]"
                       >
-                        View details →
-                      </button>
-                    </div>
-                  ))
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <p className="text-sm font-semibold text-[color:var(--color-brand-electric)] mb-1">
+                              {new Date(session.scheduled_at).toLocaleDateString()} {new Date(session.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                            <p className="text-lg font-semibold text-[color:var(--text-primary)]">{session.title}</p>
+                            <p className="text-sm text-[color:var(--text-secondary)]">{session.description || 'No description'}</p>
+                          </div>
+                          <span className={`px-3 py-1 text-xs font-bold rounded-full ${badgeClass}`}>
+                            {status}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          <button
+                            onClick={() => handleSessionClick(session.id)}
+                            className="text-sm font-medium text-[color:var(--color-brand-electric)] hover:text-[color:var(--color-brand-neon)] transition-colors"
+                          >
+                            View details →
+                          </button>
+                          <button
+                            onClick={() => openParticipantsModal(session.id)}
+                            className="text-sm font-medium text-purple-600 hover:text-purple-400 transition-colors border border-purple-200 rounded px-3 py-1 bg-purple-50"
+                          >
+                            Participants
+                          </button>
+                          {/* Show Join Meeting button only if session.status is not 'cancelled' and meeting_link exists */}
+                          {session.status !== 'cancelled' && session.meeting_link && (
+                            <button
+                              onClick={() => window.open(session.meeting_link, '_blank')}
+                              className="text-sm font-medium text-green-600 hover:text-green-400 transition-colors border border-green-200 rounded px-3 py-1 bg-green-50 flex items-center gap-1"
+                            >
+                              <span role="img" aria-label="meeting">🎥</span> Join Meeting
+                            </button>
+                          )}
+                          {status === 'Scheduled' && (
+                            <button
+                              onClick={() => handleCancelSession(session.id)}
+                              className="text-sm font-medium text-red-600 hover:text-red-400 transition-colors border border-red-200 rounded px-3 py-1 bg-red-50"
+                            >
+                              Cancel
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
                 ) : (
                   <div className="p-8 text-center text-[color:var(--text-secondary)] bg-[color:var(--bg-secondary)] rounded-xl border border-[color:var(--border-base)]">
                     <p>No upcoming sessions scheduled.</p>
@@ -357,7 +467,7 @@ const CoachDashboard: React.FC = () => {
                   <button
                     key={shortcut.id}
                     onClick={() => handleAIShortcut(shortcut.label)}
-                    className="p-5 bg-gradient-to-br from-[color:var(--bg-secondary)] to-[color:var(--bg-primary)] rounded-2xl border border-[color:var(--border-base)] hover:border-[color:var(--color-brand-electric)] hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all group"
+                    className="p5 bg-gradient-to-br from-[color:var(--bg-secondary)] to-[color:var(--bg-primary)] rounded-2xl border border-[color:var(--border-base)] hover:border-[color:var(--color-brand-electric)] hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all group"
                   >
                     <div className="text-3xl mb-3 group-hover:scale-110 transition-transform filter drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">
                       {shortcut.icon}
@@ -381,6 +491,27 @@ const CoachDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Participants Modal */}
+      {participantsModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white dark:bg-[color:var(--bg-secondary)] rounded-2xl shadow-xl p-8 min-w-[320px] max-w-md w-full border border-[color:var(--border-base)]">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-[color:var(--text-primary)]">Participants</h3>
+              <button onClick={closeParticipantsModal} className="text-lg font-bold text-gray-400 hover:text-gray-600">×</button>
+            </div>
+            {participantsLoading ? (
+              <div className="text-center py-8 text-[color:var(--text-secondary)]">Loading...</div>
+            ) : participantsCount === null ? (
+              <div className="text-center py-8 text-[color:var(--text-secondary)]">No participants enrolled</div>
+            ) : participantsCount === 0 ? (
+              <div className="text-center py-8 text-[color:var(--text-secondary)]">No participants enrolled</div>
+            ) : (
+              <div className="text-center py-8 text-[color:var(--text-secondary)]">{participantsCount} enrolled</div>
+            )}
+          </div>
+        </div>
+      )}
     </CoachAppLayout>
   );
 };

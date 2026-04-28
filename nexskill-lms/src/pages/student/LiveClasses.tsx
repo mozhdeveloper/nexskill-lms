@@ -254,6 +254,9 @@ const LiveClasses: React.FC = () => {
                             <div className="text-white text-5xl">✅</div>
                           </div>
                           <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">Completed</span>
+                            </div>
                             <h3 className="text-lg font-bold text-text-primary dark:text-dark-text-primary mb-2">
                               {liveClass.title}
                             </h3>

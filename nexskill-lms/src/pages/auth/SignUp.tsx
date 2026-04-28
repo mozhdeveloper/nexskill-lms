@@ -25,6 +25,7 @@ const SignUp: React.FC = () => {
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
 
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -65,13 +66,29 @@ const SignUp: React.FC = () => {
     return `${baseClass} ${defaultBorder}`;
   };
 
+  // Email must match approved domains only
+  const approvedDomains = [
+    'gmail.com',
+    'yahoo.com',
+    'outlook.com',
+    'hotmail.com',
+    'icloud.com',
+    'live.com',
+  ];
+  const emailRegex = /^[^@\s]+@([A-Za-z0-9.-]+\.[A-Za-z]{2,})$/;
+  const isApprovedDomain = (email) => {
+    const match = email.match(emailRegex);
+    if (!match) return false;
+    const domain = match[1].toLowerCase();
+    return approvedDomains.includes(domain);
+  };
+
   const validateForm = () => {
-    // Strict required check
     if (!formData.firstName.trim()) return false;
     if (!formData.lastName.trim()) return false;
     if (!formData.username.trim()) return false;
     if (!formData.email.trim()) return false;
-    if (!/\S+@\S+\.\S+/.test(formData.email)) return false;
+    if (!emailRegex.test(formData.email)) return false;
     if (!formData.password || formData.password.length < 8) return false;
     if (formData.password !== formData.confirmPassword) return false;
     if (!formData.agreeToTerms) return false;
@@ -81,18 +98,18 @@ const SignUp: React.FC = () => {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
-    setHasAttemptedSubmit(true); // Trigger visual validation
+    setEmailError(null);
+    setHasAttemptedSubmit(true);
+
+    // Email format and domain validation
+    if (!formData.email.trim() || !emailRegex.test(formData.email) || !isApprovedDomain(formData.email)) {
+      setEmailError("Please enter a valid email address (e.g. user@example.com)");
+      return;
+    }
 
     if (validateForm()) {
       setIsSubmitting(true);
       try {
-        // IMPORTANT: Pass middleName and nameExtension if supported by signUp, 
-        // or assume we need to update profile after. 
-        // Adjusting to match AuthContext signature if needed, or assuming updated signature.
-        // If AuthContext doesn't support middleName yet, we might need to update it or handle it here.
-        // Assuming typical signUp(email, password, first, last, username, role, middle, ext) structure
-        // specific to this user's codebase update.
-
         const { data, error } = await signUp(
           formData.email,
           formData.password,
@@ -100,8 +117,8 @@ const SignUp: React.FC = () => {
           formData.lastName,
           formData.username,
           'STUDENT',
-          formData.middleName, // Passed as arg 7
-          formData.nameExtension // Passed as arg 8
+          formData.middleName,
+          formData.nameExtension
         );
 
         if (error) {
@@ -109,7 +126,6 @@ const SignUp: React.FC = () => {
           return;
         }
 
-        // Create profiles row so UserContext can determine the role
         const newUser = data?.user;
         if (newUser) {
           await supabase.from('profiles').upsert({
@@ -134,7 +150,6 @@ const SignUp: React.FC = () => {
         return;
       }
     } else {
-      // Form is invalid, visual cues are now active via hasAttemptedSubmit
       if (!formData.agreeToTerms) {
         setSubmitError("You must agree to the Terms & Privacy Policy");
       } else if (formData.password !== formData.confirmPassword) {
@@ -272,7 +287,15 @@ const SignUp: React.FC = () => {
                 onChange={handleInputChange}
                 placeholder="jane@example.com"
                 className={getInputClass('email')}
+                autoComplete="email"
+                aria-invalid={!!emailError}
+                aria-describedby={emailError ? "email-error" : undefined}
               />
+              {emailError && (
+                <div id="email-error" className="text-red-400 text-sm mt-1 font-medium">
+                  {emailError}
+                </div>
+              )}
             </div>
 
             <div className="space-y-2 relative">

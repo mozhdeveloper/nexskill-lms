@@ -10,7 +10,7 @@ interface GroupSession {
   maxParticipants: number;
   enrolled: number;
   price: number;
-  status: 'Scheduled' | 'In Progress' | 'Completed';
+  status: 'Scheduled' | 'In Progress' | 'Completed' | 'Cancelled';
   course_id?: string;
   meeting_link?: string;
 }
@@ -26,9 +26,25 @@ const GroupCoachingDashboard: React.FC = () => {
   const [googleTokens, setGoogleTokens] = useState<any>(null);
   // Used to resume session creation after OAuth
   const [pendingSession, setPendingSession] = useState<any>(null);
+  // Loading state for create session button
+  const [creatingSession, setCreatingSession] = useState(false);
+
 
   // Form State
   const [formData, setFormData] = useState({
+    title: '',
+    course_id: '',
+    date: '',
+    time: '',
+    duration: 60,
+    maxParticipants: 1,
+    price: 0
+  });
+
+  // Edit Modal State
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingSession, setEditingSession] = useState<GroupSession | null>(null);
+  const [editForm, setEditForm] = useState({
     title: '',
     course_id: '',
     date: '',
@@ -170,6 +186,7 @@ const GroupCoachingDashboard: React.FC = () => {
         let status: GroupSession['status'] = 'Scheduled';
         if (s.status === 'completed') status = 'Completed';
         else if (s.status === 'in_progress' || s.status === 'live') status = 'In Progress';
+        else if (s.status === 'cancelled' || s.status === 'Cancelled') status = 'Cancelled';
 
         return {
           id: s.id,
@@ -225,6 +242,7 @@ const GroupCoachingDashboard: React.FC = () => {
 
   // Helper to create session (used for both normal and resumed flow)
   const createSession = async (sessionForm: any) => {
+    setCreatingSession(true);
     try {
       // Use getSession for reliable user context (same as fetchSessions)
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
@@ -304,11 +322,14 @@ const GroupCoachingDashboard: React.FC = () => {
       fetchSessions();
     } catch (err: any) {
       alert(`Error creating session: ${err.message}`);
+    } finally {
+      setCreatingSession(false);
     }
   };
 
   // Main handler
   const handleCreateSession = async () => {
+    if (creatingSession) return; // Prevent double submit
     // If not authorized, persist form and trigger OAuth
     if (!(await isGoogleAuthorized())) {
       localStorage.setItem('pending_session_form', JSON.stringify(formData));
@@ -355,8 +376,64 @@ const GroupCoachingDashboard: React.FC = () => {
   };
 
   const editSession = (sessionId: string) => {
-    console.log('Editing session:', sessionId);
-    alert('Would open session edit modal');
+    const session = groupSessions.find(s => s.id === sessionId);
+    if (!session) return;
+    setEditingSession(session);
+    setEditForm({
+      title: session.title,
+      course_id: session.course_id || '',
+      date: session.date,
+      time: session.time,
+      duration: session.duration,
+      maxParticipants: session.maxParticipants,
+      price: session.price
+    });
+    setShowEditModal(true);
+  };
+
+  const handleEditFormChange = (field: string, value: any) => {
+    setEditForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingSession) return;
+    // Validate fields
+    if (!editForm.title || !editForm.course_id || !editForm.date || !editForm.time) {
+      alert('Please fill in all required fields (Title, Course, Date, Time)');
+      return;
+    }
+    try {
+      setCreatingSession(true);
+      const scheduledAt = new Date(`${editForm.date}T${editForm.time}`).toISOString();
+      const { error } = await supabase
+        .from('live_sessions')
+        .update({
+          title: editForm.title,
+          course_id: editForm.course_id,
+          scheduled_at: scheduledAt,
+          duration_minutes: editForm.duration,
+          max_participants: editForm.maxParticipants,
+          price: editForm.price
+        })
+        .eq('id', editingSession.id);
+      if (error) throw error;
+      setShowEditModal(false);
+      setEditingSession(null);
+      setEditForm({
+        title: '',
+        course_id: '',
+        date: '',
+        time: '',
+        duration: 60,
+        maxParticipants: 1,
+        price: 0
+      });
+      fetchSessions();
+    } catch (err: any) {
+      alert(`Error updating session: ${err.message}`);
+    } finally {
+      setCreatingSession(false);
+    }
   };
 
   const sendReminder = (sessionId: string) => {
@@ -382,6 +459,8 @@ const GroupCoachingDashboard: React.FC = () => {
           <button
             onClick={createNewSession}
             className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white font-semibold rounded-full hover:shadow-lg transition-all"
+            disabled={creatingSession}
+            style={creatingSession ? { opacity: 0.6, pointerEvents: 'none' } : {}}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -536,7 +615,13 @@ const GroupCoachingDashboard: React.FC = () => {
                 {/* Actions */}
                 <div className="flex items-center gap-2">
                   {(() => {
-                    if (!session.meeting_link) return null;
+                    // Debug log for session status and meeting link
+                    console.log('[Group Session Card]', {
+                      id: session.id,
+                      status: session.status,
+                      meeting_link: session.meeting_link
+                    });
+                    if (!session.meeting_link || session.status === 'Cancelled') return null;
                     // Calculate if session is still joinable (not past end time)
                     const scheduledDate = new Date(`${session.date}T${session.time}`);
                     const endTime = new Date(scheduledDate.getTime() + session.duration * 60000);
@@ -559,16 +644,48 @@ const GroupCoachingDashboard: React.FC = () => {
                     Participants
                   </button>
                   {session.status === 'Scheduled' && (
-                    <button
-                      onClick={() => sendReminder(session.id)}
-                      className="px-4 py-2 text-sm font-medium text-[#22C55E] hover:bg-green-50 rounded-lg transition-colors"
-                    >
-                      Send Reminder
-                    </button>
+                    <>
+                      <button
+                        onClick={() => sendReminder(session.id)}
+                        className="px-4 py-2 text-sm font-medium text-[#22C55E] hover:bg-green-50 rounded-lg transition-colors"
+                      >
+                        Send Reminder
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (window.confirm('Are you sure you want to cancel this session?')) {
+                            // Log current user and session info for debugging
+                            const { data: sessionData } = await supabase.auth.getSession();
+                            const user = sessionData?.session?.user;
+                            console.log('Cancel Debug - Current user ID:', user?.id);
+                            console.log('Cancel Debug - Session to cancel:', session);
+                            const { error } = await supabase
+                              .from('live_sessions')
+                              .update({ status: 'cancelled' })
+                              .eq('id', session.id);
+                            if (error) {
+                              console.error('Cancel Debug - Supabase error:', error);
+                              alert('Failed to cancel session.');
+                            } else {
+                              setGroupSessions((prev) => prev.map(s => s.id === session.id ? { ...s, status: 'Cancelled' } : s));
+                            }
+                          }
+                        }}
+                        className="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg border border-red-200 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </>
                   )}
                   <button
-                    onClick={() => editSession(session.id)}
-                    className="px-4 py-2 text-sm font-medium text-[#5F6473] hover:bg-[#F5F7FF] rounded-lg transition-colors"
+                    onClick={session.status === 'Scheduled' ? () => editSession(session.id) : undefined}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      session.status === 'Scheduled'
+                        ? 'text-[#5F6473] hover:bg-[#F5F7FF] cursor-pointer bg-white border border-[#EDF0FB]'
+                        : 'text-gray-400 bg-gray-100 border border-gray-200 cursor-not-allowed opacity-60 pointer-events-none'
+                    }`}
+                    disabled={session.status !== 'Scheduled'}
+                    title={session.status !== 'Scheduled' ? 'Only scheduled sessions can be edited' : ''}
                   >
                     Edit
                   </button>
@@ -612,6 +729,113 @@ const GroupCoachingDashboard: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Edit Session Modal */}
+      {showEditModal && editingSession && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={() => setShowEditModal(false)}
+        >
+          <div
+            className="bg-white rounded-3xl p-8 max-w-2xl w-full mx-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 className="text-2xl font-bold text-[#111827] mb-6">Edit Group Session</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#111827] mb-2">
+                  Session Title
+                </label>
+                <input
+                  type="text"
+                  value={editForm.title}
+                  onChange={e => handleEditFormChange('title', e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-[#EDF0FB] focus:outline-none focus:ring-2 focus:ring-[#304DB5]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#111827] mb-2">Course</label>
+                <select
+                  value={editForm.course_id}
+                  onChange={e => handleEditFormChange('course_id', e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-[#EDF0FB] focus:outline-none focus:ring-2 focus:ring-[#304DB5]"
+                  disabled={coursesLoading}
+                >
+                  <option value="">Select course</option>
+                  {courses.map(course => (
+                    <option key={course.id} value={course.id}>{course.title} ({course.student_count} students)</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#111827] mb-2">Date</label>
+                  <input
+                    type="date"
+                    value={editForm.date}
+                    onChange={e => handleEditFormChange('date', e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-[#EDF0FB] focus:outline-none focus:ring-2 focus:ring-[#304DB5]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#111827] mb-2">Time</label>
+                  <input
+                    type="time"
+                    value={editForm.time}
+                    onChange={e => handleEditFormChange('time', e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-[#EDF0FB] focus:outline-none focus:ring-2 focus:ring-[#304DB5]"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#111827] mb-2">Duration (min)</label>
+                  <input
+                    type="number"
+                    value={editForm.duration}
+                    onChange={e => handleEditFormChange('duration', parseInt(e.target.value) || 0)}
+                    className="w-full px-4 py-3 rounded-xl border border-[#EDF0FB] focus:outline-none focus:ring-2 focus:ring-[#304DB5]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#111827] mb-2">Max Participants</label>
+                  <input
+                    type="number"
+                    value={editForm.maxParticipants}
+                    onChange={e => handleEditFormChange('maxParticipants', parseInt(e.target.value) || 0)}
+                    className="w-full px-4 py-3 rounded-xl border border-[#EDF0FB] focus:outline-none focus:ring-2 focus:ring-[#304DB5]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#111827] mb-2">Price (₱)</label>
+                  <input
+                    type="number"
+                    value={editForm.price}
+                    onChange={e => handleEditFormChange('price', parseFloat(e.target.value) || 0)}
+                    className="w-full px-4 py-3 rounded-xl border border-[#EDF0FB] focus:outline-none focus:ring-2 focus:ring-[#304DB5]"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-3 pt-4">
+                <button
+                  onClick={handleSaveEdit}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-[#304DB5] to-[#5E7BFF] text-white font-semibold rounded-full hover:shadow-lg transition-all"
+                  disabled={creatingSession}
+                  style={creatingSession ? { opacity: 0.6, pointerEvents: 'none' } : {}}
+                >
+                  Save Changes
+                </button>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="px-6 py-3 text-[#5F6473] font-medium rounded-full hover:bg-[#F5F7FF] transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create Session Modal */}
       {showCreateModal && (
