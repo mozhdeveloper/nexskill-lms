@@ -1,4 +1,142 @@
 import React, { useState, useEffect } from "react";
+// --- Helper component for accurate total runtime ---
+type CurriculumModule = {
+  id: string;
+  title: string;
+  is_sequential?: boolean;
+  lessons: Array<{ id: string; type: string }>;
+};
+
+interface CourseTotalRuntimeProps {
+  courseId: string | undefined;
+  curriculum: CurriculumModule[];
+}
+
+const CourseTotalRuntime: React.FC<CourseTotalRuntimeProps> = ({ courseId, curriculum }) => {
+  const [totalSeconds, setTotalSeconds] = useState<number | null>(null);
+
+  useEffect(() => {
+    async function fetchAndCompute() {
+      if (!courseId || !curriculum || curriculum.length === 0) {
+        setTotalSeconds(null);
+        return;
+      }
+      // Gather all lessonIds and quizIds
+      const lessonIds = curriculum.flatMap((mod) => (mod.lessons || []).filter((l) => l.type === 'lesson').map((l) => l.id));
+      const quizIds = curriculum.flatMap((mod) => (mod.lessons || []).filter((l) => l.type === 'quiz').map((l) => l.id));
+
+      // Fetch lesson_content_items for all lessons
+      let lessonContentItems: any[] = [];
+      if (lessonIds.length > 0) {
+        const { data } = await supabase
+          .from('lesson_content_items')
+          .select('id, lesson_id, content_type, content_id, metadata')
+          .in('lesson_id', lessonIds);
+        lessonContentItems = data || [];
+      }
+
+      // Fetch quizzes data
+      let quizzesData: any[] = [];
+      if (quizIds.length > 0) {
+        const { data } = await supabase
+          .from('quizzes')
+          .select('id, time_limit_minutes')
+          .in('id', quizIds);
+        quizzesData = data || [];
+      }
+
+      // Fetch lessons data
+      let lessonsData: any[] = [];
+      if (lessonIds.length > 0) {
+        const { data } = await supabase
+          .from('lessons')
+          .select('id, estimated_duration_minutes, content_blocks')
+          .in('id', lessonIds);
+        lessonsData = data || [];
+      }
+
+      // Fetch video progress data (optional, can be empty)
+      let videoProgressData: any[] = [];
+      if (lessonIds.length > 0) {
+        const { data } = await supabase
+          .from('lesson_video_progress')
+          .select('lesson_id, duration_seconds')
+          .in('lesson_id', lessonIds);
+        videoProgressData = data || [];
+      }
+
+      // Use the same fetchYouTubeDurations as the sidebar
+      const fetchYouTubeDurations = async (videoIds: string[]): Promise<Map<string, number>> => {
+        if (!videoIds.length) return new Map();
+        const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY;
+        if (!apiKey) return new Map();
+        try {
+          const chunks: string[][] = [];
+          for (let i = 0; i < videoIds.length; i += 50) {
+            chunks.push(videoIds.slice(i, i + 50));
+          }
+          const result = new Map<string, number>();
+          for (const chunk of chunks) {
+            const response = await fetch(
+              `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${chunk.join(',')}&key=${apiKey}`
+            );
+            if (!response.ok) continue;
+            const data = await response.json();
+            for (const item of data.items ?? []) {
+              // parseISODuration inline
+              const iso = item.contentDetails.duration;
+              const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+              const hours = parseInt(match?.[1] || '0', 10);
+              const minutes = parseInt(match?.[2] || '0', 10);
+              const seconds = parseInt(match?.[3] || '0', 10);
+              const secs = hours * 3600 + minutes * 60 + seconds;
+              result.set(item.id, secs);
+            }
+          }
+          return result;
+        } catch {
+          return new Map();
+        }
+      };
+
+      // Compute durations
+      const lessonDurationMap = await computeLessonDurations({
+        lessonContentItems,
+        quizzesData,
+        lessonsData,
+        videoProgressData,
+        fetchYouTubeDurations,
+      });
+
+      // Sum all lesson durations
+      let sum = 0;
+      for (const secs of lessonDurationMap.values()) {
+        sum += secs;
+      }
+      setTotalSeconds(sum);
+    }
+    fetchAndCompute();
+  }, [courseId, curriculum]);
+
+  return (
+    <div className="flex items-center gap-1 text-text-secondary dark:text-dark-text-secondary">
+      <span>🕒</span>
+      <span>
+        {totalSeconds === null ? '—' :
+          totalSeconds <= 0 ? '0h' :
+          (() => {
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            if (h > 0 && m > 0) return `${h}h ${m}m total`;
+            if (h > 0) return `${h}h total`;
+            return `${m}m total`;
+          })()
+        }
+      </span>
+    </div>
+  );
+};
+import { computeLessonDurations } from '../../utils/durationUtils';
 import { useParams, useNavigate } from "react-router-dom";
 import StudentAppLayout from "../../layouts/StudentAppLayout";
 import { supabase } from "../../lib/supabaseClient";
@@ -44,12 +182,7 @@ const CourseDetailRefactored: React.FC = () => {
   // Debug: Log curriculum data whenever it changes
   useEffect(() => {
     if (course?.curriculum) {
-      console.log("[CourseDetailRefactored] Curriculum data:", course.curriculum);
-      course.curriculum.forEach((module, idx) => {
-        console.log(`[CourseDetailRefactored] Module ${idx + 1}: "${module.title}" has ${module.lessons?.length || 0} lessons`, module.lessons);
-      });
-    } else {
-      console.log("[CourseDetailRefactored] No curriculum data available");
+      console.log("[DEBUG] course.curriculum:", course.curriculum);
     }
   }, [course?.curriculum]);
 
@@ -558,9 +691,14 @@ const CourseDetailRefactored: React.FC = () => {
               </div>
               {/* ⏱️ — populated on page load via useCourse, no tab click needed */}
               <div className="flex items-center gap-1 text-text-secondary dark:text-dark-text-secondary">
-                <span>⏱️</span>
-                <span>{durationLabel}</span>
               </div>
+              {/* Total Course Runtime (all modules) */}
+              {(directCurriculum.length > 0 || (course.curriculum && course.curriculum.length > 0)) && (
+                <CourseTotalRuntime
+                  courseId={courseId}
+                  curriculum={directCurriculum.length > 0 ? directCurriculum : (course.curriculum || [])}
+                />
+              )}
             </div>
 
             {/* Progress bar (enrolled students) */}

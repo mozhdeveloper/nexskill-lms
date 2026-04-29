@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../../lib/supabaseClient";
 import { getSequentialLockedItemIds } from "../../../utils/sequentialLocking";
+import { getModuleDuration } from "../../../utils/moduleDurationUtils";
 
 interface Lesson {
     id: string;
@@ -204,7 +205,23 @@ const CourseCurriculumTab: React.FC<CourseCurriculumTabProps> = ({
 
         // Notify parent of total course duration
         if (onTotalDurationLoaded) {
-            const total = [...resolved.values()].reduce((a, b) => a + b, 0);
+            // Only sum durations for lessons actually present in curriculum modules (not just all unique lesson IDs)
+            const curriculumLessonIds = curriculum
+                .flatMap((m) => m.lessons)
+                .filter((l) => l.type === "lesson")
+                .map((l) => l.id);
+            // Avoid double-counting if a lesson appears in multiple modules
+            const uniqueCurriculumLessonIds = Array.from(new Set(curriculumLessonIds));
+            // Debug: log all lesson IDs and durations being summed
+            console.log('[CourseCurriculumTab] Summing lesson durations for total:',
+                uniqueCurriculumLessonIds.map((id) => ({
+                    id,
+                    duration: resolved.get(id) || 0
+                }))
+            );
+            const total = uniqueCurriculumLessonIds
+                .map((id) => resolved.get(id) || 0)
+                .reduce((a, b) => a + b, 0);
             onTotalDurationLoaded(total);
         }
     }, [courseId, curriculum, onTotalDurationLoaded]);
@@ -324,9 +341,18 @@ const CourseCurriculumTab: React.FC<CourseCurriculumTabProps> = ({
                                         d="M9 5l7 7-7 7"
                                     />
                                 </svg>
-                                <span className="font-medium text-text-primary dark:text-dark-text-primary">
-                                    {module.title}
-                                </span>
+                                                                <span className="font-medium text-text-primary dark:text-dark-text-primary flex items-center gap-2">
+                                                                        {module.title}
+                                                                        {/* Module duration, right of title */}
+                                                                        {(() => {
+                                                                            const dur = getModuleDuration(module, durationMap);
+                                                                            return dur ? (
+                                                                                <span className="ml-2 text-xs text-text-muted dark:text-dark-text-muted whitespace-nowrap">
+                                                                                    {dur}
+                                                                                </span>
+                                                                            ) : null;
+                                                                        })()}
+                                                                </span>
                             </div>
                             <div className="flex items-center gap-3">
                                 {isEnrolled &&

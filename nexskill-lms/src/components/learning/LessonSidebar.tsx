@@ -1,8 +1,10 @@
+console.log('[LessonSidebar] Component loaded');
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 import { Video, FileQuestion, Lock, Check } from 'lucide-react';
 import { getSequentialLockedItemIds } from '../../utils/sequentialLocking';
+import { computeLessonDurations } from '../../utils/durationUtils';
 
 interface ContentItem {
   id: string;
@@ -201,10 +203,14 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
         quizDurationMap.set(quiz.id, durationSeconds);
       });
 
-      // Calculate total quiz duration per lesson (ONLY for quizzes inside lessons)
+      // Calculate total quiz duration per lesson (ONLY for quizzes inside lessons that are NOT also module-level quizzes)
+      // This prevents double-counting quiz durations in both lesson and module-level quiz rows
+      const moduleLevelQuizIds = new Set(quizIds);
       const lessonQuizDurationMap = new Map<string, number>();
       Object.entries(lessonQuizContentIds).forEach(([lessonId, quizIdsInLesson]) => {
-        const totalQuizSeconds = quizIdsInLesson.reduce((sum, quizId) => {
+        // Only sum quiz durations for quizzes that are NOT also module-level quizzes
+        const filteredQuizIds = quizIdsInLesson.filter((quizId) => !moduleLevelQuizIds.has(quizId));
+        const totalQuizSeconds = filteredQuizIds.reduce((sum, quizId) => {
           return sum + (quizDurationMap.get(quizId) || 15 * 60);
         }, 0);
         lessonQuizDurationMap.set(lessonId, totalQuizSeconds);
@@ -332,115 +338,14 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
 
       const allCompletedQuizIds = [...new Set([...completedQuizIds, ...completedQuizContentItemIds])];
 
-      // ─── NEW: Calculate total video duration per lesson from lesson_content_items ───
-      const lessonVideoDurationMap = new Map<string, number>();
-      const youtubeVideoUrls: string[] = [];
-      const contentItemIdToYouTubeId = new Map<string, string>();
-      const lessonIdForYouTubeId = new Map<string, string>();
 
-      // First, try to get durations from lesson_content_items metadata
-      Object.entries(lessonVideoContentItems).forEach(([lessonId, videoItems]) => {
-        let lessonTotalSeconds = 0;
-        let hasAllDurations = true;
-
-        videoItems.forEach((videoItem) => {
-          const duration = videoItem.metadata?.duration;
-          if (typeof duration === 'number' && duration > 0) {
-            lessonTotalSeconds += duration;
-          } else {
-            hasAllDurations = false;
-            // Check if it's a YouTube video
-            const url = videoItem.metadata?.url || '';
-            const ytId = extractYouTubeId(url);
-            if (ytId) {
-              youtubeVideoUrls.push(ytId);
-              contentItemIdToYouTubeId.set(videoItem.id, ytId);
-            }
-          }
-        });
-
-        if (hasAllDurations) {
-          lessonVideoDurationMap.set(lessonId, lessonTotalSeconds);
-        }
-      });
-
-      // Fallback to content_blocks for lessons without lesson_content_items video data
-      (lessonsRes.data ?? []).forEach((l: any) => {
-        if (lessonVideoDurationMap.has(l.id)) return; // Already have duration from lesson_content_items
-        if (!Array.isArray(l.content_blocks)) return;
-
-        const videoBlock = l.content_blocks.find(
-          (b: any) => b.type === 'video' || b.block_type === 'video'
-        );
-        if (!videoBlock) return;
-
-        const metaDuration =
-          videoBlock.attributes?.media_metadata?.duration ??
-          videoBlock.attributes?.duration ??
-          null;
-
-        if (typeof metaDuration === 'number' && metaDuration > 0) {
-          lessonVideoDurationMap.set(l.id, metaDuration);
-          return;
-        }
-
-        const url: string = videoBlock.content ?? videoBlock.url ?? '';
-        const ytId = extractYouTubeId(url);
-        if (ytId) {
-          youtubeVideoUrls.push(ytId);
-          lessonIdForYouTubeId.set(ytId, l.id);
-        }
-      });
-
-      // Fetch YouTube durations for all videos
-      const youtubeDurationMap = await fetchYouTubeDurations(
-        [...new Set(youtubeVideoUrls)]
-      );
-
-      // Apply YouTube durations to lesson_content_items
-      Object.entries(lessonVideoContentItems).forEach(([lessonId, videoItems]) => {
-        if (lessonVideoDurationMap.has(lessonId)) return; // Already have duration
-
-        let lessonTotalSeconds = 0;
-        let hasAllDurations = true;
-
-        videoItems.forEach((videoItem) => {
-          const duration = videoItem.metadata?.duration;
-          if (typeof duration === 'number' && duration > 0) {
-            lessonTotalSeconds += duration;
-          } else {
-            const ytId = contentItemIdToYouTubeId.get(videoItem.id);
-            if (ytId && youtubeDurationMap.has(ytId)) {
-              lessonTotalSeconds += youtubeDurationMap.get(ytId)!;
-            } else {
-              hasAllDurations = false;
-            }
-          }
-        });
-
-        if (hasAllDurations && lessonTotalSeconds > 0) {
-          lessonVideoDurationMap.set(lessonId, lessonTotalSeconds);
-        }
-      });
-
-      // Apply YouTube durations to content_blocks fallback
-      lessonIdForYouTubeId.forEach((lessonId, ytId) => {
-        if (!lessonVideoDurationMap.has(lessonId)) {
-          const secs = youtubeDurationMap.get(ytId);
-          if (secs) {
-            lessonVideoDurationMap.set(lessonId, secs);
-          }
-        }
-      });
-
-      // If still no video duration, fallback to watched duration
-      lessonIds.forEach((lessonId) => {
-        if (!lessonVideoDurationMap.has(lessonId)) {
-          const watchedSecs = watchedDurationMap.get(lessonId);
-          if (watchedSecs && watchedSecs > 0) {
-            lessonVideoDurationMap.set(lessonId, watchedSecs);
-          }
-        }
+      // --- Use shared utility for lesson durations ---
+      const lessonVideoDurationMap = await computeLessonDurations({
+        lessonContentItems: lessonContentItems || [],
+        quizzesData: quizzesData || [],
+        lessonsData: lessonsRes.data || [],
+        videoProgressData: videoProgressRes.data || [],
+        fetchYouTubeDurations,
       });
 
       let sequentialCounter = 1;
@@ -448,8 +353,10 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
         const modItems = (itemsData ?? []).filter((i) => i.module_id === mod.id);
         let moduleLessonDurationSeconds = 0;
 
+        console.log('[LessonSidebar] modItems for module', mod.id, modItems);
         const items: ContentItem[] = modItems
           .map((item) => {
+            console.log('[LessonSidebar] Mapping item:', item);
             if (item.content_type === 'lesson') {
               const l = lessonsMap.get(item.content_id);
               if (!l) return null;
@@ -482,7 +389,14 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
               };
             }
 
+            console.log('[LessonSidebar] About to log quiz item', item);
             const q = quizzesMap.get(item.content_id) || {};
+            console.log('[LessonSidebar] Quiz item:', {
+              id: q.id,
+              title: q.title,
+              time_limit_minutes: q.time_limit_minutes,
+              content_id: item.content_id,
+            });
             return {
               id:          q.id || '',
               title:       q.title || '',

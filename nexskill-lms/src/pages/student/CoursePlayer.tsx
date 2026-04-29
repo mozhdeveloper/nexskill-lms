@@ -28,6 +28,8 @@ interface FlatItem {
 type BottomTab = 'downloads' | 'notes' | 'ask-ai' | 'ai-summary' | 'debug';
 
 const CoursePlayer: React.FC = () => {
+  // Store quizzesData for ContentBlockRenderer (must be inside component)
+  const [quizzesData, setQuizzesData] = useState<Record<string, { time_limit_minutes?: number }>>({});
   const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>();
   const navigate = useNavigate();
   const [showAIDrawer, setShowAIDrawer] = useState(false);
@@ -154,13 +156,50 @@ const CoursePlayer: React.FC = () => {
           console.log('[CoursePlayer] Fetched lessonContentItems for lesson', lessonId, ':', contentItems);
           console.log('[CoursePlayer] lessonContentItems.length:', contentItems.length);
           console.log('[CoursePlayer] lessonContentItems types:', contentItems.map(item => item.content_type));
-          
+
           if (cancelled) return;
           setLessonContentItems(contentItems);
+
+          // --- Fetch quizzes for this lesson and build quizzesData map ---
+          // Find all quiz blocks in content_blocks (legacy) and lessonContentItems (new)
+          let quizIds: string[] = [];
+          // From lessonContentItems (new system)
+          if (contentItems && contentItems.length > 0) {
+            quizIds = contentItems
+              .filter((item: any) => item.content_type === 'quiz' && item.content_id)
+              .map((item: any) => item.content_id);
+          }
+          // From legacy content_blocks (if present)
+          if (lessonWithModule.content_blocks && Array.isArray(lessonWithModule.content_blocks)) {
+            const legacyQuizIds = lessonWithModule.content_blocks
+              .filter((block: any) => (block.type === 'quiz' || block.block_type === 'quiz') && block.attributes?.quizId)
+              .map((block: any) => block.attributes.quizId);
+            quizIds = [...quizIds, ...legacyQuizIds];
+          }
+          quizIds = Array.from(new Set(quizIds.filter(Boolean)));
+
+          if (quizIds.length > 0) {
+            const { data: quizzes, error: quizError } = await supabase
+              .from('quizzes')
+              .select('id, time_limit_minutes')
+              .in('id', quizIds);
+            if (!quizError && quizzes) {
+              const quizMap: Record<string, { time_limit_minutes?: number }> = {};
+              quizzes.forEach((q: any) => {
+                quizMap[q.id] = { time_limit_minutes: q.time_limit_minutes };
+              });
+              setQuizzesData(quizMap);
+            } else {
+              setQuizzesData({});
+            }
+          } else {
+            setQuizzesData({});
+          }
         } catch (contentError) {
           console.error('[CoursePlayer] Error fetching lesson content items:', contentError);
           if (cancelled) return;
           setLessonContentItems([]);
+          setQuizzesData({});
         }
 
         const { data: { user } } = await supabase.auth.getUser();
@@ -973,6 +1012,7 @@ const CoursePlayer: React.FC = () => {
                   lessonId={lessonId || ''}
                   onQuizClick={(quizId) => navigate(`/student/courses/${courseId}/quizzes/${quizId}/take`)}
                   onVideoComplete={handleVideoComplete}
+                  quizzesData={quizzesData}
                 />
               )}
             </div>

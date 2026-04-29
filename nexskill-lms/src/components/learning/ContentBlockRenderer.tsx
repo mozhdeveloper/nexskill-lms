@@ -14,6 +14,7 @@ interface ContentBlockRendererProps {
   onQuizClick?: (quizId: string) => void;
   lessonId?: string; // Added for video progress tracking
   onVideoComplete?: () => void; // Callback when video is completed
+  quizzesData?: Record<string, { time_limit_minutes?: number }>; // NEW: quiz durations
 }
 
 const getEmbedUrl = (url: string): string | null => {
@@ -250,11 +251,14 @@ const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({ contentBloc
       // ═════════════════════════════════════════════════════════════════
       // Quiz case - handles quiz content blocks
       // ═════════════════════════════════════════════════════════════════
+
       case 'quiz': {
         const quizId = b.attributes?.quizId;
         const title = b.attributes?.title || 'Untitled Quiz';
         const description = b.attributes?.description;
-        const timeLimit = b.attributes?.timeLimitMinutes ?? b.attributes?.time_limit_minutes;
+        // Prefer database duration if available
+        const dbTimeLimit = quizzesData && quizId ? quizzesData[quizId]?.time_limit_minutes : undefined;
+        const timeLimit = dbTimeLimit ?? b.attributes?.timeLimitMinutes ?? b.attributes?.time_limit_minutes;
         const passingScore = b.attributes?.passingScore ?? b.attributes?.passing_score;
         const maxAttempts = b.attributes?.maxAttempts ?? b.attributes?.max_attempts;
         const isPublished = b.attributes?.isPublished ?? b.attributes?.is_published ?? true;
