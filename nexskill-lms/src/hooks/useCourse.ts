@@ -246,71 +246,70 @@ export const useCourse = (courseId: string | undefined) => {
 
         console.log("[useCourse] Course data loaded:", courseData.id, courseData.title);
 
-        // 2. Fetch curriculum from student_course_curriculum view (published only)
-        const { data: curriculumData, error: curriculumError } = await supabase
-          .from("student_course_curriculum")
-          .select("*")
-          .eq("course_id", courseId);
-        
-        if (curriculumError) {
-          console.error("[useCourse] Error fetching curriculum:", curriculumError);
-        }
-        
-        console.log("[useCourse] Student curriculum data:", curriculumData);
-        
-        // Build curriculum structure from flat data
+        // 2. Fetch curriculum directly from modules and module_content_items
         let curriculum: Module[] = [];
         let totalDurationSeconds = 0;
-        
-        if (curriculumData && curriculumData.length > 0) {
-          // Group by module
-          const modulesMap = new Map<string, {
-            id: string;
-            title: string;
-            position: number;
-            lessons: Lesson[];
-          }>();
-          
-          curriculumData.forEach((row: any) => {
-            const moduleId = row.module_id;
-            
-            if (!modulesMap.has(moduleId)) {
-              modulesMap.set(moduleId, {
-                id: moduleId,
-                title: row.module_title,
-                position: row.module_position,
-                lessons: []
-              });
-            }
-            
-            const module = modulesMap.get(moduleId)!;
-            
-            if (row.content_type === "lesson" && row.lesson_id) {
-              const durationSeconds = (row.estimated_duration_minutes || 15) * 60;
-              totalDurationSeconds += durationSeconds;
-              
-              module.lessons.push({
-                id: row.lesson_id,
-                title: row.lesson_title,
-                duration: `${row.estimated_duration_minutes || 15}m`,
-                type: "lesson"
-              });
-            } else if (row.content_type === "quiz" && row.quiz_id) {
-              module.lessons.push({
-                id: row.quiz_id,
-                title: row.quiz_title,
-                duration: `${row.time_limit_minutes || 30}m`,
-                type: "quiz"
-              });
-            }
+
+        const { data: modulesData } = await supabase
+          .from("modules")
+          .select("id, title, position, is_sequential")
+          .eq("course_id", courseId)
+          .in("content_status", ["published", "pending_deletion"])
+          .order("position", { ascending: true });
+
+        if (modulesData && modulesData.length > 0) {
+          const moduleIds = modulesData.map((m: any) => m.id);
+
+          const { data: contentItems } = await supabase
+            .from("module_content_items")
+            .select("module_id, content_id, content_type, position")
+            .in("module_id", moduleIds)
+            .in("content_status", ["published", "pending_deletion"])
+            .order("position", { ascending: true });
+
+          const lessonIds = (contentItems ?? [])
+            .filter((i: any) => i.content_type === "lesson")
+            .map((i: any) => i.content_id);
+          const quizIds = (contentItems ?? [])
+            .filter((i: any) => i.content_type === "quiz")
+            .map((i: any) => i.content_id);
+
+          const [lessonsRes, quizzesRes] = await Promise.all([
+            lessonIds.length > 0
+              ? supabase.from("lessons").select("id, title, estimated_duration_minutes").in("id", lessonIds)
+              : Promise.resolve({ data: [] }),
+            quizIds.length > 0
+              ? supabase.from("quizzes").select("id, title, time_limit_minutes").in("id", quizIds)
+              : Promise.resolve({ data: [] }),
+          ]);
+
+          const lessonsMap = new Map((lessonsRes.data ?? []).map((l: any) => [l.id, l]));
+          const quizzesMap = new Map((quizzesRes.data ?? []).map((q: any) => [q.id, q]));
+
+          curriculum = modulesData.map((mod: any) => {
+            const modItems = (contentItems ?? []).filter((i: any) => i.module_id === mod.id);
+            const lessons: Lesson[] = modItems.map((item: any) => {
+              if (item.content_type === "lesson") {
+                const l = lessonsMap.get(item.content_id);
+                if (!l) return null;
+                return { id: l.id, title: l.title, duration: l.estimated_duration_minutes ? `${l.estimated_duration_minutes}m` : "", type: "lesson" as const };
+              }
+              if (item.content_type === "quiz") {
+                const q = quizzesMap.get(item.content_id);
+                if (!q) return null;
+                return { id: q.id, title: q.title, duration: q.time_limit_minutes ? `${q.time_limit_minutes}m` : "", type: "quiz" as const };
+              }
+              return null;
+            }).filter(Boolean) as Lesson[];
+
+            return { id: mod.id, title: mod.title, lessons };
           });
-          
-          // Convert map to array and sort by position
-          curriculum = Array.from(modulesMap.values())
-            .sort((a, b) => a.position - b.position);
-          
-          console.log("[useCourse] Built curriculum:", curriculum);
-          console.log("[useCourse] Total duration:", totalDurationSeconds);
+
+          // Note: totalDurationSeconds will be computed accurately by CourseTotalRuntime
+          // Use estimated fallback here just for initial render
+          totalDurationSeconds = (lessonsRes.data ?? []).reduce(
+            (sum: number, l: any) => sum + (l.estimated_duration_minutes || 0) * 60, 0
+          );
         }
 
         // 3. Coach details

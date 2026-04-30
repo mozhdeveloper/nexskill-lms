@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../../../lib/supabaseClient";
 import { getSequentialLockedItemIds } from "../../../utils/sequentialLocking";
 import { getModuleDuration } from "../../../utils/moduleDurationUtils";
+import { computeLessonDurations } from "../../../utils/durationUtils";
 
 interface Lesson {
     id: string;
@@ -120,108 +121,92 @@ const CourseCurriculumTab: React.FC<CourseCurriculumTabProps> = ({
     const fetchDurations = useCallback(async () => {
         if (!courseId) return;
 
-        // Collect all lesson ids from curriculum prop
-        const allLessonIds = curriculum
+        // Collect all lesson ids and module-level quiz ids from curriculum prop
+        const lessonIds = curriculum
             .flatMap((m) => m.lessons)
             .filter((l) => l.type === "lesson")
             .map((l) => l.id);
+        
+        const moduleQuizIds = curriculum
+            .flatMap((m) => m.lessons)
+            .filter((l) => l.type === "quiz")
+            .map((l) => l.id);
 
-        if (allLessonIds.length === 0) return;
+        if (lessonIds.length === 0 && moduleQuizIds.length === 0) return;
 
-        // 1. Fetch lesson rows (content_blocks for metadata)
+        // 1. Fetch lesson rows
         const { data: lessonsData } = await supabase
             .from("lessons")
             .select("id, content_blocks, estimated_duration_minutes")
-            .in("id", allLessonIds);
+            .in("id", lessonIds);
 
         // 2. Fetch watch-progress durations as fallback
         const { data: watchData } = await supabase
             .from("lesson_video_progress")
             .select("lesson_id, duration_seconds")
-            .in("lesson_id", allLessonIds);
+            .in("lesson_id", lessonIds);
 
-        const watchedMap = new Map<string, number>();
-        (watchData ?? []).forEach((v: any) => {
-            if (v.duration_seconds > 0 && !watchedMap.has(v.lesson_id))
-                watchedMap.set(v.lesson_id, v.duration_seconds);
+        // 3. Fetch lesson_content_items for quizzes/videos inside lessons
+        const { data: lessonContentItems } = await supabase
+            .from("lesson_content_items")
+            .select("id, lesson_id, content_type, content_id, metadata")
+            .in("lesson_id", lessonIds);
+
+        // 4. Fetch quiz metadata for all quizzes (both module-level and lesson-level)
+        const internalQuizIds = (lessonContentItems || [])
+            .filter(item => item.content_type === 'quiz' && item.content_id)
+            .map(item => item.content_id);
+        
+        const allQuizIds = [...new Set([...moduleQuizIds, ...internalQuizIds])];
+
+        const { data: quizzesData } = await supabase
+            .from("quizzes")
+            .select("id, time_limit_minutes")
+            .in("id", allQuizIds);
+
+        // 5. Use shared utility to compute lesson durations
+        const resolvedLessonDurations = await computeLessonDurations({
+            lessonContentItems: lessonContentItems || [],
+            quizzesData: quizzesData || [],
+            lessonsData: lessonsData || [],
+            videoProgressData: watchData || [],
+            fetchYouTubeDurations,
         });
 
-        // 3. Parse stored durations & collect YouTube IDs to fetch
-        const storedMap = new Map<string, number>();
-        const ytIdsToFetch: string[] = [];
-        const lessonForYtId = new Map<string, string>();
-        const estimatedMap = new Map<string, number>();
-
-        (lessonsData ?? []).forEach((l: any) => {
-            // Store estimated as final fallback
-            if (l.estimated_duration_minutes)
-                estimatedMap.set(l.id, l.estimated_duration_minutes * 60);
-
-            if (!Array.isArray(l.content_blocks)) return;
-            const videoBlock = l.content_blocks.find(
-                (b: any) => b.type === "video" || b.block_type === "video"
-            );
-            if (!videoBlock) return;
-
-            const metaDuration =
-                videoBlock.attributes?.media_metadata?.duration ??
-                videoBlock.attributes?.duration ??
-                null;
-
-            if (typeof metaDuration === "number" && metaDuration > 0) {
-                storedMap.set(l.id, metaDuration);
-                return;
-            }
-
-            const url: string = videoBlock.content ?? videoBlock.url ?? "";
-            const ytId = extractYouTubeId(url);
-            if (ytId) {
-                ytIdsToFetch.push(ytId);
-                lessonForYtId.set(ytId, l.id);
-            }
+        // 6. Build final map for UI (including module-level quizzes)
+        const uiDurationMap = new Map<string, number>();
+        
+        // Add lessons
+        lessonIds.forEach(id => {
+            uiDurationMap.set(id, resolvedLessonDurations.get(id) || 0);
         });
 
-        // 4. Batch-fetch YouTube durations
-        const ytDurations = await fetchYouTubeDurations([...new Set(ytIdsToFetch)]);
-        const ytLessonMap = new Map<string, number>();
-        lessonForYtId.forEach((lessonId, ytId) => {
-            const secs = ytDurations.get(ytId);
-            if (secs) ytLessonMap.set(lessonId, secs);
+        // Add module-level quizzes
+        const quizzesMap = new Map((quizzesData || []).map(q => [q.id, q]));
+        moduleQuizIds.forEach(qid => {
+            const q = quizzesMap.get(qid);
+            uiDurationMap.set(qid, (q?.time_limit_minutes || 0) * 60);
         });
 
-        // 5. Build final map: YouTube > stored metadata > watch progress > estimated
-        const resolved = new Map<string, number>();
-        allLessonIds.forEach((id) => {
-            const secs =
-                ytLessonMap.get(id) ??
-                storedMap.get(id) ??
-                watchedMap.get(id) ??
-                estimatedMap.get(id) ??
-                0;
-            resolved.set(id, secs);
-        });
-
-        setDurationMap(resolved);
+        setDurationMap(uiDurationMap);
 
         // Notify parent of total course duration
         if (onTotalDurationLoaded) {
-            // Only sum durations for lessons actually present in curriculum modules (not just all unique lesson IDs)
-            const curriculumLessonIds = curriculum
-                .flatMap((m) => m.lessons)
-                .filter((l) => l.type === "lesson")
-                .map((l) => l.id);
-            // Avoid double-counting if a lesson appears in multiple modules
-            const uniqueCurriculumLessonIds = Array.from(new Set(curriculumLessonIds));
-            // Debug: log all lesson IDs and durations being summed
-            console.log('[CourseCurriculumTab] Summing lesson durations for total:',
-                uniqueCurriculumLessonIds.map((id) => ({
-                    id,
-                    duration: resolved.get(id) || 0
-                }))
-            );
-            const total = uniqueCurriculumLessonIds
-                .map((id) => resolved.get(id) || 0)
-                .reduce((a, b) => a + b, 0);
+            let total = 0;
+            const uniqueLessonIds = [...new Set(lessonIds)];
+            const uniqueModuleQuizIds = [...new Set(moduleQuizIds)];
+            
+            uniqueLessonIds.forEach(id => { total += resolvedLessonDurations.get(id) || 0; });
+            
+            // Only add module-level quizzes that aren't also inside lessons
+            const internalQuizSet = new Set(internalQuizIds);
+            uniqueModuleQuizIds.forEach(qid => {
+                if (!internalQuizSet.has(qid)) {
+                    const q = quizzesMap.get(qid);
+                    total += (q?.time_limit_minutes || 0) * 60;
+                }
+            });
+            
             onTotalDurationLoaded(total);
         }
     }, [courseId, curriculum, onTotalDurationLoaded]);
@@ -233,7 +218,7 @@ const CourseCurriculumTab: React.FC<CourseCurriculumTabProps> = ({
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     const getLessonDuration = (lesson: Lesson): string => {
-        if (lesson.type === "quiz") return lesson.duration || "Quiz";
+        if (lesson.type === "quiz") return durationMap.get(lesson.id) ? formatDuration(durationMap.get(lesson.id)!) : lesson.duration || "Quiz";
         const secs = durationMap.get(lesson.id);
         if (secs && secs > 0) return formatDuration(secs);
         // If still loading or not found, fall back to prop duration or a dash

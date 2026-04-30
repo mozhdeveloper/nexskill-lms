@@ -21,27 +21,39 @@ const CourseTotalRuntime: React.FC<CourseTotalRuntimeProps> = ({ courseId, curri
         setTotalSeconds(null);
         return;
       }
-      // Gather all lessonIds and quizIds
-      const lessonIds = curriculum.flatMap((mod) => (mod.lessons || []).filter((l) => l.type === 'lesson').map((l) => l.id));
-      const quizIds = curriculum.flatMap((mod) => (mod.lessons || []).filter((l) => l.type === 'quiz').map((l) => l.id));
+      // Gather all lessonIds and module-level quizIds
+      const rawLessonIds = curriculum.flatMap((mod) => (mod.lessons || []).filter((l) => l.type === 'lesson').map((l) => l.id));
+      const rawModuleQuizIds = curriculum.flatMap((mod) => (mod.lessons || []).filter((l) => l.type === 'quiz').map((l) => l.id));
 
-      // Fetch lesson_content_items for all lessons
+      // De-duplicate IDs to prevent double-counting
+      const lessonIds = [...new Set(rawLessonIds)];
+      const moduleQuizIds = [...new Set(rawModuleQuizIds)];
+
+      // Fetch lesson_content_items for all lessons to find quizzes inside lessons
       let lessonContentItems: any[] = [];
       if (lessonIds.length > 0) {
         const { data } = await supabase
           .from('lesson_content_items')
-          .select('id, lesson_id, content_type, content_id, metadata')
-          .in('lesson_id', lessonIds);
+          .select('id, lesson_id, content_type, content_id, metadata, content_status')
+          .in('lesson_id', lessonIds)
+          .in('content_status', ['published', 'pending_deletion']);
         lessonContentItems = data || [];
       }
 
-      // Fetch quizzes data
+      // Collect ALL quiz IDs (module-level + inside lessons)
+      const internalQuizIds = lessonContentItems
+        .filter(item => item.content_type === 'quiz' && item.content_id)
+        .map(item => item.content_id);
+      
+      const allQuizIds = [...new Set([...moduleQuizIds, ...internalQuizIds])];
+
+      // Fetch metadata for ALL quizzes
       let quizzesData: any[] = [];
-      if (quizIds.length > 0) {
+      if (allQuizIds.length > 0) {
         const { data } = await supabase
           .from('quizzes')
           .select('id, time_limit_minutes')
-          .in('id', quizIds);
+          .in('id', allQuizIds);
         quizzesData = data || [];
       }
 
@@ -108,11 +120,24 @@ const CourseTotalRuntime: React.FC<CourseTotalRuntimeProps> = ({ courseId, curri
         fetchYouTubeDurations,
       });
 
-      // Sum all lesson durations
+      // ✅ Sum durations for unique lessons (already includes internal quizzes)
       let sum = 0;
-      for (const secs of lessonDurationMap.values()) {
-        sum += secs;
+      for (const id of lessonIds) {
+        sum += lessonDurationMap.get(id) ?? 0;
       }
+
+      // ✅ Add unique module-level quizzes (those NOT inside lessons)
+      const moduleLevelQuizSet = new Set(moduleQuizIds);
+      const quizzesMap = new Map(quizzesData.map(q => [q.id, q]));
+
+      // Only add quizzes that aren't already part of a lesson's internal total
+      const internalQuizSet = new Set(internalQuizIds);
+      for (const qid of moduleLevelQuizSet) {
+        if (internalQuizSet.has(qid)) continue;
+        const q = quizzesMap.get(qid);
+        sum += (q?.time_limit_minutes || 0) * 60;
+      }
+
       setTotalSeconds(sum);
     }
     fetchAndCompute();
@@ -259,10 +284,10 @@ const CourseDetailRefactored: React.FC = () => {
           const lessonsMap = new Map((lessonsRes.data || []).map(l => [l.id, l]));
           const quizzesMap = new Map((quizzesRes.data || []).map(q => [q.id, q]));
           
-          // 4. Build curriculum
-          const curriculumData = modules.map(module => {
-            const moduleItems = contentItems.filter(i => i.module_id === module.id);
-            console.log(`[CourseDetailRefactored] Module "${module.title}" has ${moduleItems.length} content items`);
+          // 4. Build curriculum - only use published/pending_deletion items for the actual curriculum view
+          const curriculumData = publishedModules.map(module => {
+            const moduleItems = contentItems.filter(i => i.module_id === module.id && ['published', 'pending_deletion'].includes(i.content_status));
+            console.log(`[CourseDetailRefactored] Module "${module.title}" has ${moduleItems.length} published content items`);
             
             const lessons = moduleItems.map(item => {
               if (item.content_type === "lesson") {
@@ -274,7 +299,7 @@ const CourseDetailRefactored: React.FC = () => {
                 return {
                   id: lesson.id,
                   title: lesson.title,
-                  duration: `${lesson.estimated_duration_minutes || 15}m`,
+                  duration: lesson.estimated_duration_minutes ? `${lesson.estimated_duration_minutes}m` : "",
                   type: "lesson" as const
                 };
               }
@@ -287,7 +312,7 @@ const CourseDetailRefactored: React.FC = () => {
                 return {
                   id: quiz.id,
                   title: quiz.title,
-                  duration: `${quiz.time_limit_minutes || 30}m`,
+                  duration: quiz.time_limit_minutes ? `${quiz.time_limit_minutes}m` : "",
                   type: "quiz" as const
                 };
               }

@@ -199,21 +199,8 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
 
       const quizDurationMap = new Map<string, number>();
       (quizzesData || []).forEach((quiz: any) => {
-        const durationSeconds = (quiz.time_limit_minutes || 15) * 60;
+        const durationSeconds = (quiz.time_limit_minutes || 0) * 60;
         quizDurationMap.set(quiz.id, durationSeconds);
-      });
-
-      // Calculate total quiz duration per lesson (ONLY for quizzes inside lessons that are NOT also module-level quizzes)
-      // This prevents double-counting quiz durations in both lesson and module-level quiz rows
-      const moduleLevelQuizIds = new Set(quizIds);
-      const lessonQuizDurationMap = new Map<string, number>();
-      Object.entries(lessonQuizContentIds).forEach(([lessonId, quizIdsInLesson]) => {
-        // Only sum quiz durations for quizzes that are NOT also module-level quizzes
-        const filteredQuizIds = quizIdsInLesson.filter((quizId) => !moduleLevelQuizIds.has(quizId));
-        const totalQuizSeconds = filteredQuizIds.reduce((sum, quizId) => {
-          return sum + (quizDurationMap.get(quizId) || 15 * 60);
-        }, 0);
-        lessonQuizDurationMap.set(lessonId, totalQuizSeconds);
       });
 
       const [lessonsRes, videoProgressRes] = await Promise.all([
@@ -340,7 +327,7 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
 
 
       // --- Use shared utility for lesson durations ---
-      const lessonVideoDurationMap = await computeLessonDurations({
+      const lessonTotalDurationMap = await computeLessonDurations({
         lessonContentItems: lessonContentItems || [],
         quizzesData: quizzesData || [],
         lessonsData: lessonsRes.data || [],
@@ -361,18 +348,18 @@ const LessonSidebar: React.FC<LessonSidebarProps> = ({
               const l = lessonsMap.get(item.content_id);
               if (!l) return null;
 
-              // Calculate total duration: videos + quizzes
-              const videoSeconds = lessonVideoDurationMap.get(l.id) || 0;
-              const quizSeconds = lessonQuizDurationMap.get(l.id) || 0;
-              const totalSeconds = videoSeconds + quizSeconds;
+              // Total duration (videos + quizzes) is already summed by computeLessonDurations
+              const totalSeconds = lessonTotalDurationMap.get(l.id) || 0;
 
               const duration = totalSeconds > 0
                 ? formatDuration(totalSeconds)
-                : `${(l.estimated_duration_minutes ?? 15).toString().padStart(2, '0')}:00`;
+                : l.estimated_duration_minutes 
+                  ? `${l.estimated_duration_minutes.toString().padStart(2, '0')}:00`
+                  : undefined;
 
               moduleLessonDurationSeconds += totalSeconds > 0
                 ? totalSeconds
-                : (l.estimated_duration_minutes ?? 15) * 60;
+                : (l.estimated_duration_minutes || 0) * 60;
 
               const contentTypes = lessonContentTypesMap[l.id] || { hasVideo: false, hasQuiz: false };
 
