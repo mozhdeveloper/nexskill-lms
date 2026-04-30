@@ -196,7 +196,31 @@ const CoachApplicationPage: React.FC = () => {
                 verification_status: 'pending'
             });
             if (coachError) throw coachError;
-            navigate('/coach/login', { state: { message: 'Your application has been submitted and is pending verification. You will be notified once approved.' } });
+
+            // Direct call to Express server to send the pending email (backup for webhook)
+            try {
+                const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000';
+                await fetch(`${serverUrl}/api/email/coach-pending`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        record: {
+                            first_name: formData.firstName,
+                            middle_name: formData.middleName,
+                            last_name: formData.lastName,
+                            email: formData.email,
+                            role: 'coach'
+                        }
+                    }),
+                });
+            } catch (emailErr) {
+                console.error("Failed to trigger email from frontend:", emailErr);
+                // We don't throw here to avoid blocking the user if only the email fails
+            }
+
+            navigate('/coach/application-received');
         } catch (err: any) {
             console.error("Application error:", err);
             setError(err.message || "An error occurred during application");
