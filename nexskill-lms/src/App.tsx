@@ -105,6 +105,7 @@ import CommunityDashboardPage from "./pages/community/CommunityDashboardPage";
 import CommunityOverviewPage from "./pages/community/CommunityOverviewPage";
 // Coach Application Pages
 import CoachApplicationPage from "./pages/coach/CoachApplicationPage";
+import CoachApplicationNotice from "./pages/coach/CoachApplicationNotice";
 // import VerificationPending from "./pages/auth/VerificationPending";
 import CommunityGroupsPage from "./pages/community/CommunityGroupsPage";
 import CommunityApprovalQueuePage from "./pages/community/CommunityApprovalQueuePage";
@@ -155,6 +156,7 @@ function App() {
 
                 <Route path="/signup" element={<SignUp />} />
                 <Route path="/coach/apply" element={<CoachApplicationPage />} />
+                <Route path="/coach/application-received" element={<CoachApplicationNotice />} />
                 <Route
                   path="/email-verification"
                   element={<EmailVerification />}

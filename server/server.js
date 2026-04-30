@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import uploadRoutes from './routes/upload.js';
 import googleMeetRoutes from './routes/googleMeet.js';
+import emailRoutes from './routes/email.js';
 
 dotenv.config();
 
@@ -26,6 +27,7 @@ app.use((req, res, next) => {
 // Routes
 app.use('/api/upload', uploadRoutes);
 app.use('/api/google', googleMeetRoutes);
+app.use('/api/email', emailRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
