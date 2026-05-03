@@ -379,19 +379,19 @@ const CoachDashboard: React.FC = () => {
                     let badgeClass = '';
                     switch (status) {
                       case 'Ongoing':
-                        badgeClass = 'bg-[color:var(--color-brand-neon)]/10 text-[color:var(--color-brand-neon)]';
+                        badgeClass = 'bg-green-100 text-green-700';
                         break;
                       case 'Scheduled':
-                        badgeClass = 'bg-[color:var(--color-brand-electric)]/10 text-[color:var(--color-brand-electric)]';
+                        badgeClass = 'bg-blue-100 text-blue-700';
                         break;
                       case 'Completed':
-                        badgeClass = 'bg-gray-400/10 text-gray-400';
+                        badgeClass = 'bg-slate-100 text-slate-700';
                         break;
                       case 'Cancelled':
-                        badgeClass = 'bg-orange-500/10 text-orange-500';
+                        badgeClass = 'bg-gray-100 text-gray-500';
                         break;
                       default:
-                        badgeClass = 'bg-gray-200 text-gray-500';
+                        badgeClass = 'bg-gray-100 text-gray-500';
                     }
                     // Debug log for session status and meeting link
                     console.log('[Session Card]', {

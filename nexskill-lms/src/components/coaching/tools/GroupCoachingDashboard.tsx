@@ -6,6 +6,7 @@ interface GroupSession {
   title: string;
   date: string;
   time: string;
+  scheduledAt: string;
   duration: number;
   maxParticipants: number;
   enrolled: number;
@@ -16,6 +17,13 @@ interface GroupSession {
 }
 
 type CourseDropdown = { id: string; title: string; student_count: number };
+
+const toUtcIsoFromLocalDateTime = (date: string, time: string): string => {
+  const [year, month, day] = date.split('-').map(Number);
+  const [hour, minute] = time.split(':').map(Number);
+  const localDate = new Date(year, (month || 1) - 1, day || 1, hour || 0, minute || 0, 0, 0);
+  return localDate.toISOString();
+};
 
 const GroupCoachingDashboard: React.FC = () => {
   const [groupSessions, setGroupSessions] = useState<GroupSession[]>([]);
@@ -28,6 +36,8 @@ const GroupCoachingDashboard: React.FC = () => {
   const [pendingSession, setPendingSession] = useState<any>(null);
   // Loading state for create session button
   const [creatingSession, setCreatingSession] = useState(false);
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
+  const [joiningSessionId, setJoiningSessionId] = useState<string | null>(null);
 
 
   // Form State
@@ -183,8 +193,13 @@ const GroupCoachingDashboard: React.FC = () => {
 
       const mapped: GroupSession[] = (data || []).map(s => {
         const scheduledDate = new Date(s.scheduled_at);
+        const nowMs = Date.now();
+        const endMs = scheduledDate.getTime() + ((s.duration_minutes || 60) * 60000);
         let status: GroupSession['status'] = 'Scheduled';
-        if (s.status === 'completed') status = 'Completed';
+        if (s.status === 'completed' || nowMs > endMs) {
+          // Guard against timezone/parsing drift: future sessions should never render as completed.
+          status = scheduledDate.getTime() > Date.now() ? 'Scheduled' : 'Completed';
+        }
         else if (s.status === 'in_progress' || s.status === 'live') status = 'In Progress';
         else if (s.status === 'cancelled' || s.status === 'Cancelled') status = 'Cancelled';
 
@@ -193,6 +208,7 @@ const GroupCoachingDashboard: React.FC = () => {
           title: s.title,
           date: scheduledDate.toISOString().split('T')[0],
           time: scheduledDate.toTimeString().split(' ')[0].substring(0, 5),
+          scheduledAt: s.scheduled_at,
           duration: s.duration_minutes,
           maxParticipants: s.max_participants || 1,
           enrolled: counts[s.course_id] || 0,
@@ -215,6 +231,8 @@ const GroupCoachingDashboard: React.FC = () => {
   useEffect(() => {
     fetchSessions();
     fetchCourses();
+    const refreshId = window.setInterval(fetchSessions, 60000);
+    return () => window.clearInterval(refreshId);
   }, []);
 
   // Auto-fill max participants when course changes
@@ -266,8 +284,8 @@ const GroupCoachingDashboard: React.FC = () => {
 
       let meetingLink = '';
       console.log('Google tokens before meeting creation:', tokens);
+      const scheduledAt = toUtcIsoFromLocalDateTime(sessionForm.date, sessionForm.time);
       if (tokens) {
-        const scheduledAt = new Date(`${sessionForm.date}T${sessionForm.time}`).toISOString();
         console.log('Attempting to create Google Meet:', { tokens, scheduledAt, title: sessionForm.title });
         try {
           const meetRes = await fetch('http://127.0.0.1:5000/api/google/create-meeting', {
@@ -291,8 +309,6 @@ const GroupCoachingDashboard: React.FC = () => {
           console.error('Error calling Google Meet API:', err);
         }
       }
-
-      const scheduledAt = new Date(`${sessionForm.date}T${sessionForm.time}`).toISOString();
 
       const { error } = await supabase.from('live_sessions').insert([{
         title: sessionForm.title,
@@ -352,13 +368,15 @@ const GroupCoachingDashboard: React.FC = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Scheduled':
-        return 'bg-[#304DB5] text-white';
+        return 'bg-blue-100 text-blue-700';
       case 'In Progress':
-        return 'bg-[#22C55E] text-white';
+        return 'bg-green-100 text-green-700';
       case 'Completed':
-        return 'bg-gray-400 text-white';
+        return 'bg-slate-100 text-slate-700';
+      case 'Cancelled':
+        return 'bg-gray-100 text-gray-500';
       default:
-        return 'bg-gray-300 text-gray-700';
+        return 'bg-gray-100 text-gray-500';
     }
   };
 
@@ -404,7 +422,7 @@ const GroupCoachingDashboard: React.FC = () => {
     }
     try {
       setCreatingSession(true);
-      const scheduledAt = new Date(`${editForm.date}T${editForm.time}`).toISOString();
+      const scheduledAt = toUtcIsoFromLocalDateTime(editForm.date, editForm.time);
       const { error } = await supabase
         .from('live_sessions')
         .update({
@@ -436,13 +454,130 @@ const GroupCoachingDashboard: React.FC = () => {
     }
   };
 
-  const sendReminder = (sessionId: string) => {
-    console.log('Sending reminder for session:', sessionId);
-    alert('Reminder emails sent to all participants!');
-  };
-
   const createNewSession = () => {
     setShowCreateModal(true);
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    if (deletingSessionId) return;
+
+    try {
+      setDeletingSessionId(sessionId);
+
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      const user = sessionData?.session?.user;
+      if (!user) throw new Error('Not authenticated');
+
+      const { data: deletedRows, error: deleteError } = await supabase
+        .from('live_sessions')
+        .delete()
+        .eq('id', sessionId)
+        .eq('coach_id', user.id)
+        .select('id');
+
+      if (deleteError) throw deleteError;
+
+      if (!deletedRows || deletedRows.length === 0) {
+        throw new Error('No session was deleted. This is usually caused by a database policy/permission mismatch.');
+      }
+
+      await fetchSessions();
+    } catch (err: any) {
+      console.error('Delete error:', err);
+      alert(`Failed to delete session: ${err.message}`);
+    } finally {
+      setDeletingSessionId(null);
+    }
+  };
+
+  const handleJoinSession = async (session: GroupSession) => {
+    if (joiningSessionId) return;
+
+    try {
+      setJoiningSessionId(session.id);
+
+      if (session.meeting_link) {
+        window.open(session.meeting_link, '_blank');
+        return;
+      }
+
+      const savedTokens = localStorage.getItem('google_calendar_tokens');
+      if (!savedTokens) {
+        await authorizeGoogle();
+        alert('Google Calendar authorization is required once. After authorization, click Join again.');
+        return;
+      }
+
+      let tokens: any = null;
+      try {
+        tokens = JSON.parse(savedTokens);
+      } catch {
+        tokens = null;
+      }
+
+      if (!tokens) {
+        await authorizeGoogle();
+        alert('Google Calendar authorization is required once. After authorization, click Join again.');
+        return;
+      }
+
+      const meetRes = await fetch('http://127.0.0.1:5000/api/google/create-meeting', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tokens,
+          title: session.title,
+          startTime: session.scheduledAt,
+          durationMinutes: session.duration
+        })
+      });
+
+      const meetData = await meetRes.json();
+
+      if (!meetRes.ok) {
+        const details = meetData?.details || meetData?.error || 'Failed to create meeting';
+        const lowerDetails = String(details).toLowerCase();
+        const authError =
+          meetRes.status === 401 ||
+          meetRes.status === 403 ||
+          lowerDetails.includes('invalid credentials') ||
+          lowerDetails.includes('invalid grant') ||
+          lowerDetails.includes('token');
+
+        if (authError) {
+          localStorage.removeItem('google_calendar_tokens');
+          await authorizeGoogle();
+          throw new Error('Google authorization expired. Please authorize again, then click Join once more.');
+        }
+
+        throw new Error(details);
+      }
+
+      const generatedLink = meetData?.meetingLink;
+
+      if (!generatedLink) {
+        throw new Error(meetData?.details || 'Unable to generate a Google Meet link for this session.');
+      }
+
+      const { error: updateError } = await supabase
+        .from('live_sessions')
+        .update({ meeting_link: generatedLink })
+        .eq('id', session.id);
+
+      if (updateError) throw updateError;
+
+      setGroupSessions(prev =>
+        prev.map(s => (s.id === session.id ? { ...s, meeting_link: generatedLink } : s))
+      );
+
+      window.open(generatedLink, '_blank');
+    } catch (err: any) {
+      console.error('Join session error:', err);
+      alert(`Failed to open meeting: ${err.message}`);
+    } finally {
+      setJoiningSessionId(null);
+    }
   };
 
   return (
@@ -621,19 +756,36 @@ const GroupCoachingDashboard: React.FC = () => {
                       status: session.status,
                       meeting_link: session.meeting_link
                     });
-                    if (!session.meeting_link || session.status === 'Cancelled') return null;
-                    // Calculate if session is still joinable (not past end time)
-                    const scheduledDate = new Date(`${session.date}T${session.time}`);
-                    const endTime = new Date(scheduledDate.getTime() + session.duration * 60000);
-                    const now = new Date();
-                    if (now > endTime) return null;
+                    const isJoinableStatus =
+                      session.status === 'Scheduled' || session.status === 'In Progress';
+                    if (!isJoinableStatus) return null;
+
+                    const startMs = new Date(session.scheduledAt).getTime();
+                    if (Number.isNaN(startMs)) return null;
+
+                    const endMs = startMs + session.duration * 60000;
+                    if (Date.now() > endMs) return null;
+
+                    const hasMeetingLink = Boolean(session.meeting_link);
+
                     return (
                       <button
-                        onClick={() => window.open(session.meeting_link, '_blank')}
-                        className="px-4 py-2 text-sm font-semibold text-white bg-[#22C55E] hover:bg-[#16a34a] rounded-lg transition-colors flex items-center gap-1"
+                        onClick={() => handleJoinSession(session)}
+                        className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors flex items-center gap-1 ${
+                          hasMeetingLink
+                            ? 'text-white bg-[#22C55E] hover:bg-[#16a34a]'
+                            : 'text-[#5F6473] bg-[#F3F4F6] border border-[#E5E7EB] hover:bg-[#E5E7EB]'
+                        }`}
+                        title={hasMeetingLink ? 'Join meeting' : 'Meeting link will be generated when you click'}
+                        disabled={joiningSessionId === session.id}
+                        style={joiningSessionId === session.id ? { opacity: 0.7, pointerEvents: 'none' } : {}}
                       >
                         <span>🎥</span>
-                        Join Meeting
+                        {joiningSessionId === session.id
+                          ? 'Preparing...'
+                          : hasMeetingLink
+                            ? 'Join Meeting'
+                            : 'Join Meeting'}
                       </button>
                     );
                   })()}
@@ -645,12 +797,6 @@ const GroupCoachingDashboard: React.FC = () => {
                   </button>
                   {session.status === 'Scheduled' && (
                     <>
-                      <button
-                        onClick={() => sendReminder(session.id)}
-                        className="px-4 py-2 text-sm font-medium text-[#22C55E] hover:bg-green-50 rounded-lg transition-colors"
-                      >
-                        Send Reminder
-                      </button>
                       <button
                         onClick={async () => {
                           if (window.confirm('Are you sure you want to cancel this session?')) {
@@ -689,6 +835,19 @@ const GroupCoachingDashboard: React.FC = () => {
                   >
                     Edit
                   </button>
+                  {(session.status === 'Cancelled' || session.status === 'Completed') && (
+                    <button
+                      onClick={async () => {
+                        if (window.confirm('Are you sure you want to permanently delete this session? This cannot be undone.')) {
+                          await handleDeleteSession(session.id);
+                        }
+                      }}
+                      disabled={deletingSessionId === session.id}
+                      className="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg border border-red-200 transition-colors"
+                    >
+                      {deletingSessionId === session.id ? 'Deleting...' : 'Delete'}
+                    </button>
+                  )}
                 </div>
               </div>
 

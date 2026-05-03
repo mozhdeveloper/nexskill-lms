@@ -365,8 +365,9 @@ const SubCoachGroupsPage: React.FC = () => {
                       <div className="bg-gray-50 rounded-xl p-4">
                         <div className="text-xs text-text-secondary mb-1">Status</div>
                         <span className={`inline-block px-2 py-1 text-xs font-medium rounded-lg ${session.status === 'Upcoming' ? 'bg-blue-100 text-blue-700' :
-                          session.status === 'Completed' ? 'bg-green-100 text-green-700' :
-                            'bg-gray-100 text-gray-700'
+                          session.status === 'In Progress' ? 'bg-green-100 text-green-700' :
+                          session.status === 'Completed' ? 'bg-slate-100 text-slate-700' :
+                            'bg-gray-100 text-gray-500'
                           }`}>{session.status}</span>
                       </div>
                     </div>
@@ -385,16 +386,6 @@ const SubCoachGroupsPage: React.FC = () => {
                     </div>
 
                     <div className="flex gap-3 pt-2">
-                      <button
-                        onClick={() => {
-                          alert('✉️ Email sent to all registered students!');
-                          const session = allSessions.find(s => s.id === selectedSession);
-                          window.alert(`📧 Session Reminder Sent\n\nSession: ${session?.title}\nScheduled: ${session?.dateTime}\n\n👥 Notifications Sent To:\n• Registered students: ${session?.registeredStudents}\n• Total recipients: ${session?.registeredStudents}\n\n📨 Reminder Contents:\n• Session details and time\n• Meeting link\n• Preparation materials\n• What to bring\n• Technical requirements\n\n✅ Delivery Status:\n• Email: Sent\n• Push notifications: Delivered\n• SMS: Sent (optional)\n• In-app: Posted\n\n💡 Reminders help ensure better attendance and student preparation for your sessions.`);
-                        }}
-                        className="flex-1 px-4 py-2 text-sm font-medium text-teal-600 border border-teal-600 hover:bg-teal-50 rounded-xl transition-all"
-                      >
-                        Send Reminder
-                      </button>
                       {session.status === 'Upcoming' && (
                         <button
                           onClick={() => {

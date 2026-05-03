@@ -3,6 +3,21 @@ import { supabase } from '../lib/supabaseClient';
 import type { LiveSession } from '../types/db';
 import { useAuth } from '../context/AuthContext';
 
+const getEffectiveSessionStatus = (session: any): string => {
+    const now = Date.now();
+    const scheduledTime = new Date(session.scheduled_at).getTime();
+    const durationMs = (session.duration_minutes || 60) * 60000;
+    const endTime = scheduledTime + durationMs;
+
+    if (session.status === 'cancelled') return 'cancelled';
+    if (session.status === 'completed') return 'completed';
+
+    // Auto-reflect completion in UI even before a background job updates the DB row.
+    if (now > endTime) return 'completed';
+
+    return session.status;
+};
+
 export const useLiveSessions = (courseId?: string) => {
     const { user } = useAuth();
     const [sessions, setSessions] = useState<LiveSession[]>([]);
@@ -64,15 +79,17 @@ export const useLiveSessions = (courseId?: string) => {
 
             // 3. Sanitize data (hide link if not live or not starting soon)
             const sanitizedData = data.map((session: any) => {
+                const effectiveStatus = getEffectiveSessionStatus(session);
                 const scheduledTime = new Date(session.scheduled_at).getTime();
                 const now = Date.now();
                 const startingSoon = (scheduledTime - now) <= 30 * 60 * 1000; // 30 minutes before
                 const isPast = now > (scheduledTime + (session.duration_minutes * 60000)); // Session is over
 
-                const showLink = (session.is_live || session.status === 'in_progress' || session.status === 'live' || startingSoon) && !isPast;
+                const showLink = (session.is_live || effectiveStatus === 'in_progress' || effectiveStatus === 'live' || startingSoon) && !isPast;
                 
                 return {
                     ...session,
+                    status: effectiveStatus,
                     meeting_link: showLink ? session.meeting_link : undefined
                 };
             });
@@ -88,6 +105,8 @@ export const useLiveSessions = (courseId?: string) => {
 
     useEffect(() => {
         fetchSessions();
+        const intervalId = window.setInterval(fetchSessions, 60000);
+        return () => window.clearInterval(intervalId);
     }, [fetchSessions]);
 
     const createSession = async (sessionData: Partial<LiveSession>) => {
@@ -193,13 +212,15 @@ export const useLiveSession = (sessionId?: string) => {
                 if (sessionError) throw sessionError;
 
                 // Sanitize
+                const effectiveStatus = getEffectiveSessionStatus(data);
                 const scheduledTime = new Date(data.scheduled_at).getTime();
                 const now = Date.now();
                 const startingSoon = (scheduledTime - now) <= 30 * 60 * 1000;
                 const isPast = now > (scheduledTime + (data.duration_minutes * 60000));
-                const showLink = (data.is_live || data.status === 'in_progress' || data.status === 'live' || startingSoon) && !isPast;
+                const showLink = (data.is_live || effectiveStatus === 'in_progress' || effectiveStatus === 'live' || startingSoon) && !isPast;
                 const sanitized = {
                     ...data,
+                    status: effectiveStatus,
                     meeting_link: showLink ? data.meeting_link : undefined
                 };
 

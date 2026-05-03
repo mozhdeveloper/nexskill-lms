@@ -143,9 +143,14 @@ const LiveClasses: React.FC = () => {
                     </div>
                   ) : (
                     upcomingSessions.map((liveClass) => {
+                      const nowMs = Date.now();
+                      const startMs = new Date(liveClass.scheduled_at).getTime();
+                      const endMs = startMs + ((liveClass.duration_minutes || 60) * 60000);
+                      const statusValue = String(liveClass.status || '').toLowerCase();
                       const isStartingSoon = liveClass.is_live ||
-                        (new Date(liveClass.scheduled_at).getTime() - Date.now() < 30 * 60 * 1000 &&
-                          new Date(liveClass.scheduled_at).getTime() > Date.now());
+                        (startMs - nowMs < 30 * 60 * 1000 && startMs > nowMs);
+                      const isJoinableStatus = statusValue === 'scheduled' || statusValue === 'in_progress' || statusValue === 'live';
+                      const shouldShowJoinButton = isJoinableStatus && nowMs <= endMs;
 
                       const participants = enrollmentCounts[liveClass.course_id] || 0;
                       const maxParticipants = liveClass.max_participants || 100;
@@ -205,7 +210,7 @@ const LiveClasses: React.FC = () => {
                               </div>
 
                               <div className="flex items-center gap-3 mt-4">
-                                {(liveClass.is_live || isStartingSoon) ? (
+                                {shouldShowJoinButton ? (
                                   <button
                                     onClick={() => {
                                       if (liveClass.meeting_link) {
@@ -255,7 +260,7 @@ const LiveClasses: React.FC = () => {
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
-                              <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">Completed</span>
+                              <span className="px-2 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded-full">Completed</span>
                             </div>
                             <h3 className="text-lg font-bold text-text-primary dark:text-dark-text-primary mb-2">
                               {liveClass.title}

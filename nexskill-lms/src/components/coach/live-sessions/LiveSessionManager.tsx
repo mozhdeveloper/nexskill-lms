@@ -278,9 +278,9 @@ const StatusBadge = ({ status, is_live }: { status: SessionStatus, is_live: bool
     if (is_live) return <span className="px-2 py-0.5 text-xs font-bold bg-green-100 text-green-700 border border-green-200 rounded animate-pulse">🔴 LIVE NOW</span>;
 
     switch (status) {
-        case 'scheduled': return <span className="px-2 py-0.5 text-xs font-bold bg-blue-50 text-blue-600 border border-blue-100 rounded">Scheduled</span>;
-        case 'completed': return <span className="px-2 py-0.5 text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200 rounded">Completed</span>;
-        case 'cancelled': return <span className="px-2 py-0.5 text-xs font-bold bg-red-50 text-red-600 border border-red-100 rounded">Cancelled</span>;
+        case 'scheduled': return <span className="px-2 py-0.5 text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200 rounded">Scheduled</span>;
+        case 'completed': return <span className="px-2 py-0.5 text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200 rounded">Completed</span>;
+        case 'cancelled': return <span className="px-2 py-0.5 text-xs font-bold bg-gray-100 text-gray-500 border border-gray-200 rounded">Cancelled</span>;
         default: return null;
     }
 };

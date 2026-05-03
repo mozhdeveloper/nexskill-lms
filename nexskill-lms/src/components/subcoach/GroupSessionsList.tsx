@@ -19,13 +19,15 @@ const GroupSessionsList: React.FC<GroupSessionsListProps> = ({ sessions, onViewD
   const getStatusColor = (status: GroupSession['status']) => {
     switch (status) {
       case 'Upcoming':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 text-blue-700';
       case 'In Progress':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-700';
       case 'Completed':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-slate-100 text-slate-700';
+      case 'Cancelled':
+        return 'bg-gray-100 text-gray-500';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-500';
     }
   };
 
