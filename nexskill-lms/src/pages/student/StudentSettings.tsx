@@ -524,7 +524,7 @@ const StudentSettings: React.FC = () => {
                 </button>
                 <button
                   onClick={handleSave}
-                  className="px-8 py-2.5 bg-gradient-to-r from-brand-primary to-brand-primary-light text-white text-sm font-semibold rounded-full shadow-button-primary hover:shadow-lg hover:scale-[1.02] transition-all"
+                  className="px-8 py-2.5 bg-brand-primary text-white text-sm font-semibold rounded-full shadow-button-primary hover:shadow-lg hover:scale-[1.02] transition-all"
                 >
                   Save Changes
                 </button>

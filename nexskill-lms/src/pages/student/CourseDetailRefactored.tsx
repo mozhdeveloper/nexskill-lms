@@ -642,29 +642,7 @@ const CourseDetailRefactored: React.FC = () => {
               )}
               {activeTab === "curriculum" && (
                 <div>
-                  {/* Debug Info & Fix Button */}
-                  <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <h4 className="text-sm font-semibold text-yellow-800 dark:text-yellow-300 mb-1">
-                          Curriculum Debug Info
-                        </h4>
-                        <div className="text-xs text-yellow-700 dark:text-yellow-400 space-y-1">
-                          <div>Direct Curriculum: {directCurriculum.length} modules</div>
-                          <div>Course Curriculum: {course.curriculum?.length || 0} modules</div>
-                          <div>Loading: {directCurriculumLoading ? "Yes" : "No"}</div>
-                          {debugInfo && <div className="font-medium">{debugInfo}</div>}
-                        </div>
-                      </div>
-                      <button
-                        onClick={handleFixVisibility}
-                        disabled={directCurriculumLoading}
-                        className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
-                      >
-                        🔧 Fix Visibility
-                      </button>
-                    </div>
-                  </div>
+                  
                   
                   <CourseCurriculumTab
                     curriculum={directCurriculum.length > 0 ? directCurriculum : (course.curriculum || [])}

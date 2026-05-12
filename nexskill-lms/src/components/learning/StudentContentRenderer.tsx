@@ -135,7 +135,7 @@ export const StudentContentRenderer: React.FC<StudentContentRendererProps> = ({
           ) : (
             <button
               onClick={() => onNavigateNext?.(nextItem)}
-              className="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-brand-primary to-brand-primary-light rounded-full shadow-button-primary hover:shadow-lg hover:scale-[1.02] transition-all"
+              className="px-5 py-2.5 text-sm font-medium text-white  bg-brand-primary  rounded-full shadow-button-primary hover:shadow-lg hover:scale-[1.02] transition-all"
             >
               Next {nextItem.type === 'quiz' ? 'Quiz' : 'Lesson'} →
             </button>

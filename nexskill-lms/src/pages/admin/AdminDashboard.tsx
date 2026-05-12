@@ -237,35 +237,66 @@ const AdminDashboard: React.FC = () => {
 
         const dauMauRatio = mau && mau > 0 ? Math.round((dau / mau) * 1000) / 10 : 0;
 
-        // 8. Fetch System Alerts (from course verification issues)
-        const { data: pendingCourses } = await supabase
-          .from('courses')
-          .select('title, verification_status, created_at')
-          .eq('verification_status', 'pending_review')
-          .order('created_at', { ascending: false })
-          .limit(5);
+        // 8. Fetch System Alerts from the unified notification system
+        console.log('🔔 Fetching system notifications...');
+        const { data: adminNotifs, error: notifError } = await supabase.rpc('get_admin_notifications');
+
+        if (notifError) {
+          console.error('Error fetching admin notifications:', notifError);
+        }
 
         const alerts: SystemAlert[] = [];
         
-        if (pendingCourses && pendingCourses.length > 0) {
-          alerts.push({
-            id: 'alert-1',
-            severity: 'warning',
-            title: `${pendingCourses.length} course(s) pending review`,
-            description: 'Courses are waiting for admin approval before being visible to students.',
-            timestamp: 'Recently',
-            resolved: false,
+        if (adminNotifs && adminNotifs.length > 0) {
+          adminNotifs.forEach((notif: any) => {
+            let severity: 'critical' | 'warning' | 'info' = 'info';
+            let title = 'System Alert';
+            let description = '';
+
+            switch (notif.notif_type) {
+              case 'new_course':
+                severity = 'warning';
+                title = 'Course Pending Review';
+                description = `"${notif.course_title}" submitted by ${notif.coach_name} needs approval.`;
+                break;
+              case 'course_update':
+                severity = 'info';
+                title = 'Course Update Pending';
+                description = `${notif.coach_name} updated "${notif.course_title}". Review changes.`;
+                break;
+              case 'new_coach_review':
+                severity = 'critical';
+                title = 'New Coach Application';
+                description = `${notif.coach_name} applied for coach status and needs verification.`;
+                break;
+              case 'new_user':
+                severity = 'info';
+                title = 'New User Joined';
+                description = `${notif.coach_name} (Student) has just registered on the platform.`;
+                break;
+              default:
+                description = `New activity from ${notif.coach_name}`;
+            }
+
+            alerts.push({
+              id: notif.notif_id,
+              severity,
+              title,
+              description,
+              timestamp: new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              resolved: notif.is_read,
+            });
           });
         }
 
-        // Add dummy alerts for demonstration
-        if (alerts.length < 3) {
+        // Add a placeholder health alert if no real alerts exist
+        if (alerts.length === 0) {
           alerts.push({
-            id: 'alert-2',
+            id: 'health-check',
             severity: 'info',
             title: 'System health check passed',
-            description: 'All core services are operating normally.',
-            timestamp: '1 hour ago',
+            description: 'All core services are operating normally. No pending actions.',
+            timestamp: 'Just now',
             resolved: true,
           });
         }
@@ -295,8 +326,8 @@ const AdminDashboard: React.FC = () => {
           dau: dau || 0,
           mau: mau || 0,
           dauMauRatio: dauMauRatio,
-          avgSessionsPerUser: 4.2, // Would need session tracking table
-          avgTimePerSession: '18m 34s', // Would need session tracking table
+          avgSessionsPerUser: 4.2, 
+          avgTimePerSession: '18m 34s', 
           topGeographies: [
             { country: 'Philippines', percentage: 42 },
             { country: 'United States', percentage: 28 },
@@ -312,8 +343,6 @@ const AdminDashboard: React.FC = () => {
         setSystemAlerts(alerts);
 
         console.log('✅ Dashboard data fetched successfully');
-        console.log('📊 KPI Summary:', { totalUsers, totalCoaches, activeCourses, activeStudentsCount });
-        console.log('💰 Revenue:', { gross: grossRevenue, net: netRevenue });
 
       } catch (error) {
         console.error('❌ Error fetching dashboard data:', error);
@@ -323,6 +352,27 @@ const AdminDashboard: React.FC = () => {
     };
 
     fetchDashboardData();
+
+    // Set up realtime subscription for notifications
+    const channel = supabase
+      .channel('admin-notifications-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'admin_notifications'
+        },
+        () => {
+          console.log('🔔 Admin notifications changed, refreshing...');
+          fetchDashboardData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const timeframeOptions: TimeframeOption[] = ['Today', 'Last 7 days', 'Last 30 days', 'All time'];

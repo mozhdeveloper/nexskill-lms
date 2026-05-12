@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../../lib/supabaseClient';
 
 interface SystemAlert {
   id: string;
@@ -17,7 +18,24 @@ const AdminSystemAlerts: React.FC<AdminSystemAlertsProps> = ({ alerts: initialAl
   const [alerts, setAlerts] = useState(initialAlerts);
   const [activeFilter, setActiveFilter] = useState<'all' | 'critical' | 'warning' | 'info'>('all');
 
-  const handleResolve = (id: string) => {
+  // Sync with props when parent re-fetches
+  useEffect(() => {
+    setAlerts(initialAlerts);
+  }, [initialAlerts]);
+
+  const handleResolve = async (id: string) => {
+    // If it's a real notification (UUID), update the database
+    if (id.length > 20) {
+      try {
+        const { error } = await supabase.rpc('mark_admin_notification_read', { p_notif_id: id });
+        if (error) throw error;
+      } catch (err) {
+        console.error('Error resolving notification:', err);
+        return;
+      }
+    }
+
+    // Update local UI immediately
     setAlerts((prev) =>
       prev.map((alert) => (alert.id === id ? { ...alert, resolved: true } : alert))
     );

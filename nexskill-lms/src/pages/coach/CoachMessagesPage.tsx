@@ -1,24 +1,21 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import CoachAppLayout from "../../layouts/CoachAppLayout";
-import { Search, Send, Plus, AlertCircle, ArrowDown } from "lucide-react";
+import { Search, Send, Plus, AlertCircle, ArrowDown, X, User, Mail, ChevronRight } from "lucide-react";
 import { useMessages, useConversations } from "../../hooks/useChat";
 import { isSupabaseConfigured, supabase } from "../../lib/supabaseClient";
 import type { Profile } from "../../types/db";
 
 const CoachMessagesPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedRecipientId, setSelectedRecipientId] = useState<string | null>(
-    null,
-  );
+  const [selectedRecipientId, setSelectedRecipientId] = useState<string | null>(null);
+  const [recipientProfile, setRecipientProfile] = useState<Profile | null>(null);
   const [messageInput, setMessageInput] = useState("");
-  const [filterTab, setFilterTab] = useState<"all" | "unread" | "starred">(
-    "all",
-  );
-  const [showNewConversationModal, setShowNewConversationModal] =
-    useState(false);
+  const [filterTab, setFilterTab] = useState<"all" | "unread">("all");
+  const [showNewConversationModal, setShowNewConversationModal] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [availableStudents, setAvailableStudents] = useState<Profile[]>([]);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const markedAsReadRef = useRef<Set<string>>(new Set());
@@ -39,203 +36,154 @@ const CoachMessagesPage: React.FC = () => {
     error: messagesError,
     sendMessage,
     markMultipleAsRead,
-  } = useMessages({ recipientId: selectedRecipientId || undefined });
+  } = useMessages({ 
+    recipientId: selectedRecipientId || undefined,
+    currentUserId: currentUserId || undefined 
+  });
 
   // Get current user
   useEffect(() => {
     const getCurrentUser = async () => {
       if (!isSupabaseConfigured) return;
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (user) setCurrentUserId(user.id);
     };
     getCurrentUser();
   }, []);
 
-  // Load available students for new conversation
+  // Sync recipient profile when selection changes
   useEffect(() => {
-    const loadStudents = async () => {
-      if (!isSupabaseConfigured || !showNewConversationModal) return;
+    const fetchRecipientProfile = async () => {
+      if (!selectedRecipientId) {
+        setRecipientProfile(null);
+        return;
+      }
 
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("role", "student");
-
-      if (!error && data) {
-        setAvailableStudents(data);
+      const existingConv = conversations.find(c => c.other_user_id === selectedRecipientId);
+      if (existingConv?.other_user_profile) {
+        setRecipientProfile(existingConv.other_user_profile as Profile);
+      } else {
+        const { data } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", selectedRecipientId)
+          .single();
+        if (data) setRecipientProfile(data);
       }
     };
-    loadStudents();
-  }, [showNewConversationModal]);
+    fetchRecipientProfile();
+  }, [selectedRecipientId, conversations]);
 
-  // Scroll to bottom function
+  // Load ONLY students enrolled in this coach's courses
+  useEffect(() => {
+    const loadEnrolledStudents = async () => {
+      if (!isSupabaseConfigured || !showNewConversationModal || !currentUserId) return;
+
+      try {
+        const { data: courses } = await supabase
+          .from("courses")
+          .select("id")
+          .eq("coach_id", currentUserId);
+
+        if (!courses || courses.length === 0) {
+          setAvailableStudents([]);
+          return;
+        }
+
+        const courseIds = courses.map(c => c.id);
+        const { data: enrollments } = await supabase
+          .from("enrollments")
+          .select("profile_id")
+          .in("course_id", courseIds);
+
+        if (!enrollments || enrollments.length === 0) {
+          setAvailableStudents([]);
+          return;
+        }
+
+        const studentIds = [...new Set(enrollments.map(e => e.profile_id))];
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("*")
+          .in("id", studentIds)
+          .eq("role", "student");
+
+        if (profiles) setAvailableStudents(profiles);
+      } catch (err) {
+        console.error("Error loading students:", err);
+      }
+    };
+    loadEnrolledStudents();
+  }, [showNewConversationModal, currentUserId]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // Auto-scroll to bottom when conversation is opened
   useEffect(() => {
-    if (selectedRecipientId) {
-      setTimeout(() => scrollToBottom(), 100);
-    }
+    if (selectedRecipientId) setTimeout(() => scrollToBottom(), 100);
   }, [selectedRecipientId]);
 
-  // Auto-scroll when messages finish loading
   useEffect(() => {
-    if (selectedRecipientId && !messagesLoading && messages.length > 0) {
-      setTimeout(() => scrollToBottom(), 100);
-    }
+    if (selectedRecipientId && !messagesLoading && messages.length > 0) setTimeout(() => scrollToBottom(), 100);
   }, [selectedRecipientId, messagesLoading, messages.length]);
 
-  // Mark all unread messages as read when conversation is opened (optimized to prevent redundant calls)
   useEffect(() => {
     if (!currentUserId || !messages.length) return;
-
-    const unreadMessages = messages.filter(
-      (msg) =>
-        msg.recipient_id === currentUserId &&
-        !msg.read_at &&
-        !markedAsReadRef.current.has(msg.id),
-    );
-
+    const unreadMessages = messages.filter(msg => msg.recipient_id === currentUserId && !msg.read_at && !markedAsReadRef.current.has(msg.id));
     if (unreadMessages.length > 0) {
-      const unreadIds = unreadMessages.map((msg) => msg.id);
-      // Mark these IDs as being processed
-      unreadIds.forEach((id) => markedAsReadRef.current.add(id));
-
-      markMultipleAsRead(unreadIds).then(() => {
-        // Only refresh conversations once after marking
-        refreshConversations();
-      });
+      const unreadIds = unreadMessages.map(msg => msg.id);
+      unreadIds.forEach(id => markedAsReadRef.current.add(id));
+      markMultipleAsRead(unreadIds).then(() => refreshConversations());
     }
-  }, [
-    selectedRecipientId,
-    messages,
-    currentUserId,
-    markMultipleAsRead,
-    refreshConversations,
-  ]);
+  }, [messages, currentUserId, markMultipleAsRead, refreshConversations]);
 
-  // Clear marked set when conversation changes
-  useEffect(() => {
-    markedAsReadRef.current.clear();
-  }, [selectedRecipientId]);
+  useEffect(() => { markedAsReadRef.current.clear(); }, [selectedRecipientId]);
 
-  // Scroll to bottom on new messages (only if already near bottom)
-  useEffect(() => {
-    if (!messagesContainerRef.current) return;
-
-    const container = messagesContainerRef.current;
-    const isNearBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight <
-      150;
-
-    if (isNearBottom) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages]);
-
-  // Handle scroll detection (throttled for performance)
   const handleScroll = useCallback(() => {
     if (scrollThrottleRef.current) return;
-
     scrollThrottleRef.current = setTimeout(() => {
-      if (!messagesContainerRef.current) {
-        scrollThrottleRef.current = null;
-        return;
-      }
-
+      if (!messagesContainerRef.current) { scrollThrottleRef.current = null; return; }
       const container = messagesContainerRef.current;
-      const isNearBottom =
-        container.scrollHeight - container.scrollTop - container.clientHeight <
-        150;
-
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
       setShowScrollButton(!isNearBottom);
       scrollThrottleRef.current = null;
-    }, 100); // Throttle to max 10 calls per second
+    }, 100);
   }, []);
 
-  // Filter conversations
   const filteredConversations = conversations.filter((conv) => {
-    // If no search query, don't filter by search
-    const matchesSearch =
-      !searchQuery ||
-      conv.other_user_profile?.first_name
-        ?.toLowerCase()
-        .includes(searchQuery.toLowerCase()) ||
-      conv.other_user_profile?.last_name
-        ?.toLowerCase()
-        .includes(searchQuery.toLowerCase()) ||
-      conv.other_user_profile?.username
-        ?.toLowerCase()
-        .includes(searchQuery.toLowerCase());
-
-    const matchesFilter =
-      filterTab === "all" ||
-      (filterTab === "unread" && (conv.unread_count || 0) > 0);
-
+    const matchesSearch = !searchQuery || 
+      conv.other_user_profile?.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      conv.other_user_profile?.last_name?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesFilter = filterTab === "all" || (filterTab === "unread" && (conv.unread_count || 0) > 0);
     return matchesSearch && matchesFilter;
   });
 
   const handleSendMessage = async () => {
     if (!messageInput.trim() || !selectedRecipientId) return;
-
-    const messageText = messageInput;
-    // Clear input immediately for better UX
+    const text = messageInput;
     setMessageInput("");
-
     try {
-      await sendMessage(messageText, selectedRecipientId);
+      await sendMessage(text, selectedRecipientId);
+      refreshConversations();
     } catch (error) {
-      console.error("Failed to send message:", error);
-      // Restore message on error
-      setMessageInput(messageText);
-      alert("Failed to send message. Please try again.");
+      setMessageInput(text);
+      console.error("Failed to send:", error);
     }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
-
-  const selectedConversation = conversations.find(
-    (c) => c.other_user_id === selectedRecipientId,
-  );
-
-  // Format timestamp
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins} min ago`;
-    if (diffHours < 24)
-      return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
-    if (diffDays === 1) return "Yesterday";
-    if (diffDays < 7) return `${diffDays} days ago`;
-    return date.toLocaleDateString();
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }
   };
 
   if (!isSupabaseConfigured) {
     return (
       <CoachAppLayout>
-        <div className="flex items-center justify-center h-screen">
-          <div className="text-center max-w-md">
-            <AlertCircle className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-2">Supabase Not Configured</h2>
-            <p className="text-slate-600 dark:text-dark-text-secondary">
-              Real-time messaging requires Supabase configuration. Please set up
-              your environment variables.
-            </p>
+        <div className="flex items-center justify-center h-screen bg-slate-50">
+          <div className="text-center p-8 bg-white rounded-2xl shadow-sm border border-slate-200">
+            <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-slate-900 mb-2">Service Unavailable</h2>
+            <p className="text-slate-500">Real-time messaging is not configured.</p>
           </div>
         </div>
       </CoachAppLayout>
@@ -244,219 +192,114 @@ const CoachMessagesPage: React.FC = () => {
 
   return (
     <CoachAppLayout>
-      <div className="p-6 space-y-6">
+      <div className="flex flex-col h-[calc(100vh-64px)] bg-white">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="px-8 py-6 border-b border-slate-200 flex items-center justify-between bg-white shrink-0">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-dark-text-primary">
-              Messages
-            </h1>
-            <p className="text-slate-600 dark:text-dark-text-secondary">
-              Chat with your students
-            </p>
+            <h1 className="text-2xl font-bold text-slate-900">Messages</h1>
+            <p className="text-sm text-slate-500 font-medium">Direct communication with your students</p>
           </div>
           <button
             onClick={() => setShowNewConversationModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-all shadow-md shadow-blue-600/20 active:scale-95"
           >
             <Plus className="w-5 h-5" />
-            New Message
+            New Conversation
           </button>
         </div>
 
-        {/* Main Content */}
-        <div
-          className="bg-white dark:bg-dark-background-card rounded-xl shadow-sm border border-slate-200 dark:border-gray-700 overflow-hidden flex"
-          style={{ height: "calc(100vh - 250px)" }}
-        >
-          <div className="w-full md:w-1/3 border-r border-slate-200 dark:border-gray-700 flex flex-col overflow-hidden">
-            {/* Conversations List */}
-            <div className="flex flex-col h-full">
-              {/* Search & Filter */}
-              <div className="p-4 border-b border-slate-200 dark:border-gray-700">
-                <div className="relative mb-3">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                  <input
-                    type="text"
-                    placeholder="Search students..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-dark-background text-slate-900 dark:text-dark-text-primary"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setFilterTab("all")}
-                    className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                      filterTab === "all"
-                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
-                        : "text-slate-600 dark:text-dark-text-secondary hover:bg-slate-100 dark:hover:bg-gray-800"
-                    }`}
-                  >
-                    All
-                  </button>
-                  <button
-                    onClick={() => setFilterTab("unread")}
-                    className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                      filterTab === "unread"
-                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
-                        : "text-slate-600 dark:text-dark-text-secondary hover:bg-slate-100 dark:hover:bg-gray-800"
-                    }`}
-                  >
-                    Unread
-                  </button>
-                </div>
+        {/* Main Messenger Area */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Sidebar */}
+          <div className="w-80 lg:w-96 border-r border-slate-200 flex flex-col bg-white shrink-0">
+            <div className="p-4 border-b border-slate-100">
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search chats..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                />
               </div>
+              <div className="flex p-1 bg-slate-100 rounded-lg">
+                {(["all", "unread"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setFilterTab(tab)}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-md capitalize transition-all ${
+                      filterTab === tab ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-              {/* Conversations List */}
-              <div className="flex-1 overflow-y-auto">
-                {conversationsLoading && conversations.length === 0 && (
-                  <div className="p-4 text-center text-slate-500">
-                    Loading conversations...
-                  </div>
-                )}
-                {conversationsError && (
-                  <div className="p-4 text-center text-red-500">
-                    Error: {conversationsError}
-                  </div>
-                )}
-                {!conversationsLoading &&
-                  conversations.length > 0 &&
-                  filteredConversations.length === 0 && (
-                    <div className="p-4 text-center text-slate-500">
-                      No conversations found
-                    </div>
-                  )}
-                {filteredConversations.map((conv) => {
-                  const otherUser = conv.other_user_profile;
-                  const displayName = otherUser
-                    ? `${otherUser.first_name || ""} ${otherUser.last_name || ""}`.trim() ||
-                      otherUser.username ||
-                      "Unknown"
-                    : "Unknown User";
-
-                  return (
-                    <div
-                      key={`${conv.user1_id}-${conv.user2_id}`}
-                      onClick={() => setSelectedRecipientId(conv.other_user_id)}
-                      className={`p-4 border-b border-slate-200 dark:border-gray-700 cursor-pointer transition-colors ${
-                        selectedRecipientId === conv.other_user_id
-                          ? "bg-blue-50 dark:bg-gray-800"
-                          : "hover:bg-slate-50 dark:hover:bg-gray-800"
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold flex-shrink-0">
-                          {displayName.charAt(0).toUpperCase()}
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+              {conversationsLoading && <div className="p-8 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">Loading...</div>}
+              {filteredConversations.map((conv) => {
+                const otherUser = conv.other_user_profile;
+                const active = selectedRecipientId === conv.other_user_id;
+                return (
+                  <div
+                    key={conv.other_user_id}
+                    onClick={() => setSelectedRecipientId(conv.other_user_id)}
+                    className={`p-4 border-b border-slate-50 cursor-pointer transition-all ${active ? "bg-blue-50/50 border-l-4 border-l-blue-600" : "hover:bg-slate-50"}`}
+                  >
+                    <div className="flex gap-3">
+                      <div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-600 shrink-0 shadow-sm border-2 border-white">
+                        {otherUser?.first_name?.[0] || "?"}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-baseline mb-1">
+                          <h3 className={`text-sm font-bold truncate ${conv.unread_count ? "text-slate-900" : "text-slate-700"}`}>{otherUser?.first_name} {otherUser?.last_name}</h3>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">{new Date(conv.last_message_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <h3
-                              className={`font-semibold truncate ${
-                                (conv.unread_count || 0) > 0
-                                  ? "text-slate-900 dark:text-dark-text-primary"
-                                  : "text-slate-700 dark:text-dark-text-secondary"
-                              }`}
-                            >
-                              {displayName}
-                            </h3>
-                            <span className="text-xs text-slate-500 dark:text-dark-text-muted ml-2">
-                              {formatTimestamp(conv.last_message_at)}
-                            </span>
-                          </div>
-                          <p
-                            className={`text-sm truncate ${
-                              (conv.unread_count || 0) > 0
-                                ? "text-slate-900 dark:text-dark-text-primary font-medium"
-                                : "text-slate-600 dark:text-dark-text-secondary"
-                            }`}
-                          >
-                            {conv.last_message}
-                          </p>
-                          {(conv.unread_count || 0) > 0 && (
-                            <span className="inline-block mt-1 px-2 py-0.5 text-xs font-semibold bg-blue-600 text-white rounded-full">
-                              {conv.unread_count}
-                            </span>
-                          )}
-                        </div>
+                        <p className={`text-xs truncate ${conv.unread_count ? "text-slate-900 font-bold" : "text-slate-500"}`}>{conv.last_message}</p>
+                        {conv.unread_count > 0 && <span className="mt-2 inline-block px-2 py-0.5 text-[10px] font-black bg-blue-600 text-white rounded-full">{conv.unread_count}</span>}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          {/* Message Thread */}
-          <div className="w-full md:w-2/3 flex flex-col overflow-hidden relative">
-            {selectedConversation && selectedRecipientId ? (
+          {/* Chat Window */}
+          <div className="flex-1 flex flex-col bg-slate-50 relative">
+            {selectedRecipientId ? (
               <>
-                {/* Thread Header */}
-                <div className="p-6 bg-white dark:bg-dark-background-card border-b border-slate-200 dark:border-gray-700 flex-shrink-0">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-lg">
-                      {(
-                        selectedConversation.other_user_profile?.first_name ||
-                        "U"
-                      ).charAt(0)}
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-bold text-slate-900 dark:text-dark-text-primary">
-                        {selectedConversation.other_user_profile?.first_name ||
-                          ""}{" "}
-                        {selectedConversation.other_user_profile?.last_name ||
-                          ""}
-                      </h2>
-                      <p className="text-sm text-slate-600 dark:text-dark-text-secondary">
-                        {selectedConversation.other_user_profile?.role ||
-                          "Student"}
-                      </p>
+                <div className="px-6 py-4 bg-white border-b border-slate-200 flex items-center gap-4 shrink-0 shadow-sm">
+                  <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">
+                    {recipientProfile?.first_name?.[0] || "?"}
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900 leading-none mb-1">{recipientProfile?.first_name} {recipientProfile?.last_name}</h2>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Student</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Messages */}
-                <div
+                <div 
                   ref={messagesContainerRef}
                   onScroll={handleScroll}
-                  className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50 dark:bg-dark-background relative"
+                  className="flex-1 overflow-y-auto p-8 space-y-6"
                 >
-                  {messagesLoading && (
-                    <div className="text-center text-slate-500">
-                      Loading messages...
-                    </div>
-                  )}
-                  {messagesError && (
-                    <div className="text-center text-red-500">
-                      Error: {messagesError}
-                    </div>
-                  )}
-                  {messages.map((msg) => {
-                    const isFromCurrentUser = msg.sender_id === currentUserId;
+                  {messages.map((msg, i) => {
+                    const self = msg.sender_id === currentUserId;
                     return (
-                      <div
-                        key={msg.id}
-                        className={`flex ${isFromCurrentUser ? "justify-end" : "justify-start"}`}
-                      >
-                        <div
-                          className={`max-w-[70%] rounded-2xl px-4 py-3 ${
-                            isFromCurrentUser
-                              ? "bg-blue-600 text-white"
-                              : "bg-white dark:bg-dark-background-card text-slate-900 dark:text-dark-text-primary border border-slate-200 dark:border-gray-700"
-                          }`}
-                        >
-                          <p className="text-sm">{msg.content}</p>
-                          <p
-                            className={`text-xs mt-1 ${
-                              isFromCurrentUser
-                                ? "text-blue-100"
-                                : "text-slate-500 dark:text-dark-text-muted"
-                            }`}
-                          >
-                            {new Date(msg.created_at).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
+                      <div key={msg.id} className={`flex ${self ? "justify-end" : "justify-start"}`}>
+                        <div className={`max-w-[70%] group`}>
+                          <div className={`px-5 py-3 rounded-2xl text-sm font-medium shadow-sm border ${self ? "bg-blue-600 text-white border-blue-500 rounded-tr-none" : "bg-white text-slate-800 border-slate-200 rounded-tl-none"}`}>
+                            {msg.content}
+                          </div>
+                          <p className={`text-[10px] mt-1 font-bold uppercase tracking-tighter ${self ? "text-right text-slate-400" : "text-left text-slate-400"}`}>
+                            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </div>
                       </div>
@@ -465,105 +308,83 @@ const CoachMessagesPage: React.FC = () => {
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Scroll to Bottom Button */}
-                {selectedRecipientId && (
-                  <button
-                    onClick={scrollToBottom}
-                    style={{ display: showScrollButton ? "block" : "none" }}
-                    className="absolute bottom-24 right-8 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-3 shadow-lg transition-all duration-200 hover:scale-110 z-50"
-                    aria-label="Scroll to bottom"
-                  >
+                {showScrollButton && (
+                  <button onClick={scrollToBottom} className="absolute bottom-32 right-8 p-3 bg-white border border-slate-200 rounded-full shadow-xl text-blue-600 hover:text-blue-700 transition-all hover:scale-110 active:scale-95 z-10">
                     <ArrowDown className="w-5 h-5" />
                   </button>
                 )}
 
-                {/* Message Input */}
-                <div className="p-4 bg-white dark:bg-dark-background-card border-t border-slate-200 dark:border-gray-700 flex-shrink-0">
-                  <div className="flex items-end gap-3">
+                <div className="p-6 bg-white border-t border-slate-200 shrink-0">
+                  <div className="flex gap-4 items-end bg-slate-50 border border-slate-200 rounded-2xl p-2 focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-500/5 transition-all">
                     <textarea
                       value={messageInput}
                       onChange={(e) => setMessageInput(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      placeholder="Type your message..."
-                      rows={2}
-                      className="flex-1 px-4 py-3 border border-slate-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none bg-white dark:bg-dark-background text-slate-900 dark:text-dark-text-primary"
+                      onKeyDown={handleKeyPress}
+                      placeholder="Write your message..."
+                      className="flex-1 bg-transparent border-none focus:ring-0 text-sm py-2 px-3 resize-none min-h-[44px] max-h-32 text-slate-900 font-medium"
+                      rows={1}
                     />
                     <button
                       onClick={handleSendMessage}
                       disabled={!messageInput.trim()}
-                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-30 disabled:grayscale transition-all shadow-lg shadow-blue-600/20"
                     >
                       <Send className="w-5 h-5" />
                     </button>
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-dark-text-muted mt-2">
-                    Press Enter to send, Shift+Enter for new line
-                  </p>
                 </div>
               </>
             ) : (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="w-20 h-20 mx-auto mb-4 bg-slate-200 dark:bg-gray-800 rounded-full flex items-center justify-center">
-                    <Send className="w-10 h-10 text-slate-400" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-slate-900 dark:text-dark-text-primary mb-2">
-                    Select a conversation
-                  </h3>
-                  <p className="text-slate-600 dark:text-dark-text-secondary">
-                    Choose a student from the list to start messaging
-                  </p>
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-12">
+                <div className="w-24 h-24 bg-white rounded-3xl shadow-xl flex items-center justify-center mb-6 border border-slate-100">
+                  <Mail className="w-10 h-10 text-slate-200" />
                 </div>
+                <h2 className="text-xl font-bold text-slate-900 mb-2">Your Inbox</h2>
+                <p className="text-slate-500 max-w-xs text-sm">Select a student from the sidebar to start a conversation or view history.</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* New Conversation Modal */}
+        {/* Modal - Professional Filtered Selection */}
         {showNewConversationModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-dark-background-card rounded-lg p-6 w-full max-w-md mx-4">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-dark-text-primary mb-4">
-                Start New Conversation
-              </h2>
-              <p className="text-slate-600 dark:text-dark-text-secondary mb-4">
-                Select a student to start messaging:
-              </p>
-
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {availableStudents.map((student) => (
-                  <button
-                    key={student.id}
-                    onClick={() => {
-                      setSelectedRecipientId(student.id);
-                      setShowNewConversationModal(false);
-                    }}
-                    className="w-full p-3 text-left hover:bg-slate-50 dark:hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-3"
-                  >
-                    <div className="w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center font-semibold">
-                      {(student.first_name || student.username || "S")
-                        .charAt(0)
-                        .toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="font-medium text-slate-900 dark:text-dark-text-primary">
-                        {student.first_name} {student.last_name}
-                      </p>
-                      <p className="text-sm text-slate-600 dark:text-dark-text-secondary">
-                        @{student.username}
-                      </p>
-                    </div>
-                  </button>
-                ))}
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+            <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 border border-slate-200">
+              <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <h2 className="text-lg font-bold text-slate-900">New Message</h2>
+                <button onClick={() => setShowNewConversationModal(false)} className="p-2 hover:bg-white rounded-xl transition-all border border-transparent hover:border-slate-200"><X className="w-5 h-5 text-slate-400" /></button>
               </div>
-
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => setShowNewConversationModal(false)}
-                  className="flex-1 px-4 py-2 border border-slate-300 dark:border-gray-600 text-slate-700 dark:text-dark-text-primary rounded-lg hover:bg-slate-50 dark:hover:bg-gray-800 transition-colors"
-                >
-                  Cancel
-                </button>
+              <div className="p-8">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Select Enrolled Student</p>
+                <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar pr-2">
+                  {availableStudents.length > 0 ? availableStudents.map((student) => (
+                    <button
+                      key={student.id}
+                      onClick={() => {
+                        setSelectedRecipientId(student.id);
+                        setShowNewConversationModal(false);
+                      }}
+                      className="w-full p-4 text-left bg-slate-50 hover:bg-blue-50 border border-slate-100 hover:border-blue-200 rounded-2xl transition-all flex items-center gap-4 group"
+                    >
+                      <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center font-bold text-slate-600 shadow-sm border border-slate-100 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                        {student.first_name?.[0] || "S"}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-slate-900 truncate">{student.first_name} {student.last_name}</p>
+                        <p className="text-xs font-medium text-slate-500 truncate">{student.email}</p>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-500 transition-all" />
+                    </button>
+                  )) : (
+                    <div className="text-center py-12 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
+                      <User className="w-8 h-8 text-slate-200 mx-auto mb-3" />
+                      <p className="text-sm font-bold text-slate-400">No enrolled students found</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="px-8 py-6 bg-slate-50 border-t border-slate-100">
+                <button onClick={() => setShowNewConversationModal(false)} className="w-full py-3 text-sm font-bold text-slate-500 hover:text-slate-700 transition-all">Cancel</button>
               </div>
             </div>
           </div>
