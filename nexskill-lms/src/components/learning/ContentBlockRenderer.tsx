@@ -105,6 +105,7 @@ const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({ contentBloc
             <VideoProgressTracker
               key={b.id}
               lessonId={lessonId}
+              contentItemId={b.id}
               videoUrl={b.content}
               onComplete={onVideoComplete}
             >

@@ -20,10 +20,10 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   isCompleted,
   startTime = 0,
 }) => {
-  const playerRef = useRef<YT.Player | null>(null);
+  const playerRef = useRef<any | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const durationRef = useRef<number>(0); // Cache duration to avoid API calls
   const hasLoadedDurationRef = useRef(false);
   const lastSeekTimeRef = useRef<number>(0); // Track last seek position
@@ -47,7 +47,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     if (!videoId) return;
 
     // Check if API is already loaded
-    if (typeof YT !== 'undefined' && YT.Player) {
+    if (typeof (window as any).YT !== 'undefined' && (window as any).YT.Player) {
       initPlayer();
       return;
     }
@@ -74,7 +74,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   const initPlayer = () => {
     if (!containerRef.current || !videoId) return;
 
-    playerRef.current = new YT.Player(containerRef.current, {
+    playerRef.current = new (window as any).YT.Player(containerRef.current, {
       videoId,
       playerVars: {
         autoplay: 0,
@@ -90,7 +90,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   };
 
   // Player ready callback
-  const onPlayerReady = (event: YT.PlayerEvent) => {
+  const onPlayerReady = (event: any) => {
     setIsReady(true);
     const player = event.target;
     const duration = player.getDuration();
@@ -121,20 +121,20 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   }, [startTime]);
 
   // Player state change callback
-  const onPlayerStateChange = (event: YT.OnStateChangeEvent) => {
+  const onPlayerStateChange = (event: any) => {
     const player = event.target;
 
     // YT.PlayerState.PLAYING = 1
     // YT.PlayerState.PAUSED = 2
     // YT.PlayerState.ENDED = 0
 
-    if (event.data === YT.PlayerState.PLAYING) {
+    if (event.data === (window as any).YT.PlayerState.PLAYING) {
       startTracking(player);
-    } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
+    } else if (event.data === (window as any).YT.PlayerState.PAUSED || event.data === (window as any).YT.PlayerState.ENDED) {
       stopTracking();
     }
 
-    if (event.data === YT.PlayerState.ENDED) {
+    if (event.data === (window as any).YT.PlayerState.ENDED) {
       // Video ended - mark as complete IMMEDIATELY
       const duration = durationRef.current || player.getDuration();
       onTimeUpdate(duration, duration);
@@ -146,7 +146,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   };
 
   // Start progress tracking (poll every 5 seconds)
-  const startTracking = (player?: YT.Player) => {
+  const startTracking = (player?: any) => {
     if (intervalRef.current) return;
 
     const targetPlayer = player || playerRef.current;

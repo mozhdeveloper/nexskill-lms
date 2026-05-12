@@ -19,6 +19,7 @@ interface CourseInfo {
     category?: {
         name: string;
     };
+    pending_content?: boolean;
 }
 
 interface VerificationActionsProps {

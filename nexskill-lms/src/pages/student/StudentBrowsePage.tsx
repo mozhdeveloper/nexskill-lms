@@ -9,10 +9,10 @@ interface Course {
   subtitle?: string;
   instructor_name?: string;
   price?: number;
-  rating?: number;
-  num_reviews?: number;
-  num_students?: number;
-  duration_minutes?: number;
+  rating: number;
+  num_reviews: number;
+  num_students: number;
+  duration_minutes: number;
   thumbnail_url?: string;
   category?: string;
   level?: string;

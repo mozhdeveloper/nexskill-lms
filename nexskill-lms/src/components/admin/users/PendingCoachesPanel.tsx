@@ -17,6 +17,7 @@ interface PendingCoach {
   websiteUrl?: string;
   jobTitle?: string;
   experienceLevel?: string;
+  certifications?: string[];
   status: 'pending' | 'under_review' | 'approved' | 'rejected';
   reviewNotes?: string;
 }
@@ -87,6 +88,7 @@ const PendingCoachesPanel: React.FC<PendingCoachesPanelProps> = ({ onApprove, on
         websiteUrl: coach.portfolio_url,
         jobTitle: coach.job_title,
         experienceLevel: coach.experience_level,
+        certifications: coach.certifications || coach.profiles?.certifications || [],
         status: coach.verification_status === 'under_review' ? 'under_review' : 'pending',
       }));
 

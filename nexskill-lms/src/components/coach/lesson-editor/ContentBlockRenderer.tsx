@@ -48,7 +48,7 @@ const renderBlock = (block: LessonContentBlock) => {
     case 'heading': {
       const level = block.attributes?.level || 2;
       const HeadingTag = `h${level}` as React.ElementType; 
-      const styles = {
+      const styles: Record<number, string> = {
         1: 'text-3xl font-bold mt-8 mb-4 text-gray-900 dark:text-white border-b pb-2 border-gray-100 dark:border-gray-800',
         2: 'text-2xl font-bold mt-6 mb-3 text-gray-900 dark:text-white',
         3: 'text-xl font-semibold mt-4 mb-2 text-gray-900 dark:text-white',

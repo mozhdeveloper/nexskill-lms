@@ -149,7 +149,7 @@ const CourseStructureTree: React.FC<CourseStructureTreeProps> = ({
                                         <ChevronRight size={16} className="text-gray-400 flex-shrink-0" />
                                     )}
                                     {module.is_sequential && (
-                                        <Lock size={13} className="text-gray-400 flex-shrink-0" title="Sequential module" />
+                                        <Lock size={13} className="text-gray-400 flex-shrink-0" aria-label="Sequential module" />
                                     )}
                                     <span className="font-medium text-gray-900 text-sm truncate flex-1">
                                         {module.title}

@@ -235,7 +235,9 @@ const AdminDashboard: React.FC = () => {
           .select('*', { count: 'exact', head: true })
           .gte('updated_at', monthStart.toISOString());
 
-        const dauMauRatio = mau && mau > 0 ? Math.round((dau / mau) * 1000) / 10 : 0;
+        const dauCount = dau || 0;
+        const mauCount = mau || 0;
+        const dauMauRatio = mauCount > 0 ? Math.round((dauCount / mauCount) * 1000) / 10 : 0;
 
         // 8. Fetch System Alerts from the unified notification system
         console.log('🔔 Fetching system notifications...');
@@ -309,7 +311,7 @@ const AdminDashboard: React.FC = () => {
           coachesGrowth: newCoaches ? `+${newCoaches} this month` : '0 this month',
           activeCourses: activeCourses || 0,
           coursesGrowth: newCourses ? `+${newCourses} this month` : '0 this month',
-          activeStudents: activeStudentsCount,
+          activeStudents: activeStudentsCount || 0,
           studentsGrowth: newStudentsThisWeek ? `+${newStudentsThisWeek} this week` : '0 this week',
           avgRating: avgRating,
           ratingChange: avgRating > 0 ? '+0.1 vs last period' : '0 vs last period',
@@ -323,8 +325,8 @@ const AdminDashboard: React.FC = () => {
         });
 
         setPlatformAnalytics({
-          dau: dau || 0,
-          mau: mau || 0,
+          dau: dauCount,
+          mau: mauCount,
           dauMauRatio: dauMauRatio,
           avgSessionsPerUser: 4.2, 
           avgTimePerSession: '18m 34s', 

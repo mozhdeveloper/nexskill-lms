@@ -232,7 +232,7 @@ const LiveSessionManager: React.FC = () => {
                                             <button
                                                 onClick={async () => {
                                                     if (window.confirm('Are you sure you want to cancel this session?')) {
-                                                        await updateSession(session.id, { status: 'canceled' });
+                                                        await updateSession(session.id, { status: 'cancelled' });
                                                     }
                                                 }}
                                                 className="px-4 py-2 bg-red-100 text-red-600 text-sm rounded-lg hover:bg-red-200 font-medium border border-red-300 ml-2"

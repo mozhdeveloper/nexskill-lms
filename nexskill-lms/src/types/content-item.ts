@@ -38,7 +38,7 @@ export const lessonToContentItem = (lesson: Lesson): ContentItem => ({
     description: lesson.description,
     content_blocks: lesson.content_blocks,
     estimated_duration_minutes: lesson.estimated_duration_minutes,
-    is_published: lesson.is_published,
+    is_published: lesson.content_status === "published",
     created_at: lesson.created_at,
     updated_at: lesson.updated_at,
     duration: lesson.duration,

@@ -4,7 +4,7 @@
  */
 
 import { supabase } from '../supabaseClient';
-import type { LessonContentItem, ContentMetadata, CreateContentItemInput, UpdateContentItemInput } from '../types/lesson-content-item';
+import type { LessonContentItem, ContentMetadata, CreateContentItemInput, UpdateContentItemInput } from '../../types/lesson-content-item';
 
 /**
  * Fetch all content items for a lesson.

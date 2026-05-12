@@ -76,7 +76,7 @@ const SignUp: React.FC = () => {
     'live.com',
   ];
   const emailRegex = /^[^@\s]+@([A-Za-z0-9.-]+\.[A-Za-z]{2,})$/;
-  const isApprovedDomain = (email) => {
+  const isApprovedDomain = (email: string) => {
     const match = email.match(emailRegex);
     if (!match) return false;
     const domain = match[1].toLowerCase();

@@ -167,7 +167,7 @@ const VideoBlockEditor: React.FC<VideoBlockEditorProps> = ({
                         media_metadata: {
                             duration,
                             thumbnail_url: `https://img.youtube.com/vi/${newUrl.match(/(?:v=|\/)([a-zA-Z0-9_-]{11})/)?.[1]}/maxresdefault.jpg`,
-                        },
+                        } as any,
                     },
                 });
                 return;

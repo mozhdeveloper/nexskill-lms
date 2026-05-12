@@ -971,17 +971,18 @@ const QuizSession: React.FC = () => {
           }
         }
 
-        if (question.type === 'video-submission' && uploadedVideos[question.id]) {
+        const uploadedVideo = uploadedVideos[question.id];
+        if (question.type === 'video-submission' && uploadedVideo) {
           try {
             const url = await uploadVideoToStorage(
-              uploadedVideos[question.id],
+              uploadedVideo,
               currentAttempt.id,
               question.id
             );
             uploadedFileUrls[question.id] = {
               type: 'video',
               url,
-              filename: uploadedVideos[question.id].name
+              filename: uploadedVideo.name
             };
           } catch (error: any) {
             console.error(`Failed to upload video for question ${question.id}:`, error);

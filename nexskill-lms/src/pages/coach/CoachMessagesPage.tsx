@@ -259,7 +259,7 @@ const CoachMessagesPage: React.FC = () => {
                           <span className="text-[10px] font-bold text-slate-400 uppercase">{new Date(conv.last_message_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
                         </div>
                         <p className={`text-xs truncate ${conv.unread_count ? "text-slate-900 font-bold" : "text-slate-500"}`}>{conv.last_message}</p>
-                        {conv.unread_count > 0 && <span className="mt-2 inline-block px-2 py-0.5 text-[10px] font-black bg-blue-600 text-white rounded-full">{conv.unread_count}</span>}
+                        {(conv.unread_count || 0) > 0 && <span className="mt-2 inline-block px-2 py-0.5 text-[10px] font-black bg-blue-600 text-white rounded-full">{conv.unread_count}</span>}
                       </div>
                     </div>
                   </div>

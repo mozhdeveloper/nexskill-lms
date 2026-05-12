@@ -22,21 +22,24 @@ interface EarningsSummary {
 interface Transaction {
   id: string;
   date: string;
-  description: string;
-  type: 'sale' | 'refund' | 'payout';
+  time: string;
+  studentName: string;
+  course: string;
+  type: 'Course purchase' | 'Coaching session' | 'Refund';
   amount: number;
-  status: 'completed' | 'pending' | 'failed';
-  courseTitle?: string;
-  studentName?: string;
+  status: 'Completed' | 'Refunded' | 'Pending';
+  transactionId: string;
 }
 
 interface Payout {
   id: string;
-  date: string;
-  amount: number;
-  status: 'paid' | 'pending' | 'processing';
-  method: string;
-  reference?: string;
+  monthLabel: string;
+  gross: number;
+  fees: number;
+  refunds: number;
+  net: number;
+  status: 'Sent' | 'Pending' | 'On hold';
+  payoutDate?: string;
 }
 
 const EarningsDashboard: React.FC = () => {
@@ -79,7 +82,7 @@ const EarningsDashboard: React.FC = () => {
 
         // 1. Fetch transactions from database
         console.log('📊 Step 1: Fetching transactions from database...');
-        const { data: transactionsData, error: txError } = await supabase
+        let { data: transactionsData, error: txError } = await supabase
           .from('transactions')
           .select('*')
           .eq('coach_id', profile.id)
@@ -194,9 +197,7 @@ const EarningsDashboard: React.FC = () => {
               console.log('✅ New transactions fetched:', newTxDataResult?.length || 0);
             }
 
-            // Use let instead of const for reassignment
-            let finalTransactionsData = newTxDataResult || [];
-            transactionsData = finalTransactionsData;
+            transactionsData = newTxDataResult || [];
           } else {
             console.log('⚠️ No enrollments found');
           }
@@ -331,7 +332,7 @@ const EarningsDashboard: React.FC = () => {
           console.log('✅ Payouts fetched:', payoutTransactions?.length || 0);
         }
 
-        const payoutsList = payoutTransactions?.map(tx => ({
+        const payoutsList: Payout[] = payoutTransactions?.map(tx => ({
           id: tx.id,
           monthLabel: new Date(tx.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
           gross: tx.amount,
